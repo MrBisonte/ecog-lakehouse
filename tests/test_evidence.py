@@ -13,7 +13,7 @@ def test_every_governance_check_passes_on_the_built_layers(built):
     ).fetchall()
     assert rows == []
     kinds = {r[0] for r in db.connect().execute("SELECT DISTINCT check_kind FROM gold_evidence").fetchall()}
-    assert {"hash_match", "not_null", "no_direct_identifier", "row_count_min", "unique", "partition_layout"} <= kinds
+    assert {"hash_match", "not_null", "no_direct_identifier", "row_count_min", "unique", "partition_layout", "sql"} <= kinds
 
 
 def test_evidence_is_append_only_and_versions_repeat_for_identical_inputs(built):

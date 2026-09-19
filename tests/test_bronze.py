@@ -1,6 +1,6 @@
 import pytest
 
-from pipeline import convert_mat, db
+from pipeline import convert_mat, db, synth
 from tests.conftest import CHANNELS, FILES, SECONDS
 
 SPEC_RECORDING = [
@@ -72,7 +72,7 @@ def test_lid_is_layer_1_and_traces_to_the_audit_row(bronze):
         "SELECT lid, ingest_id, channel_idx FROM bronze_recording "
         "WHERE experiment = 'motor_basic' AND channel_idx = 2 LIMIT 1"
     ).fetchone()
-    decoded = bronze.execute("SELECT lid_decode(?)", [row[0]]).fetchone()[0]
+    decoded = bronze.execute("SELECT lid_decode(lid_u128(?))", [row[0]]).fetchone()[0]
     assert decoded["layer"] == 1 and decoded["channel"] == 2 and decoded["run"] == 1
     audit = bronze.execute(
         "SELECT source_path, source_url, sha256 FROM bronze_ingest_audit WHERE ingest_id = ?",
@@ -81,6 +81,17 @@ def test_lid_is_layer_1_and_traces_to_the_audit_row(bronze):
     trace = bronze.execute("SELECT source_path, source_url, sha256 FROM lid_trace(?)", [row[0]])
     assert trace.fetchone() == audit
     assert audit[1].startswith("synthetic://motor_basic/")
+
+
+def test_only_the_canary_subject_carries_the_radioactive_bit(bronze):
+    rows = bronze.execute(
+        "SELECT subject_src, max(lid_radioactive(lid_u128(lid))), min(lid_radioactive(lid_u128(lid))) "
+        "FROM (SELECT DISTINCT subject_src, lid FROM bronze_recording) GROUP BY 1 ORDER BY 1"
+    ).fetchall()
+    assert [(s, hi == lo == int(s in convert_mat.CANARY_SUBJECTS)) for s, hi, lo in rows] == [
+        (s, True) for s, _, _ in rows
+    ]
+    assert {s for s, _, _ in rows} == set(synth.SUBJECTS)
 
 
 def test_rerun_is_a_no_op_and_unknown_directory_is_skipped(bronze, capsys):

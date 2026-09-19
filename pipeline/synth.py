@@ -16,7 +16,8 @@ from scipy.io import savemat
 
 from pipeline.db import data_dir
 
-SUBJECTS = ["aa", "bb", "cc"]
+# The last subject is the canary of spec 12.5, named in convert_mat.CANARY_SUBJECTS.
+SUBJECTS = ["aa", "bb", "cc", "canary"]
 CUE_CODES = {"fingerflex": 5, "motor_basic": 2}
 SAMPLE_RATE_HZ = 1000
 CUE_EVERY_S = 2

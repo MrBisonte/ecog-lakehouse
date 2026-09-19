@@ -8,7 +8,7 @@ COPY (
         (b.sample_idx::BIGINT * 1000 / a.sample_rate_hz)::INTEGER AS ts_ms,
         b.event_code,
         b.event_label,
-        lid_from_u128(lid_u128(b.lid) + (1::UHUGEINT << 76)) AS lid
+        lid_relayer(b.lid, 1) AS lid
     FROM bronze_event b
     JOIN keyring.key_map k USING (subject_src)
     JOIN bronze_ingest_audit a USING (ingest_id)
