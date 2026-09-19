@@ -8,7 +8,7 @@ import argparse
 import shutil
 import sys
 
-from pipeline import convert_mat, db, keyring, synth
+from pipeline import convert_mat, db, keyring, line_noise, synth
 
 
 def run_files(con, paths, **values):
@@ -64,14 +64,23 @@ def silver() -> int:
     return 0
 
 
+def gold() -> int:
+    con = db.connect()
+    print(f"run: line noise on {line_noise.register(con)} records")
+    run_files(con, layer_files("gold"))
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("layer", choices=["bronze", "silver"])
+    parser.add_argument("layer", choices=["bronze", "silver", "gold"])
     parser.add_argument("--synth", action="store_true", help="generate synthetic raw files first")
     args = parser.parse_args(argv)
     if args.layer == "bronze":
         return bronze(args.synth)
-    return silver()
+    if args.layer == "silver":
+        return silver()
+    return gold()
 
 
 if __name__ == "__main__":

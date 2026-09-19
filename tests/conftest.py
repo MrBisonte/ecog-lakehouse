@@ -20,10 +20,10 @@ def data_root(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def built(data_root):
-    """Bronze and Silver built from the small synthetic set, plus one directory without adapter."""
+    """Bronze, Silver and Gold from the small synthetic set, plus one directory without adapter."""
     synth.main(["--seconds", str(SECONDS), "--channels", str(CHANNELS)])
     (data_root / "raw" / "mystery").mkdir()
     (data_root / "raw" / "mystery" / "x.mat").write_bytes(b"not a mat file")
-    assert run.main(["bronze"]) == 0
-    assert run.main(["silver"]) == 0
+    for layer in ("bronze", "silver", "gold"):
+        assert run.main([layer]) == 0
     return data_root
