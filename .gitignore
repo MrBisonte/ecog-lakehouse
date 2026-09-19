@@ -1,0 +1,32 @@
+# Allow list. Everything is ignored unless a rule below re-includes it.
+*
+!*/
+!.gitignore
+!README.md
+!LICENSE
+!CLAUDE.md
+!Makefile
+!pyproject.toml
+!doc/**/*.md
+!adr/*.md
+!pipeline/**/*.py
+!sql/**/*.sql
+!tests/**/*.py
+!scripts/**/*.py
+!scripts/**/*.sh
+!faults/**/*.py
+!faults/**/*.sql
+!faults/**/*.sh
+!contracts/*.yaml
+!governance/*.csv
+!docs/index.html
+!docs/*.md
+!/docs/data/LICENSE.md
+# Bulk data never enters the repository, whatever the extension.
+/data/
+/docs/data/**
+!/docs/data/LICENSE.md
+keyring.duckdb
+*.duckdb
+*.duckdb.wal
+*.mat
