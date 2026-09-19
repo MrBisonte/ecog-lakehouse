@@ -1,6 +1,7 @@
 import pytest
 
-from pipeline import convert_mat, db, synth
+from pipeline import convert_mat, db
+from tests.conftest import CHANNELS, FILES, SECONDS
 
 SPEC_RECORDING = [
     ("experiment", "VARCHAR"),
@@ -32,17 +33,8 @@ def describe(con, view):
 
 
 @pytest.fixture(scope="module")
-def bronze(tmp_path_factory):
-    root = tmp_path_factory.mktemp("data")
-    import os
-
-    os.environ["DATA_DIR"] = str(root)
-    synth.main(["--seconds", "1", "--channels", "3"])
-    (root / "raw" / "mystery").mkdir()
-    (root / "raw" / "mystery" / "x.mat").write_bytes(b"not a mat file")
-    convert_mat.main([])
-    yield db.connect()
-    os.environ.pop("DATA_DIR")
+def bronze(built):
+    return db.connect()
 
 
 def test_schemas_match_spec_3_1(bronze):
@@ -59,14 +51,16 @@ def test_schemas_match_spec_3_1(bronze):
 
 
 def test_row_counts_and_audit(bronze):
-    assert bronze.execute("SELECT count(*) FROM bronze_ingest_audit").fetchone()[0] == 6
-    assert bronze.execute("SELECT count(*) FROM bronze_recording").fetchone()[0] == 6 * 3 * 1000
-    assert bronze.execute("SELECT sum(rows_written) FROM bronze_ingest_audit").fetchone()[0] == 18000
-    assert bronze.execute("SELECT count(*) FROM bronze_event").fetchone()[0] == 6
+    rows = FILES * CHANNELS * SECONDS * 1000
+    assert bronze.execute("SELECT count(*) FROM bronze_ingest_audit").fetchone()[0] == FILES
+    assert bronze.execute("SELECT count(*) FROM bronze_recording").fetchone()[0] == rows
+    assert bronze.execute("SELECT sum(rows_written) FROM bronze_ingest_audit").fetchone()[0] == rows
+    events = FILES * SECONDS // 2
+    assert bronze.execute("SELECT count(*) FROM bronze_event").fetchone()[0] == events
     assert bronze.execute(
         "SELECT count(*) FROM bronze_event WHERE event_label IS NULL"
     ).fetchone()[0] == 0
-    assert bronze.execute("SELECT count(DISTINCT ingest_ord) FROM lineage_dim").fetchone()[0] == 6
+    assert bronze.execute("SELECT count(DISTINCT ingest_ord) FROM lineage_dim").fetchone()[0] == FILES
     assert bronze.execute(
         "SELECT count(*) FROM bronze_ingest_audit WHERE tool <> 'convert_mat.py' "
         "OR tool_version IS NULL OR duckdb_version IS NULL OR ingested_at IS NULL"
@@ -94,5 +88,5 @@ def test_rerun_is_a_no_op_and_unknown_directory_is_skipped(bronze, capsys):
     convert_mat.main([])
     out = capsys.readouterr().out
     assert "no adapter registered for 'mystery'" in out
-    assert out.count("sha256 already ingested") == 6
+    assert out.count("sha256 already ingested") == FILES
     assert db.connect().execute("SELECT count(*) FROM bronze_recording").fetchone()[0] == before
