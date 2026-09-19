@@ -1,0 +1,411 @@
+# spec.md
+
+Working name of the repository: `brain`. Rename freely; nothing depends on it.
+
+## 1. Scope
+
+The system ingests recordings from the Stanford ECoG library, stores them in three layers on Parquet, enforces data contracts with checks generated from a regulatory requirements table, writes evidence for every run, and exposes the Gold layer to a browser page. Four faults are planted on purpose, each with a fix and a measurement.
+
+## 2. Source data
+
+The Stanford ECoG library is a set of MATLAB `.mat` files, one per subject and experiment, at 1 kHz with electrode positions registered to anatomy. Subject codes in the library are already de-identified two-letter codes. This system treats those codes as source identifiers and pseudonymises them anyway, so the mechanism is real even though the risk is not.
+
+Experiments used, one directory each under `data/raw/<experiment>/`:
+
+| Experiment | Behaviour | Why it is in |
+|---|---|---|
+| `fingerflex` | Cued individual finger movement with dataglove position | Continuous behavioural signal alongside the neural signal, the closest analogue to closed-loop therapy data |
+| `motor_basic` | Cued hand and tongue movement | Event-driven task, exercises the `event` entity |
+| One further experiment chosen at conversion time | | Third dimension for Silver partitioning and a Gold use case |
+
+> **Note.** Field names inside the `.mat` files differ per experiment. `pipeline/convert_mat.py` holds one adapter per experiment that maps the file's arrays to the Bronze schema. An experiment without an adapter is skipped with a logged reason, never guessed.
+
+## 3. Layers
+
+```mermaid
+flowchart LR
+  RAW[data/raw/*.mat] --> B
+  subgraph B[Bronze]
+    B1[bronze/recording]
+    B2[bronze/electrode]
+    B3[bronze/event]
+    B4[bronze/ingest_audit]
+  end
+  B --> S
+  subgraph S[Silver]
+    S1[silver/recording]
+    S2[silver/electrode]
+    S3[silver/event]
+    S4[silver/subject]
+  end
+  K[(keyring.duckdb)] -. pseudonym .-> S4
+  S --> G
+  subgraph G[Gold]
+    G1[gold/channel_quality]
+    G2[gold/experiment_summary]
+    G3[gold/feature_window]
+  end
+  C[contracts/*.yaml] --> CHK[checks]
+  R[governance/requirements.csv] --> CHK
+  CHK --> E[gold/evidence]
+  G --> SITE[docs/ GitHub Pages, DuckDB-WASM]
+  E --> SITE
+```
+
+All layers are Parquet under `data/<layer>/`, Hive partitioned. Published copies for the site and the CLI demo live under `docs/data/<layer>/` and are size-limited (see section 9).
+
+### 3.1 Bronze
+
+Bronze is the raw arrays, one row per sample, with no cleaning. It is append-only. A file, once written, is never modified; a re-ingestion writes a new partition with a new `ingest_id`.
+
+#### bronze/recording
+
+Partition: `experiment=<experiment>/subject_src=<code>/ingest_id=<id>/`.
+
+| Column name | Column type |
+|---|---|
+| experiment | VARCHAR |
+| subject_src | VARCHAR |
+| run | SMALLINT |
+| channel_idx | SMALLINT |
+| sample_idx | INTEGER |
+| value_raw | FLOAT |
+| ingest_id | VARCHAR |
+| lid | UUID |
+
+- `experiment` is the library experiment name, for example `fingerflex`. Not NULL.
+- `subject_src` is the source subject code as found in the library, for example `bp`. Not NULL. This column does not exist in Silver or Gold.
+- `run` is the recording run within the experiment for that subject, starting at 1. Not NULL.
+- `channel_idx` is the zero-based electrode index in the source array. Not NULL.
+- `sample_idx` is the zero-based sample position at the source sampling rate. Not NULL. Timestamp in milliseconds is `sample_idx * 1000 / sample_rate_hz` and is derived in Silver, not stored here.
+- `value_raw` is the amplifier value as stored in the file, in the file's units. Not NULL.
+- `ingest_id` is a ULID assigned per conversion run. Not NULL. References `bronze/ingest_audit.ingest_id`.
+- `lid` is the Bronze-layer lineage identifier of the record (layer 1, see section 12), computed at conversion time from the file's `ingest_ord`, `run` and `channel_idx`. Not NULL. Bronze is the first layer that carries it, so the chain is unbroken from the ingested file downward: `lid_trace` on a Bronze row returns the source path, the source URL at the Stanford repository and the sha256 recorded in `bronze/ingest_audit`.
+
+#### bronze/electrode
+
+Partition: `experiment=<experiment>/subject_src=<code>/`.
+
+| Column name | Column type |
+|---|---|
+| experiment | VARCHAR |
+| subject_src | VARCHAR |
+| channel_idx | SMALLINT |
+| x_mm | FLOAT |
+| y_mm | FLOAT |
+| z_mm | FLOAT |
+| brain_area | VARCHAR |
+| ingest_id | VARCHAR |
+| lid | UUID |
+
+- `x_mm`, `y_mm`, `z_mm` are electrode coordinates in millimetres in the library's registered space. NULL when the file has no location for that channel.
+- `brain_area` is the library's anatomical label. NULL when absent.
+
+#### bronze/event
+
+Partition: `experiment=<experiment>/subject_src=<code>/`.
+
+| Column name | Column type |
+|---|---|
+| experiment | VARCHAR |
+| subject_src | VARCHAR |
+| run | SMALLINT |
+| sample_idx | INTEGER |
+| event_code | SMALLINT |
+| event_label | VARCHAR |
+| ingest_id | VARCHAR |
+| lid | UUID |
+
+- `event_code` is the cue code from the file's stimulus array. Not NULL.
+- `event_label` is the adapter's human label for the code, for example `thumb`. NULL when the adapter has no label.
+
+#### bronze/ingest_audit
+
+One row per source file converted. Not partitioned.
+
+| Column name | Column type |
+|---|---|
+| ingest_id | VARCHAR |
+| source_path | VARCHAR |
+| source_url | VARCHAR |
+| sha256 | VARCHAR |
+| bytes | BIGINT |
+| sample_rate_hz | INTEGER |
+| rows_written | BIGINT |
+| tool | VARCHAR |
+| tool_version | VARCHAR |
+| duckdb_version | VARCHAR |
+| ingested_at | TIMESTAMP |
+
+- `sha256` is the hex digest of the source file. Not NULL. This is the "original" of ALCOA+.
+- `tool` and `tool_version` identify the converter, for example `convert_mat.py` and the git commit hash. Not NULL.
+- `ingested_at` is UTC. Not NULL.
+
+### 3.2 Silver
+
+Silver is typed, timestamped and pseudonymised. It is the first layer a consumer may read.
+
+#### silver/subject
+
+| Column name | Column type |
+|---|---|
+| subject_pid | VARCHAR |
+| first_seen_at | TIMESTAMP |
+
+- `subject_pid` is the pseudonymous identifier: the first 16 hex characters of `HMAC-SHA256(secret, subject_src)`. Not NULL, unique. The secret lives only in `keyring.duckdb`, a separate database file that is never published and never copied to `docs/`.
+
+#### keyring.duckdb
+
+Not part of any layer. Contains two tables.
+
+| Table | Columns | Purpose |
+|---|---|---|
+| `key_map` | `subject_src VARCHAR, subject_pid VARCHAR, created_at TIMESTAMP` | The only place where a source code and a pseudonym meet |
+| `access_log` | `accessed_at TIMESTAMP, actor VARCHAR, purpose VARCHAR, subject_pid VARCHAR` | Every re-identification query appends a row here first |
+
+#### silver/recording
+
+Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `channel_idx, ts_ms`. Row group size 200,000 rows.
+
+| Column name | Column type |
+|---|---|
+| experiment | VARCHAR |
+| subject_pid | VARCHAR |
+| run | SMALLINT |
+| channel_idx | SMALLINT |
+| ts_ms | INTEGER |
+| value_uv | FLOAT |
+
+- `ts_ms` is milliseconds from the start of the run. Not NULL.
+- `value_uv` is the value in microvolts after the adapter's unit conversion. NULL is not allowed; a source NaN is dropped and counted in `gold/channel_quality.missing_samples`.
+
+`silver/electrode` and `silver/event` mirror their Bronze tables with `subject_src` replaced by `subject_pid`, `sample_idx` replaced by `ts_ms`, and `ingest_id` removed.
+
+### 3.3 Gold
+
+Gold is the enterprise model for consumers. Everything here is a query result.
+
+| Dataset | Grain | Columns |
+|---|---|---|
+| `gold/channel_quality` | experiment, subject_pid, run, channel_idx | `n_samples BIGINT, missing_samples BIGINT, rms_uv FLOAT, clipped_pct FLOAT, line_noise_ratio FLOAT` |
+| `gold/experiment_summary` | experiment, subject_pid | `n_runs SMALLINT, n_channels SMALLINT, duration_s FLOAT, n_events INTEGER` |
+| `gold/feature_window` | experiment, subject_pid, run, channel_idx, window_start_ms | `mean_uv FLOAT, std_uv FLOAT, p2p_uv FLOAT` over 1,000 ms windows |
+| `gold/evidence` | run_id, check_id | see section 5 |
+
+- `clipped_pct` is the share of samples at the amplifier's minimum or maximum, in percent.
+- `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per channel in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.
+
+## 4. Contracts
+
+One file per Silver and Gold dataset under `contracts/`, following the Open Data Contract Standard v3. Each contract lists the columns with types, `required`, `unique`, and a `quality` block. The check generator reads the contracts; the layers are written by SQL in `sql/` that must match the contracts, and a test asserts they do.
+
+## 5. Governance as code
+
+### 5.1 governance/requirements.csv
+
+One row per requirement clause. This table generates checks.
+
+| Column | Type | Meaning |
+|---|---|---|
+| framework | text | `Part11`, `GDPR-Art9`, `ALCOA+`, `ISO13485`, `ISO14155` |
+| requirement_id | text | Stable id, for example `Part11-11.10e` |
+| clause | text | Short statement of the requirement in the framework's words |
+| control | text | Which design element satisfies it |
+| check_kind | text | One of the kinds in section 5.2 |
+| dataset | text | Target dataset, for example `silver/recording` |
+| params | JSON | Parameters for the check kind |
+
+Adding a framework means adding rows. No code changes.
+
+### 5.2 Check kinds
+
+| check_kind | params | Passes when |
+|---|---|---|
+| `not_null` | `{"column": "..."}` | No NULL in the column |
+| `unique` | `{"columns": [...]}` | No duplicate across the columns |
+| `row_count_min` | `{"min": n}` | Row count at least `n` |
+| `no_direct_identifier` | `{"forbidden_columns": [...]}` | None of the listed columns exist in the dataset |
+| `hash_match` | `{}` | Every `ingest_audit.sha256` matches a recomputed digest of the source file |
+| `partition_layout` | `{"max_rows_per_row_group": n, "min_row_groups": n}` | Parquet metadata satisfies both bounds |
+| `retention` | `{"max_age_days": n}` | No partition older than the limit |
+| `sql` | `{"sql": "..."}` | The query returns zero rows |
+
+### 5.3 gold/evidence
+
+One row per check per run. Append-only.
+
+| Column name | Column type |
+|---|---|
+| run_id | VARCHAR |
+| check_id | VARCHAR |
+| requirement_id | VARCHAR |
+| framework | VARCHAR |
+| dataset | VARCHAR |
+| dataset_version | VARCHAR |
+| check_kind | VARCHAR |
+| result | VARCHAR |
+| observed | VARCHAR |
+| expected | VARCHAR |
+| ran_at | TIMESTAMP |
+| engine_version | VARCHAR |
+| git_commit | VARCHAR |
+
+- `dataset_version` is the sha256 of the sorted list of Parquet file digests in the dataset at run time. Not NULL. Two runs over identical files produce identical versions.
+- `result` is one of `pass`, `fail`, `error`. Not NULL.
+- `observed` and `expected` are the measured and required values as text, for example `0` and `0` for a `not_null` check. NULL for `error`.
+
+## 6. Planted faults
+
+Each fault lives under `faults/<letter>/` with `plant.*`, `fix.*` and `bench.sh`. `bench.sh` prints a two-row table, before and after, with wall-clock seconds.
+
+### Fault A: single row group, unpartitioned, unsorted
+
+- Plant: `COPY (SELECT * FROM silver.recording) TO 'docs/data/faults/a/bad/recording.parquet' (FORMAT parquet, ROW_GROUP_SIZE 100000000);` on one experiment, one subject, so the file stays under 95 MB.
+- Fix, DuckDB v2.0 syntax:
+
+```sql
+COPY silver.recording TO 'docs/data/faults/a/good'
+(
+    FORMAT parquet,
+    PARTITION BY (experiment, subject_pid),
+    ORDER BY (channel_idx, ts_ms),
+    ROW_GROUP_SIZE 200000
+);
+```
+
+- Fix, v1.x compatible form used by the pipeline: `COPY (SELECT ... ORDER BY channel_idx, ts_ms) TO ... (FORMAT parquet, PARTITION_BY (experiment, subject_pid), ROW_GROUP_SIZE 200000);`
+- Bench: the same aggregate over both layouts, remote URL, with `SET read_ahead_depth = 0;` and with the default. Four timings.
+- Story: parallelism is per row group; a single row group is a single stream, and no I/O scheduler can help it.
+
+### Fault D: synchronous one-file-at-a-time loop
+
+- Plant: `faults/d/plant.py` downloads each partition file with `urllib`, sequentially, into a temp directory, then loads.
+- Fix: `SELECT ... FROM read_parquet('https://<pages>/docs/data/faults/a/good/**/*.parquet', hive_partitioning = true);` with `httpfs`, one statement.
+- Bench: wall clock for both; line count of both.
+
+### Fault F: flaky remote reads without retries
+
+- Plant: `faults/f/flaky_proxy.py`, a 40-line HTTP proxy that forwards to the Pages URL and answers HTTP 503 to a configurable fraction of range requests (default 10 percent). Query with `SET http_retries = 0;`.
+- Fix: `SET http_retries = 8; SET http_retry_wait_ms = 50; SET http_retry_backoff = 2;` from the DuckDB async I/O post's tuned configuration.
+- Bench: success rate over 10 attempts and mean wall clock, both settings.
+
+### Fault G: pathological generated SQL
+
+- Plant: `faults/g/plant.py` generates a `sql` check whose predicate nests one `OR` per channel 512 levels deep, and a second variant with an unbalanced parenthesis, the way a naive metadata-driven generator does.
+- Fix: the generator emits `channel_idx IN (...)` or a join against a `VALUES` list; the malformed variant is caught by a generator test.
+- Bench: parse plus bind time for nested versus `IN`; the v2.0 parser's error message for the malformed variant, pointing at the token.
+
+## 7. Pipeline
+
+`pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `pyyaml` and nothing else. Orchestration is `make`.
+
+All data and DuckDB working files live under `DATA_DIR`, an environment variable defaulting to `$HOME/data/ecog-lakehouse`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. The repository sits on a Windows mount under WSL2, where per-file operations are slow and OneDrive style syncing can lock files, so nothing but source, documentation and `docs/data/` is written inside it. `DATA_DIR` is created on first run. Paths in this document written as `data/<layer>/` mean `$DATA_DIR/<layer>/`.
+
+Targets:
+
+| Target | Does |
+|---|---|
+| `fetch` | Downloads the selected experiments from the Stanford repository into `data/raw/`, verifying sha256 against `governance/sources.csv` |
+| `synth` | Generates synthetic files with the Bronze schema into `data/raw/synthetic/` (used when `data/raw/` is empty or `SYNTH=1`) |
+| `bronze`, `silver`, `gold` | Run the SQL in `sql/<layer>/` in order |
+| `checks` | Generate checks from contracts and requirements, run them, append to `gold/evidence` |
+| `publish` | Copy size-limited slices of Gold and the fault files to `docs/data/`, write `docs/data/manifest.json` |
+| `bench` | Run all `faults/*/bench.sh` and write `docs/bench.md` |
+| `all` | `bronze silver gold checks publish` |
+
+Every SQL file is plain DuckDB SQL with `{{var}}` placeholders resolved by a 20-line renderer. No ORM.
+
+## 8. Browser page
+
+`docs/index.html`, one file, DuckDB-WASM loaded from `cdn.jsdelivr.net` at a pinned version. On load it:
+
+1. Reads `docs/data/manifest.json`.
+2. Attaches the Gold Parquet files over HTTP range requests.
+3. Runs the same check SQL the pipeline ran, from `docs/data/checks.json`.
+4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables.
+
+Rules: every number on the page is a query result; system font stack; no request to any host other than the page's origin and the pinned CDN.
+
+## 9. Publishing limits
+
+| Limit | Value |
+|---|---|
+| Single file | 95 MB |
+| Total under `docs/data/` | 500 MB |
+| Repository without data | under 5 MB |
+
+`make publish` fails if a limit is exceeded.
+
+## 10. Versions
+
+| Component | Version | Reason |
+|---|---|---|
+| DuckDB CLI for the demo | v2.0.0 alpha, exact build recorded in `docs/bench.md` | Async I/O and the `COPY ... PARTITION BY ... ORDER BY` syntax |
+| DuckDB Python for the pipeline | Latest stable 1.x, or 2.0 alpha if on PyPI at build time | Pipeline uses only syntax valid on both |
+| DuckDB-WASM | Pinned exact version in `docs/index.html` | Reproducibility |
+
+## 11. Licences
+
+Code: MIT. Published data under `docs/data/`: CC BY-SA 4.0, attributed to Kai J. Miller, "A library of human electrocorticographic data and analyses", Nature Human Behaviour, 2019, with the repository URL, as `docs/data/LICENSE.md`.
+
+## 12. Lineage identifier (`lid`)
+
+Every record in Silver and Gold carries a lineage identifier, `lid`, from which the full path back to the ingested file can be decoded without a join, and from which every derived row can be found with a range scan. A record is one channel of one run of one ingested file, optionally split into fixed segments. Samples reference their record; they do not carry their own `lid`.
+
+### 12.1 Shape
+
+`lid` is 128 bits in the ULID layout (https://github.com/ulid/spec): 48 bits of millisecond timestamp followed by 80 bits that the ULID specification reserves for randomness. This system fills those 80 bits with the hierarchy. The value is stored as `UUID` in DuckDB and PostgreSQL and displayed as the 26-character Crockford base32 ULID string. Any tool that sorts, indexes or parses ULIDs handles it unchanged.
+
+```
+ bits 127..80   ts_ms          48   first ingestion time of the source file, ms since epoch
+ bits  79..76   layer           4   1 Bronze, 2 Silver, 3 Gold
+ bits  75..68   experiment      8   code from lineage_experiment
+ bits  67..52   ingest_ord     16   rank of the file's sha256 in ingest_audit
+ bits  51..48   run             4   run within the file, from 1
+ bits  47..38   channel        10   electrode index
+ bits  37..28   segment        10   fixed segment within the channel run, 0 when unsplit
+ bits  27..0    reserved       28   zero; available to a derived layer that needs sub-record identity
+```
+
+`ts_ms` is the timestamp of the first ingestion of that sha256, read from `ingest_audit`. A rerun of the same file reuses it, so identical inputs yield identical identifiers within one environment. A fresh environment assigns new timestamps; the sha256 in `lineage_dim` is what ties the two.
+
+### 12.2 Where it appears
+
+| Dataset | Column | Meaning |
+|---|---|---|
+| `bronze/recording`, `bronze/electrode`, `bronze/event` | `lid UUID` | Layer 1 identifier, set at conversion; the chain starts here, not in Silver |
+| `silver/record` | `lid UUID` | One row per record; the lineage dimension for Silver |
+| `silver/recording` | `lid UUID, sample_idx INTEGER` | Each sample points at its record |
+| `gold/feature_window` | `lid UUID, sample_lo INTEGER, sample_hi INTEGER` | The window's source range within one record |
+| `gold/channel_quality` | `lid UUID` | Whole record |
+| `gold/evidence` | `lid UUID` | NULL for dataset-level checks; set when a check targets one record |
+| `lineage_dim` | `ingest_ord SMALLINT, ingest_id VARCHAR, source_path VARCHAR, source_url VARCHAR, sha256 VARCHAR, ts_ms BIGINT` | The only table decoding needs; `source_url` is the origin outside this system |
+| `lineage_experiment` | `code TINYINT, experiment VARCHAR` | Experiment code table |
+| `lineage_edge` | `child_lid UUID, parent_lid UUID` | Only for derivations that span more than one record. Empty in this system; present so the limit is explicit |
+
+A Silver record's `lid` differs from its Bronze parent's only in the layer bits; `lid_parent(lid)` returns the same identifier with the layer decremented, so Gold to Silver to Bronze is three bit operations and no lookup. `silver/recording` is sorted by `lid, sample_idx` within each file, which is file, run, channel, time order. Zone maps prune on `lid` ranges.
+
+### 12.3 Functions
+
+All are DuckDB macros in `sql/lineage.sql`; the PostgreSQL versions are in `sql/lineage_pg.sql` and are the same expressions over `uuid` cast to `numeric`.
+
+| Macro | Returns | Use |
+|---|---|---|
+| `lid_encode(ts_ms, layer, exp, ing, run, ch, seg)` | `UUID` | Build an identifier from its parts |
+| `lid_decode(lid)` | `STRUCT(ts_ms, layer, experiment, ingest_ord, run, channel, segment)` | Bit slicing, no table access |
+| `lid_text(lid)` | `VARCHAR`, 26 characters | Crockford base32 for display and logs |
+| `lid_parse(text)` | `UUID` | Inverse of `lid_text` |
+| `lid_trace(lid)` | table: `source_path, source_url, sha256, ts_ms, layer, experiment, run, channel, segment` | Back: one record to its file, joining `lineage_dim` on `ingest_ord` |
+| `lid_parent(lid)` | `UUID` | Same identifier one layer up; Gold to Silver to Bronze without a lookup |
+| `lid_children(ing)` | table: every `silver/record` row of one ingested file | Forward: range scan on the `ingest_ord` prefix |
+| `lid_prefix_lo(ing)`, `lid_prefix_hi(ing)` | `UUID` | Bounds for the range scan |
+
+Example. Given a `gold/channel_quality` row with `lid = 01K5H2ZQ8G0000000000000000` (text form), `lid_trace` returns the `.mat` file it came from, the sha256 recorded at ingestion, and run 1, channel 17. `lid_children(3)` returns every record derived from the third ingested file.
+
+### 12.4 Site behaviour
+
+Every number in the `channel_quality` and `experiment_summary` tables on `docs/index.html` is clickable. Clicking runs `lid_trace` in DuckDB-WASM and shows the result in a side panel: file, digest, run, channel, sample range. The panel text is a query result like everything else on the page.
+
+### 12.5 Limits
+
+A record's sample budget is bounded by `sample_idx INTEGER`, 2.1e9 samples, 24 days at 1 kHz; a run longer than that is split into segments. A Gold row derived from more than one record cannot be expressed as one `lid` plus a range and uses `lineage_edge`; none exists in this system.
