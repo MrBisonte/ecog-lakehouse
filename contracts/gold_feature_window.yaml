@@ -1,0 +1,68 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: gold-feature-window
+name: gold/feature_window
+version: 0.1.0
+status: active
+description:
+  purpose: Features per record and 1,000 ms window, with the source sample range. spec 3.3 and 12.2.
+schema:
+  - name: feature_window
+    physicalName: gold/feature_window
+    physicalType: parquet
+    properties:
+      - name: experiment
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: subject_pid
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: run
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: channel_idx
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: window_start_ms
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+      - name: mean_uv
+        logicalType: number
+        physicalType: FLOAT
+        required: true
+      - name: std_uv
+        logicalType: number
+        physicalType: FLOAT
+        required: true
+      - name: p2p_uv
+        logicalType: number
+        physicalType: FLOAT
+        required: true
+      - name: lid
+        logicalType: string
+        physicalType: UUID
+        required: true
+      - name: sample_lo
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+      - name: sample_hi
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+    quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: unique
+          params: {"columns": ["lid", "window_start_ms"]}
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: no_direct_identifier
+          params: {"forbidden_columns": ["subject_src"]}

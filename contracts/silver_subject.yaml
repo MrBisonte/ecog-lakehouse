@@ -1,0 +1,29 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: silver-subject
+name: silver/subject
+version: 0.1.0
+status: active
+description:
+  purpose: One row per pseudonymous subject present in Silver. spec 3.2.
+schema:
+  - name: subject
+    physicalName: silver/subject
+    physicalType: parquet
+    properties:
+      - name: subject_pid
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        unique: true
+        description: First 16 hex characters of HMAC-SHA256(secret, subject_src).
+      - name: first_seen_at
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+    quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: no_direct_identifier
+          params: {"forbidden_columns": ["subject_src"]}

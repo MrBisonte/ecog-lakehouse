@@ -1,0 +1,46 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: silver-record
+name: silver/record
+version: 0.1.0
+status: active
+description:
+  purpose: One row per record (ingested file, run, channel), the lineage dimension of Silver. spec 12.2.
+schema:
+  - name: record
+    physicalName: silver/record
+    physicalType: parquet
+    properties:
+      - name: lid
+        logicalType: string
+        physicalType: UUID
+        required: true
+        unique: true
+        description: Layer 2 lineage identifier.
+      - name: experiment
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: subject_pid
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: run
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: channel_idx
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: n_samples_src
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+        description: Source samples of the record in Bronze, NaN included.
+    quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: no_direct_identifier
+          params: {"forbidden_columns": ["subject_src"]}
