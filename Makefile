@@ -1,6 +1,7 @@
-.PHONY: all fetch synth bronze silver gold checks publish bench test lint
+.PHONY: all fetch synth bronze silver gold checks publish bench test lint lineage
 PY ?= python3
 SYNTH ?= 0
+ARCH_STANDARDS ?= ../arch-standards
 export DATA_DIR ?= $(HOME)/data/ecog-lakehouse
 
 all: bronze silver gold checks publish
@@ -31,6 +32,9 @@ bench:
 
 test:
 	$(PY) -m pytest -q
+
+lineage:
+	cp $(ARCH_STANDARDS)/ids/generated/lid/duckdb.sql sql/lineage/lid_generated.sql
 
 lint:
 	ruff check . && $(PY) scripts/lint_doc.py README.md CLAUDE.md doc/*.md doc/agent/*.md adr/*.md

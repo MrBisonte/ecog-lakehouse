@@ -1,0 +1,60 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: gold-dataset-manifest
+name: gold/dataset_manifest
+version: 0.1.0
+status: active
+description:
+  purpose: One row per dataset of the current build, the handle a model registry or a submission package holds. spec 3.3.
+schema:
+  - name: dataset_manifest
+    physicalName: gold/dataset_manifest
+    physicalType: parquet
+    properties:
+      - name: dataset_version
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        unique: true
+        description: The digest gold/evidence uses for the same dataset.
+      - name: dataset
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        unique: true
+      - name: layer
+        logicalType: integer
+        physicalType: TINYINT
+        required: true
+      - name: lid_lo
+        logicalType: string
+        physicalType: UUID
+        required: false
+        description: NULL for a dataset without a lid column.
+      - name: lid_hi
+        logicalType: string
+        physicalType: UUID
+        required: false
+      - name: n_records
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+      - name: file_digests
+        logicalType: array
+        physicalType: VARCHAR[]
+        required: true
+        description: sha256 of the source files the records came from.
+      - name: produced_at
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+      - name: git_commit
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+    quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: no_direct_identifier
+          params: {"forbidden_columns": ["subject_src"]}

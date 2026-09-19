@@ -8,7 +8,7 @@ COPY (
         b.y_mm,
         b.z_mm,
         b.brain_area,
-        lid_from_u128(lid_u128(b.lid) + (1::UHUGEINT << 76)) AS lid
+        lid_relayer(b.lid, 1) AS lid
     FROM bronze_electrode b
     JOIN keyring.key_map k USING (subject_src)
     ORDER BY lid
