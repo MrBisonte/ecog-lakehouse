@@ -1,1 +1,9 @@
 framework,requirement_id,clause,control,check_kind,dataset,params
+Part11,Part11-11.10e,"Secure, computer-generated, time-stamped audit trails",bronze/ingest_audit records the sha256 and UTC time of every source file,hash_match,bronze/ingest_audit,{}
+Part11,Part11-11.10e,"Secure, computer-generated, time-stamped audit trails",every Silver sample carries the lineage identifier of its record,not_null,silver/recording,"{""column"": ""lid""}"
+GDPR-Art9,GDPR-Art9,Processing of data concerning health is prohibited without safeguards,pseudonymisation at the Silver boundary; no source identifier in Silver,no_direct_identifier,silver/recording,"{""forbidden_columns"": [""subject_src""]}"
+GDPR-Art9,GDPR-Art9,Processing of data concerning health is prohibited without safeguards,no source identifier in any Gold dataset,no_direct_identifier,gold/*,"{""forbidden_columns"": [""subject_src""]}"
+ALCOA+,ALCOA+-Original,Original: the first capture of the data is preserved,sha256 of every ingested file matches the file on disk,hash_match,bronze/ingest_audit,{}
+ALCOA+,ALCOA+-Complete,Complete: all data is present,Silver recording holds at least one sample,row_count_min,silver/recording,"{""min"": 1}"
+ISO13485,ISO13485-4.2.5,Control of records: records remain identifiable and retrievable,one unique lineage identifier per Silver record,unique,silver/record,"{""columns"": [""lid""]}"
+ISO13485,ISO13485-4.2.5,Control of records: records remain identifiable and retrievable,Silver recording files keep the row group layout that makes range retrieval work,partition_layout,silver/recording,"{""max_rows_per_row_group"": 200000, ""min_row_groups"": 2}"

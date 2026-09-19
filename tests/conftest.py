@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipeline import run, synth
+from pipeline import checks, run, synth
 
 SECONDS = 30
 CHANNELS = 16
@@ -20,10 +20,12 @@ def data_root(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def built(data_root):
-    """Bronze, Silver and Gold from the small synthetic set, plus one directory without adapter."""
+    """Bronze, Silver, Gold and one checks run from the small synthetic set, plus one
+    directory without adapter."""
     synth.main(["--seconds", str(SECONDS), "--channels", str(CHANNELS)])
     (data_root / "raw" / "mystery").mkdir()
     (data_root / "raw" / "mystery" / "x.mat").write_bytes(b"not a mat file")
     for layer in ("bronze", "silver", "gold"):
         assert run.main([layer]) == 0
+    assert checks.main([]) == 0
     return data_root
