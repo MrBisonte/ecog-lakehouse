@@ -51,7 +51,10 @@ def pseudonymise(codes) -> int:
     secret = con.execute("SELECT hex FROM secret").fetchone()[0]
     known = {r[0] for r in con.execute("SELECT subject_src FROM key_map").fetchall()}
     new = sorted(set(codes) - known)
-    con.executemany("INSERT INTO key_map VALUES (?, ?, ?)", [(c, pid(secret, c), now()) for c in new])
+    if new:
+        con.executemany(
+            "INSERT INTO key_map VALUES (?, ?, ?)", [(c, pid(secret, c), now()) for c in new]
+        )
     con.close()
     return len(new)
 
