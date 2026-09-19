@@ -1,25 +1,42 @@
 # Agent prompt, phase 0
 
-Paste as the first message in Claude Code, Opus model, inside `<checkout>`.
+Paste as the first message in Claude Code inside `<checkout>`. This is the version that was actually used; it supersedes the earlier draft.
 
 ```
-You are building phase 0 of the repository at <checkout> (Windows path
-<checkout>, a Windows drive mounted in WSL2). Read, in this order and in
-full before doing anything else: CLAUDE.md, doc/intent.md, doc/spec.md,
-doc/plan.md, doc/REVIEW.md, then every file under adr/.
-doc/spec.md is the contract. If you find a contradiction between doc/spec.md
-and anything else, stop and tell me which line, do not resolve it yourself.
+You are building phase 0 of the repository ecog-lakehouse at <checkout>
+(Windows path <checkout>, a Windows drive mounted in WSL2). A zip named
+ecog-lakehouse.zip is in or next to that folder; it contains the repository with its
+.git history.
 
-Before anything else: the repo lives on a Windows mount, so all data and
-DuckDB working files must live outside it. DATA_DIR (environment variable,
-default $HOME/data/ecog-lakehouse, already exported by the Makefile) is where
-raw/, bronze/, silver/, gold/ and keyring.duckdb go. Only docs/data/ stays
-inside the repo. Create DATA_DIR on first run. Never write anything but
-source, docs and docs/data/ inside the repo root; if a script wants to write
-elsewhere in the repo, that is a bug.
+Pre-flight, do this first and report the result of each line before
+anything else:
+
+1. If <checkout> has no .git directory, unzip ecog-lakehouse.zip so that the
+   repository root is <checkout> itself, not <checkout>/ecog-lakehouse.
+   Then `git log --oneline`: expect exactly one commit, "chore: scaffold
+   ecog-lakehouse with intent, spec, plan, ADRs and phase 0 agent prompt".
+   `git status --short` must be empty. If either is not true, stop and show me.
+2. `python3 --version` must be 3.12 or newer. Create a venv inside WSL, not on
+   the Windows mount: `python3 -m venv <venv> && source
+   <venv>/bin/activate && pip install -e ".[dev]"`.
+3. `export DATA_DIR=$HOME/data/ecog-lakehouse && mkdir -p $DATA_DIR`. All data and
+   DuckDB working files live there: raw/, bronze/, silver/, gold/,
+   keyring.duckdb. Only docs/data/ stays inside the repo. Never write anything
+   but source, docs and docs/data/ inside the repo root; if a script wants to
+   write elsewhere in the repo, that is a bug.
+4. `make lint` is expected to fail right now because ruff has no .py file to
+   check yet. It must pass from step 1 of the build onward.
+
+Then read, in this order and in full: CLAUDE.md, doc/intent.md, doc/spec.md,
+doc/plan.md, doc/REVIEW.md, every file under adr/.
+doc/spec.md is the contract. If you find a contradiction
+between doc/spec.md and anything else, stop and tell me which line; do not
+resolve it yourself. doc/agent/phase0.md is an earlier copy of this prompt;
+this message supersedes it, update that file to match before your first
+commit.
 
 Goal of phase 0: `make all SYNTH=1` and `make test` pass from a clean clone
-with no network access, on synthetic data that has the exact Bronze schema in
+with no network access, on synthetic data with the exact Bronze schema in
 doc/spec.md section 3.1. No real data, no faults, no site in this phase.
 
 Use plan mode first. Produce the plan as a numbered list following "Order
@@ -71,8 +88,8 @@ Build, in this order:
    generated SQL is rejected by the generator; the lineage tests from step 3.
 8. Update doc/REVIEW.md phase 0 entry: what you checked, what failed, what
    changed. Update doc/spec.md only if the code forced a change, and say so in
-   doc/REVIEW.md. A decision that changes an ADR gets a new ADR that supersedes
-   it; accepted ADRs are not edited.
+   doc/REVIEW.md. A decision that changes an ADR gets a new ADR (next number
+   ADR-0005) that supersedes it; accepted ADRs are not edited.
 
 Rules that override your defaults:
 - Shortest thing that works. Standard library before a dependency. The only
@@ -83,12 +100,19 @@ Rules that override your defaults:
 - Never write to Bronze partitions that exist. Never put subject_src outside
   Bronze and keyring.duckdb.
 - Commas, never dashes, in every file you write. Conventional Commits, one
-  commit per step above. .gitignore is an allow list; if a new file type is
-  needed, add one allow line and say so.
+  commit per step above.
+- .gitignore is an allow list. If a new file type is needed, add one allow
+  line and say so. Before every commit run `git status --short` and confirm
+  nothing under data/, docs/data/ or any .duckdb, .parquet, .mat appears.
 - Run `make lint` and `make test` before every commit. Do not commit red.
-- When done, run a verifier pass: clone the repo to a temp dir, run
-  `make all SYNTH=1` and `make test` there, paste the output into doc/REVIEW.md.
+- The repo is on a Windows mount: keep the number of files small, do not
+  generate per-row or per-partition files inside the repo, and expect git and
+  pytest collection to be slower than native.
+- When done, run a verifier pass: clone the repo to a temp dir inside WSL
+  (not on /mnt/c), run `make all SYNTH=1` and `make test` there with a fresh
+  DATA_DIR, paste the output into doc/REVIEW.md.
 
-Report back with: the commit list, the test count, the doc/REVIEW.md entry,
-and any place where you had to guess. Guesses are fine if they are listed.
+Report back with: the pre-flight results, the commit list, the test count,
+the doc/REVIEW.md entry, and any place where you had to guess. Guesses are
+fine if they are listed.
 ```

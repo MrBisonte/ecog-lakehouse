@@ -1,0 +1,78 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: gold-evidence
+name: gold/evidence
+version: 0.1.0
+status: active
+description:
+  purpose: One row per check per run, append-only. spec 5.3 and 12.2.
+schema:
+  - name: evidence
+    physicalName: gold/evidence
+    physicalType: parquet
+    properties:
+      - name: run_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: check_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: requirement_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: framework
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: dataset
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: dataset_version
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: sha256 of the sorted list of Parquet file digests of the dataset at run time.
+      - name: check_kind
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: result
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: pass, fail or error.
+      - name: observed
+        logicalType: string
+        physicalType: VARCHAR
+        required: false
+      - name: expected
+        logicalType: string
+        physicalType: VARCHAR
+        required: false
+      - name: ran_at
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+      - name: engine_version
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: git_commit
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: lid
+        logicalType: string
+        physicalType: UUID
+        required: false
+        description: NULL for dataset-level checks.
+    quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: unique
+          params: {"columns": ["run_id", "check_id"]}

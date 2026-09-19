@@ -1,0 +1,48 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: gold-experiment-summary
+name: gold/experiment_summary
+version: 0.1.0
+status: active
+description:
+  purpose: One row per experiment and subject. spec 3.3.
+schema:
+  - name: experiment_summary
+    physicalName: gold/experiment_summary
+    physicalType: parquet
+    properties:
+      - name: experiment
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: subject_pid
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: n_runs
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: n_channels
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: duration_s
+        logicalType: number
+        physicalType: FLOAT
+        required: true
+      - name: n_events
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+    quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: unique
+          params: {"columns": ["experiment", "subject_pid"]}
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: no_direct_identifier
+          params: {"forbidden_columns": ["subject_src"]}

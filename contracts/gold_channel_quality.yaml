@@ -1,0 +1,61 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: gold-channel-quality
+name: gold/channel_quality
+version: 0.1.0
+status: active
+description:
+  purpose: Quality measures per record. spec 3.3.
+schema:
+  - name: channel_quality
+    physicalName: gold/channel_quality
+    physicalType: parquet
+    properties:
+      - name: experiment
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: subject_pid
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: run
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: channel_idx
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: n_samples
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+      - name: missing_samples
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+      - name: rms_uv
+        logicalType: number
+        physicalType: FLOAT
+        required: true
+      - name: clipped_pct
+        logicalType: number
+        physicalType: FLOAT
+        required: true
+      - name: line_noise_ratio
+        logicalType: number
+        physicalType: FLOAT
+        required: false
+        description: NULL when the record has under 10 s of samples.
+      - name: lid
+        logicalType: string
+        physicalType: UUID
+        required: true
+        unique: true
+    quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: no_direct_identifier
+          params: {"forbidden_columns": ["subject_src"]}
