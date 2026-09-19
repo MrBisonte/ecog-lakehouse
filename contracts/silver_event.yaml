@@ -1,0 +1,47 @@
+apiVersion: v3.0.1
+kind: DataContract
+id: silver-event
+name: silver/event
+version: 0.1.0
+status: active
+description:
+  purpose: One row per cue onset, pseudonymised, in milliseconds. spec 3.2.
+schema:
+  - name: event
+    physicalName: silver/event
+    physicalType: parquet
+    properties:
+      - name: experiment
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: subject_pid
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - name: run
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: ts_ms
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+      - name: event_code
+        logicalType: integer
+        physicalType: SMALLINT
+        required: true
+      - name: event_label
+        logicalType: string
+        physicalType: VARCHAR
+        required: false
+      - name: lid
+        logicalType: string
+        physicalType: UUID
+        required: true
+    quality:
+      - type: custom
+        engine: ibrain
+        implementation:
+          check_kind: no_direct_identifier
+          params: {"forbidden_columns": ["subject_src"]}
