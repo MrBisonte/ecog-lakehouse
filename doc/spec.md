@@ -357,15 +357,21 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
 `lid` is 128 bits in the ULID layout (https://github.com/ulid/spec): 48 bits of millisecond timestamp followed by 80 bits that the ULID specification reserves for randomness. This system fills those 80 bits with the hierarchy. The value is stored as `UUID` in DuckDB and PostgreSQL and displayed as the 26-character Crockford base32 ULID string. Any tool that sorts, indexes or parses ULIDs handles it unchanged.
 
 ```
+ hi word
  bits 127..80   ts_ms          48   first ingestion time of the source file, ms since epoch
- bits  79..76   layer           4   1 Bronze, 2 Silver, 3 Gold
+ bits  79..76   layer           4   1 Bronze, 2 Silver, 3 Gold, 4 Export
  bits  75..68   experiment      8   code from lineage_experiment
- bits  67..52   ingest_ord     16   rank of the file's sha256 in ingest_audit
- bits  51..48   run             4   run within the file, from 1
- bits  47..38   channel        10   electrode index
- bits  37..28   segment        10   fixed segment within the channel run, 0 when unsplit
- bits  27..0    reserved       28   zero; available to a derived layer that needs sub-record identity
+ bits  67..64   reserved_hi     4   zero
+ lo word
+ bits  63..48   file           16   ingest_ord, rank of the file's sha256 in ingest_audit
+ bits  47..44   run             4   run within the file, from 1
+ bits  43..34   channel        10   electrode index
+ bits  33..24   segment        10   fixed segment within the channel run, 0 when unsplit
+ bit   23       radioactive     1   1 marks a canary record planted to detect leakage
+ bits  22..0    reserved       23   zero
 ```
+
+No field straddles the 64 bit boundary, so a hi and lo pair of 64 bit words is equivalent to the native 128 bit value on engines without one. The layout is the file `ids/layouts/lid.yaml` in the arch-standards repository; the macros below are generated from it by `idgen` and committed under `sql/lineage/`, never edited by hand.
 
 `ts_ms` is the timestamp of the first ingestion of that sha256, read from `ingest_audit`. A rerun of the same file reuses it, so identical inputs yield identical identifiers within one environment. A fresh environment assigns new timestamps; the sha256 in `lineage_dim` is what ties the two.
 
@@ -397,6 +403,8 @@ All are DuckDB macros in `sql/lineage.sql`; the PostgreSQL versions are in `sql/
 | `lid_parse(text)` | `UUID` | Inverse of `lid_text` |
 | `lid_trace(lid)` | table: `source_path, source_url, sha256, ts_ms, layer, experiment, run, channel, segment` | Back: one record to its file, joining `lineage_dim` on `ingest_ord` |
 | `lid_parent(lid)` | `UUID` | Same identifier one layer up; Gold to Silver to Bronze without a lookup |
+| `lid_validate(lid, expected_layer)` | `BOOLEAN` | False when the layer bits do not match the table being written; every loader calls it |
+| `lid_radioactive(lid)` | `BIGINT` | 1 for a canary record |
 | `lid_children(ing)` | table: every `silver/record` row of one ingested file | Forward: range scan on the `ingest_ord` prefix |
 | `lid_prefix_lo(ing)`, `lid_prefix_hi(ing)` | `UUID` | Bounds for the range scan |
 
@@ -406,6 +414,10 @@ Example. Given a `gold/channel_quality` row with `lid = 01K5H2ZQ8G00000000000000
 
 Every number in the `channel_quality` and `experiment_summary` tables on `docs/index.html` is clickable. Clicking runs `lid_trace` in DuckDB-WASM and shows the result in a side panel: file, digest, run, channel, sample range. The panel text is a query result like everything else on the page.
 
-### 12.5 Limits
+### 12.5 Canary records
+
+One synthetic subject per experiment is planted in Silver with the radioactive bit set. A check of kind `sql` asserts that no `lid` with the bit set appears in any Gold mart or under `docs/data/`. The flag lives in the identifier, not in a column, so a copy of the record cannot lose it.
+
+### 12.6 Limits
 
 A record's sample budget is bounded by `sample_idx INTEGER`, 2.1e9 samples, 24 days at 1 kHz; a run longer than that is split into segments. A Gold row derived from more than one record cannot be expressed as one `lid` plus a range and uses `lineage_edge`; none exists in this system.

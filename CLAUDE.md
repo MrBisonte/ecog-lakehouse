@@ -25,5 +25,8 @@ Pre-commit: `ruff`, `python scripts/lint_doc.py` on every `.md`, `make test`. A 
 ## Review
 Every phase ends with a pass recorded in `doc/REVIEW.md`: what was checked, what failed, what changed. A verifier subagent reruns `make all SYNTH=1` and `make test` from a clean clone before a phase is marked done.
 
+## Identifiers
+Follow arch-standards/ids/SPEC.md. `lid` is generated from its layout file; `sql/lineage/` holds the generated macros plus the hand written `lid_trace`, `lid_children`, `lid_parent`.
+
 ## Faults
 `faults/<a|d|f|g>/` each hold `plant.*`, `fix.*`, `bench.sh`. Do not "fix" a planted fault in the pipeline itself; the pipeline is already the fixed version.
