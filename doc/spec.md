@@ -165,7 +165,7 @@ Not part of any layer. Contains two tables.
 
 #### silver/recording
 
-Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `channel_idx, ts_ms`. Row group size 200,000 rows.
+Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `lid, sample_idx`, which is file, run, channel, time order (section 12.2). Row groups of at most 200,000 rows; the writer asks for 198,656, the largest multiple of DuckDB's 2,048 row vector under the limit, because DuckDB rounds the requested size up.
 
 | Column name | Column type |
 |---|---|
@@ -175,9 +175,29 @@ Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file
 | channel_idx | SMALLINT |
 | ts_ms | INTEGER |
 | value_uv | FLOAT |
+| lid | UUID |
+| sample_idx | INTEGER |
 
 - `ts_ms` is milliseconds from the start of the run. Not NULL.
 - `value_uv` is the value in microvolts after the adapter's unit conversion. NULL is not allowed; a source NaN is dropped and counted in `gold/channel_quality.missing_samples`.
+- `lid` is the layer 2 identifier of the sample's record (section 12.2). Not NULL. References `silver/record.lid`.
+- `sample_idx` is the source sample position, kept so a Gold row can name its sample range. Not NULL.
+
+#### silver/record
+
+One row per record, that is one channel of one run of one ingested file. Not partitioned. The lineage dimension of Silver (section 12.2).
+
+| Column name | Column type |
+|---|---|
+| lid | UUID |
+| experiment | VARCHAR |
+| subject_pid | VARCHAR |
+| run | SMALLINT |
+| channel_idx | SMALLINT |
+| n_samples_src | BIGINT |
+
+- `lid` is the Bronze record's identifier with the layer set to 2. Not NULL, unique.
+- `n_samples_src` is the number of source samples of the record in Bronze, NaN included, so that `gold/channel_quality.missing_samples` is derived from Silver alone. Not NULL.
 
 `silver/electrode` and `silver/event` mirror their Bronze tables with `subject_src` replaced by `subject_pid`, `sample_idx` replaced by `ts_ms`, and `ingest_id` removed.
 
@@ -268,12 +288,12 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 (
     FORMAT parquet,
     PARTITION BY (experiment, subject_pid),
-    ORDER BY (channel_idx, ts_ms),
-    ROW_GROUP_SIZE 200000
+    ORDER BY (lid, sample_idx),
+    ROW_GROUP_SIZE 198656
 );
 ```
 
-- Fix, v1.x compatible form used by the pipeline: `COPY (SELECT ... ORDER BY channel_idx, ts_ms) TO ... (FORMAT parquet, PARTITION_BY (experiment, subject_pid), ROW_GROUP_SIZE 200000);`
+- Fix, v1.x compatible form used by the pipeline: one `COPY (SELECT ... WHERE experiment = ... AND subject_pid = ... ORDER BY lid, sample_idx) TO '<partition directory>/data_0.parquet' (FORMAT parquet, ROW_GROUP_SIZE 198656);` per partition. DuckDB 1.5's partitioned `COPY` does not keep the `ORDER BY` across its buffer flushes, a plain `COPY` does.
 - Bench: the same aggregate over both layouts, remote URL, with `SET read_ahead_depth = 0;` and with the default. Four timings.
 - Story: parallelism is per row group; a single row group is a single stream, and no I/O scheduler can help it.
 
@@ -360,7 +380,7 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
  bits 127..80   ts_ms          48   first ingestion time of the source file, ms since epoch
  bits  79..76   layer           4   1 Bronze, 2 Silver, 3 Gold
  bits  75..68   experiment      8   code from lineage_experiment
- bits  67..52   ingest_ord     16   rank of the file's sha256 in ingest_audit
+ bits  67..52   ingest_ord     16   position of the file in the append-only ingest_audit, ordered by ingested_at then sha256
  bits  51..48   run             4   run within the file, from 1
  bits  47..38   channel        10   electrode index
  bits  37..28   segment        10   fixed segment within the channel run, 0 when unsplit
@@ -379,7 +399,7 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
 | `gold/feature_window` | `lid UUID, sample_lo INTEGER, sample_hi INTEGER` | The window's source range within one record |
 | `gold/channel_quality` | `lid UUID` | Whole record |
 | `gold/evidence` | `lid UUID` | NULL for dataset-level checks; set when a check targets one record |
-| `lineage_dim` | `ingest_ord SMALLINT, ingest_id VARCHAR, source_path VARCHAR, source_url VARCHAR, sha256 VARCHAR, ts_ms BIGINT` | The only table decoding needs; `source_url` is the origin outside this system |
+| `lineage_dim` | `ingest_ord SMALLINT, ingest_id VARCHAR, source_path VARCHAR, source_url VARCHAR, sha256 VARCHAR, ts_ms BIGINT, experiment VARCHAR` | The only table decoding needs; `source_url` is the origin outside this system. A view over `bronze/ingest_audit`; `experiment` comes from the Bronze recording partition of the `ingest_id` and is needed by `lid_prefix_lo` and `lid_prefix_hi`, because `ts_ms` and `experiment` precede `ingest_ord` in the bit order |
 | `lineage_experiment` | `code TINYINT, experiment VARCHAR` | Experiment code table |
 | `lineage_edge` | `child_lid UUID, parent_lid UUID` | Only for derivations that span more than one record. Empty in this system; present so the limit is explicit |
 
