@@ -191,8 +191,10 @@ Gold is the enterprise model for consumers. Everything here is a query result.
 | `gold/experiment_summary` | experiment, subject_pid | `n_runs SMALLINT, n_channels SMALLINT, duration_s FLOAT, n_events INTEGER` |
 | `gold/feature_window` | experiment, subject_pid, run, channel_idx, window_start_ms | `mean_uv FLOAT, std_uv FLOAT, p2p_uv FLOAT` over 1,000 ms windows |
 | `gold/evidence` | run_id, check_id | see section 5 |
+| `gold/dataset_manifest` | dataset_version | `dataset VARCHAR, layer TINYINT, lid_lo UUID, lid_hi UUID, n_records BIGINT, file_digests VARCHAR[], produced_at TIMESTAMP, git_commit VARCHAR` |
 
 - `clipped_pct` is the share of samples at the amplifier's minimum or maximum, in percent.
+- `gold/dataset_manifest` has one row per dataset per build. `dataset_version` is the same digest `gold/evidence` uses; `lid_lo` and `lid_hi` bound the records included; `file_digests` lists the source sha256 values. This is the handle a model registry or a submission package holds to say exactly which data it was built on: one row, and every record and file it covers can be enumerated with `lid_children` and `lineage_dim`.
 - `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per channel in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.
 
 ## 4. Contracts
