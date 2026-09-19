@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import duckdb
+import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 SQL = REPO / "sql"
@@ -71,8 +72,19 @@ def run_sql(con, path: Path, **values):
     con.execute(render(path.read_text(encoding="utf-8"), **values))
 
 
+def columns(dataset: str) -> str | None:
+    """`name TYPE, ...` of a dataset: inline for Bronze, from its contract for Silver and Gold."""
+    if dataset in EMPTY:
+        return EMPTY[dataset]
+    contract = REPO / "contracts" / f"{view_name(dataset)}.yaml"
+    if not contract.exists():
+        return None
+    props = yaml.safe_load(contract.read_text(encoding="utf-8"))["schema"][0]["properties"]
+    return ", ".join(f"{p['name']} {p['physicalType']}" for p in props)
+
+
 def views(con):
-    """One view per dataset that exists on disk, a typed empty view for the ones macros need."""
+    """One view per dataset on disk; a typed empty view for a dataset with a known schema."""
     for dataset in DATASETS:
         root = data_dir() / dataset
         if any(root.rglob("*.parquet")):
@@ -81,10 +93,8 @@ def views(con):
                 f"'{root.as_posix()}/**/*.parquet', hive_partitioning = true, "
                 "hive_types_autocast = false)"
             )
-        elif dataset in EMPTY:
-            cols = ", ".join(
-                f"NULL::{t} AS {c}" for c, t in (p.split() for p in EMPTY[dataset].split(", "))
-            )
+        elif (schema := columns(dataset)) is not None:
+            cols = ", ".join(f"NULL::{t} AS {c}" for c, t in (p.split() for p in schema.split(", ")))
             con.execute(f"CREATE OR REPLACE VIEW {view_name(dataset)} AS SELECT {cols} WHERE false")
 
 

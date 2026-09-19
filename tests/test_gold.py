@@ -62,11 +62,10 @@ def test_feature_window(gold):
 def test_publish_writes_manifest_within_limits(built, tmp_path, monkeypatch):
     assert publish.main(["--out", str(tmp_path)]) == 0
     manifest = json.loads((tmp_path / "manifest.json").read_text())
-    assert {f["path"] for f in manifest["files"]} == {
-        "gold/channel_quality/data_0.parquet",
-        "gold/experiment_summary/data_0.parquet",
-        "gold/feature_window/data_0.parquet",
+    assert {f["path"].split("/")[1] for f in manifest["files"]} == {
+        "channel_quality", "experiment_summary", "feature_window", "evidence",
     }
+    assert all(f["path"].startswith("gold/") and len(f["sha256"]) == 64 for f in manifest["files"])
     assert all((tmp_path / f["path"]).stat().st_size == f["bytes"] for f in manifest["files"])
     monkeypatch.setattr(publish, "FILE_LIMIT", 1)
     assert publish.main(["--out", str(tmp_path)]) == 1
