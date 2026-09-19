@@ -79,6 +79,8 @@ def test_reidentification_is_logged_before_it_answers(built):
     src, pid = con.execute("SELECT subject_src, subject_pid FROM key_map LIMIT 1").fetchone()
     assert con.execute("SELECT count(*) FROM secret").fetchone()[0] == 1
     con.close()
+    assert keyring.pseudonymise(synth.SUBJECTS) == 0, "a rerun adds no pseudonym"
+    assert keyring.pseudonymise([*synth.SUBJECTS, "zz"]) == 1
     assert keyring.reidentify(pid, "pytest", "unit test") == src
     assert keyring.reidentify("0000000000000000", "pytest", "unknown pid") is None
     log = duckdb.connect(str(keyring.path()), read_only=True).execute(
