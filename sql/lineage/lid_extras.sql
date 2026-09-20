@@ -1,6 +1,6 @@
 -- Hand written lineage macros, doc/spec.md 12.3. The bit work is in lid_generated.sql, copied
 -- from arch-standards by `make lineage` and never edited here. This file adds the lineage
--- tables, the UUID bridge, the text form, and the navigation: lid_trace, lid_children,
+-- tables, the text form, and the navigation: lid_trace, lid_children,
 -- lid_parent. Requires the views bronze_ingest_audit, bronze_recording and silver_record
 -- (pipeline/db.py connect).
 
@@ -23,27 +23,15 @@ SELECT
 FROM bronze_ingest_audit a
 LEFT JOIN (SELECT DISTINCT experiment, ingest_id FROM bronze_recording) r USING (ingest_id);
 
--- ponytail: UUID bridge through hex text, DuckDB 1.5 has no cast between UHUGEINT and UUID.
--- Replace with the generated lid_to_uuid and lid_from_uuid once idgen emits this bridge.
-CREATE OR REPLACE MACRO lid_u128(u) AS from_hex(replace(u::VARCHAR, '-', ''))::BIT::UHUGEINT;
-
-CREATE OR REPLACE MACRO lid_hex32(x) AS lpad(hex(x::UHUGEINT), 32, '0');
-
-CREATE OR REPLACE MACRO lid_uuid(x) AS (
-    substr(lid_hex32(x), 1, 8) || '-' || substr(lid_hex32(x), 9, 4) || '-'
-    || substr(lid_hex32(x), 13, 4) || '-' || substr(lid_hex32(x), 17, 4) || '-'
-    || substr(lid_hex32(x), 21, 12)
-)::UUID;
-
 CREATE OR REPLACE MACRO lid_text(lid) AS list_aggregate(
     list_transform(range(26), i -> substr(
         '0123456789ABCDEFGHJKMNPQRSTVWXYZ',
-        ((lid_u128(lid) >> (125 - i * 5)::UHUGEINT) & 31)::INTEGER + 1, 1)),
+        ((lid_from_uuid(lid) >> (125 - i * 5)::UHUGEINT) & 31)::INTEGER + 1, 1)),
     'string_agg', '');
 
 CREATE OR REPLACE MACRO lid_parse(txt) AS
     CASE WHEN length(txt) <> 26 THEN error('lid_parse: expected 26 characters')
-    ELSE lid_uuid(list_reduce(
+    ELSE lid_to_uuid(list_reduce(
         list_transform(string_split(upper(txt), ''),
             c -> (position(c IN '0123456789ABCDEFGHJKMNPQRSTVWXYZ') - 1)::UHUGEINT),
         (a, d) -> a * 32 + d))
@@ -52,25 +40,25 @@ CREATE OR REPLACE MACRO lid_parse(txt) AS
 -- Every loader calls lid_validate: an identifier is carried one layer down only when its
 -- layer bits are the ones the loader reads. The radioactive bit travels with it.
 CREATE OR REPLACE MACRO lid_relayer(lid, from_layer) AS
-    CASE WHEN NOT lid_validate(lid_u128(lid), from_layer)
+    CASE WHEN NOT lid_validate(lid_from_uuid(lid), from_layer)
          THEN error('lid_relayer: layer bits do not match the layer being read')
-         ELSE lid_uuid(lid_u128(lid) + (1::UHUGEINT << 76))
+         ELSE lid_to_uuid(lid_from_uuid(lid) + (1::UHUGEINT << 76))
     END;
 
 CREATE OR REPLACE MACRO lid_parent(lid) AS
-    CASE WHEN lid_layer(lid_u128(lid)) <= 1 THEN error('lid_parent: Bronze has no parent')
-    ELSE lid_uuid(lid_u128(lid) - (1::UHUGEINT << 76))
+    CASE WHEN lid_layer(lid_from_uuid(lid)) <= 1 THEN error('lid_parent: Bronze has no parent')
+    ELSE lid_to_uuid(lid_from_uuid(lid) - (1::UHUGEINT << 76))
     END;
 
 -- Bounds of every Silver record of one ingested file: ts_ms and experiment come from the
 -- file, layer is 2, run, channel, segment and the canary bit span their full range.
 CREATE OR REPLACE MACRO lid_prefix_lo(ing) AS (
-    SELECT lid_uuid(lid_encode(d.ts_ms, 2, e.code, ing, 0, 0, 0, 0))
+    SELECT lid_to_uuid(lid_encode(d.ts_ms, 2, e.code, ing, 0, 0, 0, 0))
     FROM lineage_dim d JOIN lineage_experiment e USING (experiment)
     WHERE d.ingest_ord = ing);
 
 CREATE OR REPLACE MACRO lid_prefix_hi(ing) AS (
-    SELECT lid_uuid(lid_encode(d.ts_ms, 2, e.code, ing, 15, 1023, 1023, 1) | ((1::UHUGEINT << 23) - 1))
+    SELECT lid_to_uuid(lid_encode(d.ts_ms, 2, e.code, ing, 15, 1023, 1023, 1) | ((1::UHUGEINT << 23) - 1))
     FROM lineage_dim d JOIN lineage_experiment e USING (experiment)
     WHERE d.ingest_ord = ing);
 
@@ -81,6 +69,6 @@ CREATE OR REPLACE MACRO lid_children(ing) AS TABLE
 CREATE OR REPLACE MACRO lid_trace(lid) AS TABLE
     SELECT d.source_path, d.source_url, d.sha256, f.ts_ms, f.layer, e.experiment,
            f.run, f.channel, f.segment
-    FROM (SELECT lid_decode(lid_u128(lid)) AS f)
+    FROM (SELECT lid_decode(lid_from_uuid(lid)) AS f)
     JOIN lineage_dim d ON d.ingest_ord = f.file
     JOIN lineage_experiment e ON e.code = f.experiment;

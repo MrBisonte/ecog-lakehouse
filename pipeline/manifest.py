@@ -19,7 +19,7 @@ def row(con, dataset: str, produced_at, commit: str) -> tuple:
         n, lo, hi = con.execute(f"SELECT count(*), min(lid), max(lid) FROM {view}").fetchone()
         digests = con.execute(
             f"SELECT DISTINCT d.sha256 FROM (SELECT DISTINCT lid FROM {view} WHERE lid IS NOT NULL) v "
-            "JOIN lineage_dim d ON d.ingest_ord = lid_file(lid_u128(v.lid)) ORDER BY 1"
+            "JOIN lineage_dim d ON d.ingest_ord = lid_file(lid_from_uuid(v.lid)) ORDER BY 1"
         ).fetchall()
     else:
         n, lo, hi = con.execute(f"SELECT count(*) FROM {view}").fetchone()[0], None, None

@@ -14,7 +14,7 @@ COPY (
     JOIN (
         SELECT
             channel_idx,
-            lid_uuid(lid_encode(epoch_ms(TIMESTAMP '{{ingested_at}}'), 1, {{experiment_code}},
+            lid_to_uuid(lid_encode(epoch_ms(TIMESTAMP '{{ingested_at}}'), 1, {{experiment_code}},
                                 {{ingest_ord}}, {{run}}, channel_idx, 0, {{radioactive}})) AS lid
         FROM (SELECT DISTINCT channel_idx FROM src_recording)
     ) l USING (channel_idx)

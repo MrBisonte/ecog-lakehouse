@@ -31,7 +31,7 @@ def test_channel_quality(gold):
     ).fetchone()[0] == 0
     assert gold.execute(
         "SELECT count(*) FROM gold_channel_quality WHERE line_noise_ratio IS NULL "
-        "OR line_noise_ratio < 0 OR line_noise_ratio > 1 OR rms_uv <= 0 OR lid_layer(lid_u128(lid)) <> 3"
+        "OR line_noise_ratio < 0 OR line_noise_ratio > 1 OR rms_uv <= 0 OR lid_layer(lid_from_uuid(lid)) <> 3"
     ).fetchone()[0] == 0
     noisy, clean = gold.execute(
         "SELECT min(line_noise_ratio) FILTER (WHERE channel_idx % 4 = 0), "
@@ -55,7 +55,7 @@ def test_feature_window(gold):
     assert gold.execute(
         "SELECT count(*) FROM gold_feature_window WHERE window_start_ms % 1000 <> 0 "
         "OR sample_lo < window_start_ms OR sample_hi >= window_start_ms + 1000 "
-        "OR p2p_uv < 0 OR std_uv < 0 OR lid_layer(lid_u128(lid)) <> 3 "
+        "OR p2p_uv < 0 OR std_uv < 0 OR lid_layer(lid_from_uuid(lid)) <> 3 "
         "OR lid_parent(lid) NOT IN (SELECT lid FROM silver_record)"
     ).fetchone()[0] == 0
 
@@ -63,10 +63,10 @@ def test_feature_window(gold):
 def test_no_canary_record_reaches_a_gold_mart(gold):
     for view in ("gold_channel_quality", "gold_feature_window"):
         assert gold.execute(
-            f"SELECT count(*) FROM {view} WHERE lid_radioactive(lid_u128(lid)) = 1"
+            f"SELECT count(*) FROM {view} WHERE lid_radioactive(lid_from_uuid(lid)) = 1"
         ).fetchone()[0] == 0, view
     canary = gold.execute(
-        "SELECT DISTINCT subject_pid FROM silver_record WHERE lid_radioactive(lid_u128(lid)) = 1"
+        "SELECT DISTINCT subject_pid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 1"
     ).fetchall()
     assert len(canary) == 1
     assert gold.execute(
@@ -111,7 +111,7 @@ def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
     leak = tmp_path / "data" / "gold" / "channel_quality"
     leak.mkdir(parents=True)
     canary = db.connect().execute(
-        "SELECT lid FROM silver_record WHERE lid_radioactive(lid_u128(lid)) = 1 LIMIT 1"
+        "SELECT lid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 1 LIMIT 1"
     ).fetchone()[0]
     duckdb.connect().execute(
         f"COPY (SELECT '{canary}'::UUID AS lid, 1 AS n) TO '{(leak / 'data_0.parquet').as_posix()}' (FORMAT parquet)"

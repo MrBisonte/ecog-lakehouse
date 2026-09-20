@@ -15,5 +15,5 @@ CREATE OR REPLACE MACRO lid_radioactive(x) AS CAST((CAST(x AS UHUGEINT) >> 23) &
 CREATE OR REPLACE MACRO lid_decode(x) AS {"ts_ms": lid_ts_ms(x), "layer": lid_layer(x), "experiment": lid_experiment(x), "file": lid_file(x), "run": lid_run(x), "channel": lid_channel(x), "segment": lid_segment(x), "radioactive": lid_radioactive(x)};
 CREATE OR REPLACE MACRO lid_validate(x, expected_layer) AS lid_layer(x) = expected_layer;
 CREATE OR REPLACE MACRO lid_time(x) AS to_timestamp((lid_ts_ms(x) + 0) / 1000.0);
-CREATE OR REPLACE MACRO lid_to_uuid(x) AS CAST(CAST(x AS UHUGEINT) AS UUID);
-CREATE OR REPLACE MACRO lid_from_uuid(u) AS CAST(CAST(u AS UHUGEINT) AS UHUGEINT);
+CREATE OR REPLACE MACRO lid_to_uuid(x) AS CAST(substr(lpad(hex(CAST(x AS UHUGEINT)), 32, '0'), 1, 8) || '-' || substr(lpad(hex(CAST(x AS UHUGEINT)), 32, '0'), 9, 4) || '-' || substr(lpad(hex(CAST(x AS UHUGEINT)), 32, '0'), 13, 4) || '-' || substr(lpad(hex(CAST(x AS UHUGEINT)), 32, '0'), 17, 4) || '-' || substr(lpad(hex(CAST(x AS UHUGEINT)), 32, '0'), 21, 12) AS UUID);
+CREATE OR REPLACE MACRO lid_from_uuid(u) AS CAST(CAST(from_hex(replace(CAST(u AS VARCHAR), '-', '')) AS BIT) AS UHUGEINT);

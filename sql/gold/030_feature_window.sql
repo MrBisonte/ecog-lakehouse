@@ -14,7 +14,7 @@ COPY (
         min(sample_idx)::INTEGER AS sample_lo,
         max(sample_idx)::INTEGER AS sample_hi
     FROM silver_recording
-    WHERE lid IN (SELECT lid FROM silver_record WHERE lid_radioactive(lid_u128(lid)) = 0)
+    WHERE lid IN (SELECT lid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 0)
     GROUP BY experiment, subject_pid, run, channel_idx, window_start_ms, lid
     ORDER BY lid, window_start_ms
 ) TO '{{data_dir}}/gold/feature_window/data_0.parquet' (FORMAT parquet);

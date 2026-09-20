@@ -24,7 +24,7 @@ def radioactive_rows(con, path: Path) -> int:
         return 0
     return con.execute(
         f"SELECT count(*) FROM read_parquet('{path.as_posix()}') "
-        "WHERE lid IS NOT NULL AND lid_radioactive(lid_u128(lid)) = 1"
+        "WHERE lid IS NOT NULL AND lid_radioactive(lid_from_uuid(lid)) = 1"
     ).fetchone()[0]
 
 
