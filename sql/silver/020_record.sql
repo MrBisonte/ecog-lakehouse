@@ -4,7 +4,7 @@
 -- Silver alone.
 COPY (
     SELECT
-        lid_relayer(r.lid, 1) AS lid,
+        lid_to_uuid(lid_relayer(lid_from_uuid(r.lid), 1)) AS lid,
         r.experiment,
         k.subject_pid,
         r.run,
