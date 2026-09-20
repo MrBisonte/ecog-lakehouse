@@ -8,7 +8,7 @@ COPY (
         b.y_mm,
         b.z_mm,
         b.brain_area,
-        lid_relayer(b.lid, 1) AS lid
+        lid_to_uuid(lid_relayer(lid_from_uuid(b.lid), 1)) AS lid
     FROM bronze_electrode b
     JOIN keyring.key_map k USING (subject_src)
     ORDER BY lid
