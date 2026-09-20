@@ -34,7 +34,7 @@ COPY (
         q.rms_uv,
         q.clipped_pct,
         n.line_noise_ratio::FLOAT AS line_noise_ratio,
-        lid_relayer(q.lid, 2) AS lid
+        lid_to_uuid(lid_relayer(lid_from_uuid(q.lid), 2)) AS lid
     FROM q
     JOIN silver_record s USING (lid)
     LEFT JOIN line_noise n USING (lid)
