@@ -183,3 +183,58 @@ $ du -sh $DATA_DIR/*
 119M	/tmp/ibrain_verify_data/raw
 352M	/tmp/ibrain_verify_data/silver
 ```
+
+## Phase 0 amendment, text, parse and relayer from the generator
+
+- Status: done, 2026-09-20, branch `feat/lid-generated-macros` on top of `feat/lid-layout`
+- Environment: as phase 0, arch-standards at `../arch-standards` on branch `feat/ids-text-parse-relayer`, its pull requests 2 and 3 open
+
+### Checked
+
+- `sql/lineage/lid_generated.sql` is byte identical to `arch-standards/ids/generated/lid/duckdb.sql` after `make lineage`. It now carries `lid_text`, `lid_parse` and `lid_relayer` as well, 17 macros in total.
+- `sql/lineage/lid_extras.sql` hand writes only the lineage tables and the navigation: `lid_parent`, `lid_prefix_lo`, `lid_prefix_hi`, `lid_children`, `lid_trace`. Nothing in it touches a bit position except `lid_parent`, which subtracts one layer.
+- The five loaders still go through `lid_relayer`, now the generated one, which validates the layer being read before incrementing it. The mismatch error is still proved by a test.
+- Clean clone, `ruff` clean, 20 documents lint clean, 30,720,000 Bronze rows, 102 checks pass and 0 fail, 55 tests. Output below.
+
+### Failed, and fixed before the commit
+
+- Nothing failed. The swap is type driven: the generated macros take and return `UHUGEINT` while `lid` is stored as `UUID`, so the five loaders and three test assertions wrap with `lid_from_uuid` and `lid_to_uuid`. Caught by writing it, not by a red test, because the hand written macros were shadowing the generated ones by name until they were deleted.
+
+### Changed
+
+- `sql/lineage/lid_extras.sql`: `lid_text`, `lid_parse` and `lid_relayer` deleted, they are generated now.
+- `sql/silver/020_record.sql`, `040_electrode.sql`, `050_event.sql`, `sql/gold/010_channel_quality.sql`, `030_feature_window.sql`: `lid_relayer` calls wrapped for the UUID boundary.
+- `tests/test_lineage.py`: same wrapping in the text, parse and relayer assertions.
+- `doc/spec.md` 12.1 and 12.3, forced by a contradiction with the code. 12.3 named `sql/lineage.sql` and a PostgreSQL twin `sql/lineage_pg.sql`, neither of which exists; it gave `lid_encode` 7 arguments where the layout has 8 including the canary bit; it called the decode key `ingest_ord` where the generated struct says `file`. The code was right in all three, the spec was stale. The table now has a `Source` column saying which macros are generated and which are this system's own, and `lid_relayer`, `lid_validate`, `lid_to_uuid` and `lid_from_uuid` are listed.
+- No ADR here. The decision to generate `relayer` is arch-standards ADR-0002, because that is where the rule and the naming table live.
+
+### Guesses and open points
+
+- `lid_relayer` returning the native integer rather than `UUID` is the generator's contract, so this system wraps at five call sites. More verbose than the hand written macro it replaces, and it keeps one home for the bit work. Reversing that would mean the generator knowing a project's storage type, which it does not.
+- The range guard gap from the previous entry is still open. Ids SPEC rule 7 says every input field is range checked on encode; the Python target does it, the SQL targets do not, so `lid_encode` in DuckDB still wraps a value that is out of range instead of erroring. It belongs in `idgen`, not here.
+- The verifier reused `~/.venvs/ibrain`, whose editable install points at `/mnt/c/Prj/ibrain`. `pipeline/db.py` sets `REPO` from the `pipeline` module's own location, so `publish` wrote its manifest into the original checkout rather than the clone. The clone's data and checks were unaffected and the original repository stayed clean, but a verifier run is only truly isolated with a venv installed from the clone, as the previous entry did.
+
+### Verifier output
+
+```
+$ git clone -q -b feat/lid-generated-macros /mnt/c/Prj/ibrain /tmp/ibrain_verify
+$ git log --oneline | head -1
+d58cbcf refactor(lineage): take text, parse and relayer from the generated macros
+$ cmp sql/lineage/lid_generated.sql /mnt/c/Prj/arch-standards/ids/generated/lid/duckdb.sql && echo identical
+identical
+$ export DATA_DIR=/tmp/ibrain_verify_data
+$ ruff check .
+All checks passed!
+$ python scripts/lint_doc.py ... | grep -c "result: pass"
+20
+$ make all SYNTH=1        # recipes run directly, make is not installed in this WSL
+convert: 30720000 rows written
+run: silver/050_event.sql
+run: gold/dataset_manifest, 12 datasets
+checks: run 01M2ZJVD4E594S7N12R9SWSXB4, {'pass': 102, 'fail': 0, 'error': 0}
+publish: 5 files, 306037 bytes
+$ python -m pytest -q
+.......................................................                  [100%]
+55 passed in 10.00s
+$ git status --short
+```
