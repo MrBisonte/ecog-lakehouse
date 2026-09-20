@@ -120,3 +120,15 @@ def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
     out = tmp_path / "out"
     assert publish.main(["--out", str(out)]) == 1
     assert not (out / "manifest.json").exists()
+
+
+def test_publish_default_out_follows_the_working_directory(built, tmp_path, monkeypatch):
+    """An editable install points at the checkout it was installed from, so a verifier running
+    from a clone must not publish into that checkout."""
+    install = tmp_path / "install"
+    (install / "docs" / "data").mkdir(parents=True)
+    monkeypatch.setattr(db, "REPO", install)
+    monkeypatch.chdir(tmp_path)
+    assert publish.main([]) == 0
+    assert json.loads((tmp_path / "docs" / "data" / "manifest.json").read_text())["files"]
+    assert list((install / "docs" / "data").iterdir()) == []

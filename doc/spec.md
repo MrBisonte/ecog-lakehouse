@@ -321,7 +321,7 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 
 `pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `pyyaml` and nothing else. Orchestration is `make`.
 
-All data and DuckDB working files live under `DATA_DIR`, an environment variable defaulting to `$HOME/data/ecog-lakehouse`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. The repository sits on a Windows mount under WSL2, where per-file operations are slow and OneDrive style syncing can lock files, so nothing but source, documentation and `docs/data/` is written inside it. `DATA_DIR` is created on first run. Paths in this document written as `data/<layer>/` mean `$DATA_DIR/<layer>/`.
+All data and DuckDB working files live under `DATA_DIR`, an environment variable defaulting to `$HOME/data/ecog-lakehouse`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. The repository sits on a Windows mount under WSL2, where per-file operations are slow and OneDrive style syncing can lock files, so nothing but source, documentation and `docs/data/` is written inside it. `DATA_DIR` is created on first run. Paths in this document written as `data/<layer>/` mean `$DATA_DIR/<layer>/`. `publish` resolves `docs/data/` against the working directory, not against the location the `pipeline` package was installed from, so a run inside a clone publishes into that clone even when the active virtual environment holds an editable install of another checkout.
 
 Targets:
 
