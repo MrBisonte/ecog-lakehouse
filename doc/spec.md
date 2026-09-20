@@ -393,7 +393,7 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
  bits  22..0    reserved       23   zero
 ```
 
-No field straddles the 64 bit boundary, so a hi and lo pair of 64 bit words is equivalent to the native 128 bit value on engines without one. The layout is the file `ids/layouts/lid.yaml` in the arch-standards repository; the macros below are generated from it by `idgen` and committed under `sql/lineage/`, never edited by hand.
+No field straddles the 64 bit boundary, so a hi and lo pair of 64 bit words is equivalent to the native 128 bit value on engines without one. The layout is the file `ids/layouts/lid.yaml` in the arch-standards repository. Every macro that touches these bits is generated from it by `idgen` and committed as `sql/lineage/lid_generated.sql`, never edited by hand; section 12.3 says which of the macros below are generated and which are this system's own.
 
 `ts_ms` is the timestamp of the first ingestion of that sha256, read from `ingest_audit`. A rerun of the same file reuses it, so identical inputs yield identical identifiers within one environment. A fresh environment assigns new timestamps; the sha256 in `lineage_dim` is what ties the two.
 
@@ -415,20 +415,24 @@ A Silver record's `lid` differs from its Bronze parent's only in the layer bits;
 
 ### 12.3 Functions
 
-All are DuckDB macros in `sql/lineage.sql`; the PostgreSQL versions are in `sql/lineage_pg.sql` and are the same expressions over `uuid` cast to `numeric`.
+All are DuckDB macros, split by who owns them. `sql/lineage/lid_generated.sql` is copied from arch-standards by `make lineage` and never edited here: every bit operation, the layer check, the text form and the UUID bridge. `sql/lineage/lid_extras.sql` is hand written and holds only what is specific to this system, the lineage tables and the navigation. The PostgreSQL versions are not written yet; when they are they come from the same layout file, not by hand.
 
-| Macro | Returns | Use |
-|---|---|---|
-| `lid_encode(ts_ms, layer, exp, ing, run, ch, seg)` | `UUID` | Build an identifier from its parts |
-| `lid_decode(lid)` | `STRUCT(ts_ms, layer, experiment, ingest_ord, run, channel, segment)` | Bit slicing, no table access |
-| `lid_text(lid)` | `VARCHAR`, 26 characters | Crockford base32 for display and logs |
-| `lid_parse(text)` | `UUID` | Inverse of `lid_text` |
-| `lid_trace(lid)` | table: `source_path, source_url, sha256, ts_ms, layer, experiment, run, channel, segment` | Back: one record to its file, joining `lineage_dim` on `ingest_ord` |
-| `lid_parent(lid)` | `UUID` | Same identifier one layer up; Gold to Silver to Bronze without a lookup |
-| `lid_validate(lid, expected_layer)` | `BOOLEAN` | False when the layer bits do not match the table being written; every loader calls it |
-| `lid_radioactive(lid)` | `BIGINT` | 1 for a canary record |
-| `lid_children(ing)` | table: every `silver/record` row of one ingested file | Forward: range scan on the `ingest_ord` prefix |
-| `lid_prefix_lo(ing)`, `lid_prefix_hi(ing)` | `UUID` | Bounds for the range scan |
+The generated macros take and return the native `UHUGEINT`, while `lid` is stored as `UUID`, so a call wraps with `lid_from_uuid` going in and `lid_to_uuid` coming out. The `Returns` column below is the type of the macro itself, before that wrapping.
+
+| Macro | Source | Returns | Use |
+|---|---|---|---|
+| `lid_encode(ts_ms, layer, exp, ing, run, ch, seg, radioactive)` | generated | `UHUGEINT` | Build an identifier from its parts |
+| `lid_decode(lid)` | generated | `STRUCT(ts_ms, layer, experiment, file, run, channel, segment, radioactive)` | Bit slicing, no table access. `file` is the `ingest_ord` |
+| `lid_text(lid)` | generated | `VARCHAR`, 26 characters | Crockford base32 for display and logs |
+| `lid_parse(text)` | generated | `UHUGEINT` | Inverse of `lid_text`, errors when the text is not 26 characters |
+| `lid_validate(lid, expected_layer)` | generated | `BOOLEAN` | False when the layer bits do not match the table being written |
+| `lid_relayer(lid, from_layer)` | generated | `UHUGEINT` | Carry a row one layer down. Validates the layer bits first, so the check cannot be forgotten at a call site; this is what enforces the rule, not the loaders |
+| `lid_radioactive(lid)` | generated | `BIGINT` | 1 for a canary record |
+| `lid_to_uuid(x)`, `lid_from_uuid(u)` | generated | `UUID`, `UHUGEINT` | The bridge between the stored type and the native one |
+| `lid_trace(lid)` | hand written | table: `source_path, source_url, sha256, ts_ms, layer, experiment, run, channel, segment` | Back: one record to its file, joining `lineage_dim` on `ingest_ord` |
+| `lid_parent(lid)` | hand written | `UUID` | Same identifier one layer up; Gold to Silver to Bronze without a lookup |
+| `lid_children(ing)` | hand written | table: every `silver/record` row of one ingested file | Forward: range scan on the `ingest_ord` prefix |
+| `lid_prefix_lo(ing)`, `lid_prefix_hi(ing)` | hand written | `UUID` | Bounds for the range scan |
 
 Example. Given a `gold/channel_quality` row with `lid = 01K5H2ZQ8G0000000000000000` (text form), `lid_trace` returns the `.mat` file it came from, the sha256 recorded at ingestion, and run 1, channel 17. `lid_children(3)` returns every record derived from the third ingested file.
 
