@@ -9,7 +9,7 @@ COPY (
         z_mm::FLOAT AS z_mm,
         brain_area::VARCHAR AS brain_area,
         '{{ingest_id}}' AS ingest_id,
-        lid_uuid(lid_encode(epoch_ms(TIMESTAMP '{{ingested_at}}'), 1, {{experiment_code}},
+        lid_to_uuid(lid_encode(epoch_ms(TIMESTAMP '{{ingested_at}}'), 1, {{experiment_code}},
                             {{ingest_ord}}, {{run}}, channel_idx, 0, {{radioactive}})) AS lid
     FROM src_electrode
 ) TO '{{data_dir}}/bronze/electrode'

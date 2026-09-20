@@ -12,7 +12,7 @@ EXCERPTS = """
 WITH rate AS (
     SELECT s.lid, a.sample_rate_hz
     FROM silver_record s
-    JOIN lineage_dim d ON d.ingest_ord = lid_file(lid_u128(s.lid))
+    JOIN lineage_dim d ON d.ingest_ord = lid_file(lid_from_uuid(s.lid))
     JOIN bronze_ingest_audit a USING (ingest_id)
 )
 SELECT r.lid, rate.sample_rate_hz, list(r.value_uv ORDER BY r.sample_idx) AS excerpt

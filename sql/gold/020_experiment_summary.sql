@@ -3,7 +3,7 @@
 -- records carry the canary bit (spec 12.5) is left out.
 COPY (
     WITH canary AS (
-        SELECT DISTINCT subject_pid FROM silver_record WHERE lid_radioactive(lid_u128(lid)) = 1
+        SELECT DISTINCT subject_pid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 1
     ),
     runs AS (
         SELECT experiment, subject_pid, run,

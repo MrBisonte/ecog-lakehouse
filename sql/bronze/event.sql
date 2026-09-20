@@ -9,7 +9,7 @@ COPY (
         e.event_code::SMALLINT AS event_code,
         l.event_label::VARCHAR AS event_label,
         '{{ingest_id}}' AS ingest_id,
-        lid_uuid(lid_encode(epoch_ms(TIMESTAMP '{{ingested_at}}'), 1, {{experiment_code}},
+        lid_to_uuid(lid_encode(epoch_ms(TIMESTAMP '{{ingested_at}}'), 1, {{experiment_code}},
                             {{ingest_ord}}, {{run}}, 0, 0, {{radioactive}})) AS lid
     FROM src_event e
     LEFT JOIN src_label l USING (event_code)

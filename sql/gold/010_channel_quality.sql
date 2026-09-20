@@ -21,7 +21,7 @@ COPY (
                 / count(*))::FLOAT AS clipped_pct
         FROM silver_recording r
         JOIN rails USING (experiment, subject_pid, run)
-        WHERE r.lid IN (SELECT lid FROM silver_record WHERE lid_radioactive(lid_u128(lid)) = 0)
+        WHERE r.lid IN (SELECT lid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 0)
         GROUP BY ALL
     )
     SELECT

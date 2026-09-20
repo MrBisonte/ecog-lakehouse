@@ -4,7 +4,7 @@ import pytest
 from pipeline import db
 from pipeline.lid import ALPHABET, ulid
 
-ENCODE = "SELECT lid_uuid(lid_encode(?, ?, ?, ?, ?, ?, ?, ?))"
+ENCODE = "SELECT lid_to_uuid(lid_encode(?, ?, ?, ?, ?, ?, ?, ?))"
 FIELDS = ["ts_ms", "layer", "experiment", "file", "run", "channel", "segment", "radioactive"]
 CASES = {
     "typical": (1789819200000, 2, 1, 3, 1, 17, 0, 0),
@@ -25,7 +25,7 @@ def encode(con, parts):
 
 
 def decode(con, lid):
-    return con.execute("SELECT lid_decode(lid_u128(?))", [lid]).fetchone()[0]
+    return con.execute("SELECT lid_decode(lid_from_uuid(?))", [lid]).fetchone()[0]
 
 
 @pytest.mark.parametrize("parts", CASES.values(), ids=CASES.keys())
@@ -36,7 +36,7 @@ def test_generated_encode_and_decode_round_trip_every_field(con, parts):
 def test_no_field_straddles_the_64_bit_boundary(con):
     x = encode(con, CASES["maxes"])
     hi, lo = con.execute(
-        "SELECT (lid_u128(?) >> 64)::UBIGINT, (lid_u128(?) & ((1::UHUGEINT << 64) - 1))::UBIGINT",
+        "SELECT (lid_from_uuid(?) >> 64)::UBIGINT, (lid_from_uuid(?) & ((1::UHUGEINT << 64) - 1))::UBIGINT",
         [x, x],
     ).fetchone()
     assert (hi >> 16, (hi >> 12) & 15, (hi >> 4) & 255, hi & 0xF) == (2**48 - 1, 15, 255, 0)
@@ -65,7 +65,7 @@ def test_parent_decrements_layer_only_and_relayer_validates(con):
     parent = con.execute("SELECT lid_parent(?)", [silver]).fetchone()[0]
     assert parent == encode(con, (parts[0], 1, *parts[2:]))
     assert con.execute("SELECT lid_relayer(?, 1)", [parent]).fetchone()[0] == silver
-    assert con.execute("SELECT lid_validate(lid_u128(?), 2), lid_radioactive(lid_u128(?))", [silver, silver]).fetchone() == (True, 1)
+    assert con.execute("SELECT lid_validate(lid_from_uuid(?), 2), lid_radioactive(lid_from_uuid(?))", [silver, silver]).fetchone() == (True, 1)
     with pytest.raises(duckdb.Error, match="Bronze has no parent"):
         con.execute("SELECT lid_parent(?)", [parent]).fetchone()
     with pytest.raises(duckdb.Error, match="layer bits do not match"):
@@ -88,7 +88,7 @@ def lineage_fixture(con):
     )
     con.execute(
         "CREATE OR REPLACE VIEW silver_record AS "
-        "SELECT lid_uuid(lid_encode(d.ts_ms, 2, e.code, d.ingest_ord, r.run, r.ch, 0, r.rad)) AS lid, "
+        "SELECT lid_to_uuid(lid_encode(d.ts_ms, 2, e.code, d.ingest_ord, r.run, r.ch, 0, r.rad)) AS lid, "
         "d.experiment, 'pid' AS subject_pid, r.run::SMALLINT AS run, "
         "r.ch::SMALLINT AS channel_idx, 1000::BIGINT AS n_samples_src "
         "FROM lineage_dim d JOIN lineage_experiment e USING (experiment), "
@@ -101,7 +101,7 @@ def test_children_returns_exactly_the_records_of_one_ingest(con):
     assert con.execute("SELECT count(*) FROM silver_record").fetchone()[0] == 9
     got = con.execute("SELECT lid FROM lid_children(2) ORDER BY lid").fetchall()
     want = con.execute(
-        "SELECT lid FROM silver_record WHERE lid_file(lid_u128(lid)) = 2 ORDER BY lid"
+        "SELECT lid FROM silver_record WHERE lid_file(lid_from_uuid(lid)) = 2 ORDER BY lid"
     ).fetchall()
     assert len(got) == 3 and got == want
 
@@ -109,7 +109,7 @@ def test_children_returns_exactly_the_records_of_one_ingest(con):
 def test_trace_on_a_bronze_row_returns_the_ingested_file(con):
     lineage_fixture(con)
     bronze = con.execute(
-        "SELECT lid_uuid(lid_encode(ts_ms, 1, 2, ingest_ord, 1, 17, 0, 0)) FROM lineage_dim "
+        "SELECT lid_to_uuid(lid_encode(ts_ms, 1, 2, ingest_ord, 1, 17, 0, 0)) FROM lineage_dim "
         "WHERE ingest_id = 'I2'"
     ).fetchone()[0]
     cursor = con.execute("SELECT * FROM lid_trace(?)", [bronze])

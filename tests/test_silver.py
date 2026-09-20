@@ -67,7 +67,7 @@ def test_files_are_sorted_by_lid_then_sample_idx_in_row_groups_under_the_limit(s
 
 def test_silver_lid_is_layer_2_child_of_a_bronze_record(silver):
     row = silver.execute(
-        "SELECT lid_layer(lid_u128(lid)), lid_parent(lid) IN (SELECT lid FROM bronze_recording) "
+        "SELECT lid_layer(lid_from_uuid(lid)), lid_parent(lid) IN (SELECT lid FROM bronze_recording) "
         "FROM silver_record LIMIT 1"
     ).fetchone()
     assert row == (2, True)
@@ -81,7 +81,7 @@ def test_canary_subject_is_in_silver_with_the_radioactive_bit(silver):
     ).fetchone()[0]
     con.close()
     per_pid = silver.execute(
-        "SELECT subject_pid, max(lid_radioactive(lid_u128(lid))) FROM silver_record GROUP BY 1"
+        "SELECT subject_pid, max(lid_radioactive(lid_from_uuid(lid))) FROM silver_record GROUP BY 1"
     ).fetchall()
     assert {pid: r for pid, r in per_pid} == {
         pid: int(pid == canary_pid) for pid, _ in per_pid
