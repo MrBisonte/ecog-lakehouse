@@ -10,7 +10,7 @@ COPY (
         avg(value_uv)::FLOAT AS mean_uv,
         stddev_pop(value_uv)::FLOAT AS std_uv,
         (max(value_uv) - min(value_uv))::FLOAT AS p2p_uv,
-        lid_relayer(lid, 2) AS lid,
+        lid_to_uuid(lid_relayer(lid_from_uuid(lid), 2)) AS lid,
         min(sample_idx)::INTEGER AS sample_lo,
         max(sample_idx)::INTEGER AS sample_hi
     FROM silver_recording

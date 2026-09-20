@@ -1,8 +1,12 @@
--- Hand written lineage macros, doc/spec.md 12.3. The bit work is in lid_generated.sql, copied
--- from arch-standards by `make lineage` and never edited here. This file adds the lineage
--- tables, the text form, and the navigation: lid_trace, lid_children,
+-- Hand written lineage macros, doc/spec.md 12.3. Every bit operation is in lid_generated.sql,
+-- copied from arch-standards by `make lineage` and never edited here: encode, decode, the field
+-- accessors, validate, relayer, time, text, parse and the UUID bridge. This file adds only what
+-- is specific to this system, the lineage tables and the navigation: lid_trace, lid_children,
 -- lid_parent. Requires the views bronze_ingest_audit, bronze_recording and silver_record
 -- (pipeline/db.py connect).
+--
+-- lid is stored as UUID and the generated macros work on the native UHUGEINT, so a call wraps
+-- with lid_from_uuid going in and lid_to_uuid coming out.
 
 CREATE OR REPLACE TABLE lineage_experiment (code TINYINT, experiment VARCHAR);
 INSERT INTO lineage_experiment VALUES (1, 'fingerflex'), (2, 'motor_basic');
@@ -23,28 +27,8 @@ SELECT
 FROM bronze_ingest_audit a
 LEFT JOIN (SELECT DISTINCT experiment, ingest_id FROM bronze_recording) r USING (ingest_id);
 
-CREATE OR REPLACE MACRO lid_text(lid) AS list_aggregate(
-    list_transform(range(26), i -> substr(
-        '0123456789ABCDEFGHJKMNPQRSTVWXYZ',
-        ((lid_from_uuid(lid) >> (125 - i * 5)::UHUGEINT) & 31)::INTEGER + 1, 1)),
-    'string_agg', '');
-
-CREATE OR REPLACE MACRO lid_parse(txt) AS
-    CASE WHEN length(txt) <> 26 THEN error('lid_parse: expected 26 characters')
-    ELSE lid_to_uuid(list_reduce(
-        list_transform(string_split(upper(txt), ''),
-            c -> (position(c IN '0123456789ABCDEFGHJKMNPQRSTVWXYZ') - 1)::UHUGEINT),
-        (a, d) -> a * 32 + d))
-    END;
-
--- Every loader calls lid_validate: an identifier is carried one layer down only when its
--- layer bits are the ones the loader reads. The radioactive bit travels with it.
-CREATE OR REPLACE MACRO lid_relayer(lid, from_layer) AS
-    CASE WHEN NOT lid_validate(lid_from_uuid(lid), from_layer)
-         THEN error('lid_relayer: layer bits do not match the layer being read')
-         ELSE lid_to_uuid(lid_from_uuid(lid) + (1::UHUGEINT << 76))
-    END;
-
+-- Up one layer. The inverse, lid_relayer, is generated and carries the lid_validate call, so
+-- a loader that carries a row down cannot forget the layer check.
 CREATE OR REPLACE MACRO lid_parent(lid) AS
     CASE WHEN lid_layer(lid_from_uuid(lid)) <= 1 THEN error('lid_parent: Bronze has no parent')
     ELSE lid_to_uuid(lid_from_uuid(lid) - (1::UHUGEINT << 76))
