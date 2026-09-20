@@ -24,6 +24,10 @@ TOOL = "convert_mat.py"
 # Microvolts per raw amplifier unit, per experiment. Silver applies it; Bronze stays raw.
 UV_PER_UNIT = {"fingerflex": 0.1, "motor_basic": 0.1}
 
+# Source codes of the canary subjects, spec 12.5. Their records carry the radioactive bit
+# from Bronze on, so no copy of a record can lose it.
+CANARY_SUBJECTS = {"canary"}
+
 SYNTHETIC_LABELS = {
     "fingerflex": {1: "thumb", 2: "index", 3: "middle", 4: "ring", 5: "little"},
     "motor_basic": {1: "hand", 2: "tongue"},
@@ -125,6 +129,7 @@ def convert(con, path: Path, adapter) -> int:
         "experiment_code": code[0],
         "subject_src": src.subject_src,
         "run": src.run,
+        "radioactive": int(src.subject_src in CANARY_SUBJECTS),
         "ingest_id": ulid(),
         "ingest_ord": 1 + con.execute("SELECT count(*) FROM bronze_ingest_audit").fetchone()[0],
         "ingested_at": datetime.now(UTC).replace(tzinfo=None).isoformat(sep=" "),

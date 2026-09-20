@@ -6,7 +6,6 @@ The generator refuses SQL that does not parse and predicates nested deeper than 
 """
 
 import csv
-import hashlib
 import json
 import sys
 import time
@@ -156,13 +155,6 @@ def from_contracts(folder=CONTRACTS) -> list[Check]:
     return checks
 
 
-def dataset_version(dataset: str) -> str:
-    """sha256 of the sorted list of the dataset's Parquet file digests."""
-    files = (db.data_dir() / dataset).rglob("*.parquet")
-    digests = sorted(hashlib.sha256(p.read_bytes()).hexdigest() for p in files)
-    return hashlib.sha256("\n".join(digests).encode()).hexdigest()
-
-
 def passes(compare: str, observed: str, expected: str) -> bool:
     o, e = float(observed), float(expected)
     return {"eq": o == e, "ge": o >= e, "le": o <= e}[compare]
@@ -175,7 +167,7 @@ def run(con, checks: list[Check]) -> list[dict]:
     versions = {}
     rows = []
     for c in checks:
-        version = versions.setdefault(c.dataset, dataset_version(c.dataset))
+        version = versions.setdefault(c.dataset, db.dataset_version(c.dataset))
         try:
             observed = str(con.execute(c.sql).fetchone()[0])
             expected = c.expected

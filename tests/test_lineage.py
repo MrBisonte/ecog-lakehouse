@@ -4,12 +4,13 @@ import pytest
 from pipeline import db
 from pipeline.lid import ALPHABET, ulid
 
-ENCODE = "SELECT lid_encode(?, ?, ?, ?, ?, ?, ?)"
-FIELDS = ["ts_ms", "layer", "experiment", "ingest_ord", "run", "channel", "segment"]
+ENCODE = "SELECT lid_to_uuid(lid_encode(?, ?, ?, ?, ?, ?, ?, ?))"
+FIELDS = ["ts_ms", "layer", "experiment", "file", "run", "channel", "segment", "radioactive"]
 CASES = {
-    "typical": (1789819200000, 2, 1, 3, 1, 17, 0),
-    "zeros": (0, 0, 0, 0, 0, 0, 0),
-    "maxes": (2**48 - 1, 15, 255, 65535, 15, 1023, 1023),
+    "typical": (1789819200000, 2, 1, 3, 1, 17, 0, 0),
+    "canary": (1789819200000, 2, 2, 4, 1, 5, 0, 1),
+    "zeros": (0, 0, 0, 0, 0, 0, 0, 0),
+    "maxes": (2**48 - 1, 15, 255, 65535, 15, 1023, 1023, 1),
 }
 
 
@@ -23,10 +24,24 @@ def encode(con, parts):
     return con.execute(ENCODE, list(parts)).fetchone()[0]
 
 
+def decode(con, lid):
+    return con.execute("SELECT lid_decode(lid_from_uuid(?))", [lid]).fetchone()[0]
+
+
 @pytest.mark.parametrize("parts", CASES.values(), ids=CASES.keys())
-def test_encode_decode_round_trips_every_field(con, parts):
-    decoded = con.execute("SELECT lid_decode(?)", [encode(con, parts)]).fetchone()[0]
-    assert [decoded[f] for f in FIELDS] == list(parts)
+def test_generated_encode_and_decode_round_trip_every_field(con, parts):
+    assert [decode(con, encode(con, parts))[f] for f in FIELDS] == list(parts)
+
+
+def test_no_field_straddles_the_64_bit_boundary(con):
+    x = encode(con, CASES["maxes"])
+    hi, lo = con.execute(
+        "SELECT (lid_from_uuid(?) >> 64)::UBIGINT, (lid_from_uuid(?) & ((1::UHUGEINT << 64) - 1))::UBIGINT",
+        [x, x],
+    ).fetchone()
+    assert (hi >> 16, (hi >> 12) & 15, (hi >> 4) & 255, hi & 0xF) == (2**48 - 1, 15, 255, 0)
+    assert (lo >> 48, (lo >> 44) & 15, (lo >> 34) & 1023, (lo >> 24) & 1023) == (65535, 15, 1023, 1023)
+    assert (lo >> 23) & 1 == 1 and lo & 0x7FFFFF == 0
 
 
 def test_text_is_26_crockford_characters_and_parse_inverts(con):
@@ -34,6 +49,8 @@ def test_text_is_26_crockford_characters_and_parse_inverts(con):
     text = con.execute("SELECT lid_text(?)", [x]).fetchone()[0]
     assert len(text) == 26 and set(text) <= set(ALPHABET)
     assert con.execute("SELECT lid_parse(?) = ?", [text, x]).fetchone()[0]
+    with pytest.raises(duckdb.Error, match="26 characters"):
+        con.execute("SELECT lid_parse('short')").fetchone()
 
 
 def test_python_ulid_and_sql_text_agree(con):
@@ -42,19 +59,17 @@ def test_python_ulid_and_sql_text_agree(con):
     assert con.execute("SELECT lid_text(lid_parse(?))", [u]).fetchone()[0] == u
 
 
-def test_parent_decrements_layer_only(con):
-    parts = CASES["typical"]
-    parent = con.execute("SELECT lid_parent(?)", [encode(con, parts)]).fetchone()[0]
+def test_parent_decrements_layer_only_and_relayer_validates(con):
+    parts = CASES["canary"]
+    silver = encode(con, parts)
+    parent = con.execute("SELECT lid_parent(?)", [silver]).fetchone()[0]
     assert parent == encode(con, (parts[0], 1, *parts[2:]))
+    assert con.execute("SELECT lid_relayer(?, 1)", [parent]).fetchone()[0] == silver
+    assert con.execute("SELECT lid_validate(lid_from_uuid(?), 2), lid_radioactive(lid_from_uuid(?))", [silver, silver]).fetchone() == (True, 1)
     with pytest.raises(duckdb.Error, match="Bronze has no parent"):
         con.execute("SELECT lid_parent(?)", [parent]).fetchone()
-
-
-def test_out_of_range_field_is_an_error(con):
-    with pytest.raises(duckdb.Error, match="out of range"):
-        encode(con, (0, 1, 1, 1, 1, 1024, 0))
-    with pytest.raises(duckdb.Error, match="26 characters"):
-        con.execute("SELECT lid_parse('short')").fetchone()
+    with pytest.raises(duckdb.Error, match="layer bits do not match"):
+        con.execute("SELECT lid_relayer(?, 1)", [silver]).fetchone()
 
 
 def lineage_fixture(con):
@@ -73,11 +88,11 @@ def lineage_fixture(con):
     )
     con.execute(
         "CREATE OR REPLACE VIEW silver_record AS "
-        "SELECT lid_encode(d.ts_ms, 2, e.code, d.ingest_ord, r.run, r.ch, 0) AS lid, "
+        "SELECT lid_to_uuid(lid_encode(d.ts_ms, 2, e.code, d.ingest_ord, r.run, r.ch, 0, r.rad)) AS lid, "
         "d.experiment, 'pid' AS subject_pid, r.run::SMALLINT AS run, "
         "r.ch::SMALLINT AS channel_idx, 1000::BIGINT AS n_samples_src "
         "FROM lineage_dim d JOIN lineage_experiment e USING (experiment), "
-        "(VALUES (1, 0), (1, 1), (2, 5)) r(run, ch)"
+        "(VALUES (1, 0, 0), (1, 1, 0), (2, 5, 1)) r(run, ch, rad)"
     )
 
 
@@ -86,7 +101,7 @@ def test_children_returns_exactly_the_records_of_one_ingest(con):
     assert con.execute("SELECT count(*) FROM silver_record").fetchone()[0] == 9
     got = con.execute("SELECT lid FROM lid_children(2) ORDER BY lid").fetchall()
     want = con.execute(
-        "SELECT lid FROM silver_record WHERE lid_decode(lid).ingest_ord = 2 ORDER BY lid"
+        "SELECT lid FROM silver_record WHERE lid_file(lid_from_uuid(lid)) = 2 ORDER BY lid"
     ).fetchall()
     assert len(got) == 3 and got == want
 
@@ -94,10 +109,12 @@ def test_children_returns_exactly_the_records_of_one_ingest(con):
 def test_trace_on_a_bronze_row_returns_the_ingested_file(con):
     lineage_fixture(con)
     bronze = con.execute(
-        "SELECT lid_encode(ts_ms, 1, 2, ingest_ord, 1, 17, 0) FROM lineage_dim WHERE ingest_id = 'I2'"
+        "SELECT lid_to_uuid(lid_encode(ts_ms, 1, 2, ingest_ord, 1, 17, 0, 0)) FROM lineage_dim "
+        "WHERE ingest_id = 'I2'"
     ).fetchone()[0]
-    row = con.execute("SELECT * FROM lid_trace(?)", [bronze]).fetchone()
-    cols = [d[0] for d in con.execute("SELECT * FROM lid_trace(?)", [bronze]).description]
+    cursor = con.execute("SELECT * FROM lid_trace(?)", [bronze])
+    cols = [d[0] for d in cursor.description]
+    row = cursor.fetchone()
     assert cols == [
         "source_path", "source_url", "sha256", "ts_ms", "layer", "experiment",
         "run", "channel", "segment",
