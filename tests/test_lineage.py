@@ -46,9 +46,9 @@ def test_no_field_straddles_the_64_bit_boundary(con):
 
 def test_text_is_26_crockford_characters_and_parse_inverts(con):
     x = encode(con, CASES["typical"])
-    text = con.execute("SELECT lid_text(?)", [x]).fetchone()[0]
+    text = con.execute("SELECT lid_text(lid_from_uuid(?))", [x]).fetchone()[0]
     assert len(text) == 26 and set(text) <= set(ALPHABET)
-    assert con.execute("SELECT lid_parse(?) = ?", [text, x]).fetchone()[0]
+    assert con.execute("SELECT lid_to_uuid(lid_parse(?)) = ?", [text, x]).fetchone()[0]
     with pytest.raises(duckdb.Error, match="26 characters"):
         con.execute("SELECT lid_parse('short')").fetchone()
 
@@ -64,12 +64,12 @@ def test_parent_decrements_layer_only_and_relayer_validates(con):
     silver = encode(con, parts)
     parent = con.execute("SELECT lid_parent(?)", [silver]).fetchone()[0]
     assert parent == encode(con, (parts[0], 1, *parts[2:]))
-    assert con.execute("SELECT lid_relayer(?, 1)", [parent]).fetchone()[0] == silver
+    assert con.execute("SELECT lid_to_uuid(lid_relayer(lid_from_uuid(?), 1))", [parent]).fetchone()[0] == silver
     assert con.execute("SELECT lid_validate(lid_from_uuid(?), 2), lid_radioactive(lid_from_uuid(?))", [silver, silver]).fetchone() == (True, 1)
     with pytest.raises(duckdb.Error, match="Bronze has no parent"):
         con.execute("SELECT lid_parent(?)", [parent]).fetchone()
     with pytest.raises(duckdb.Error, match="layer bits do not match"):
-        con.execute("SELECT lid_relayer(?, 1)", [silver]).fetchone()
+        con.execute("SELECT lid_relayer(lid_from_uuid(?), 1)", [silver]).fetchone()
 
 
 def lineage_fixture(con):
