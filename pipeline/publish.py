@@ -61,7 +61,12 @@ def publish(out: Path) -> int:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", default=str(db.REPO / "docs" / "data"))
+    parser.add_argument(
+        "--out",
+        default=str(Path.cwd() / "docs" / "data"),
+        help="where to publish, default docs/data under the working directory. An editable "
+        "install can point at another checkout, which must not be written to",
+    )
     args = parser.parse_args(argv)
     return publish(Path(args.out))
 
