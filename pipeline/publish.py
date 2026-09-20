@@ -1,6 +1,7 @@
 """Copy Gold to docs/data/gold and write docs/data/manifest.json, within the limits of spec 9.
 
-Phase 0 publishes Gold only; fault files and checks.json arrive with the site.
+A file holding a canary record (radioactive bit, spec 12.5) is refused before anything is
+copied. Phase 0 publishes Gold only; fault files and checks.json arrive with the site.
 """
 
 import argparse
@@ -16,11 +17,28 @@ FILE_LIMIT = 95 * 1024**2
 TOTAL_LIMIT = 500 * 1024**2
 
 
-def publish(out) -> int:
+def radioactive_rows(con, path: Path) -> int:
+    """Rows of one Parquet file whose lid carries the canary bit, 0 when it has no lid."""
+    columns = {r[0] for r in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{path.as_posix()}')").fetchall()}
+    if "lid" not in columns:
+        return 0
+    return con.execute(
+        f"SELECT count(*) FROM read_parquet('{path.as_posix()}') "
+        "WHERE lid IS NOT NULL AND lid_radioactive(lid_from_uuid(lid)) = 1"
+    ).fetchone()[0]
+
+
+def publish(out: Path) -> int:
     gold = db.data_dir() / "gold"
+    sources = sorted(gold.rglob("*.parquet"))
+    con = db.connect()
+    leaks = {p.relative_to(db.data_dir()).as_posix(): radioactive_rows(con, p) for p in sources}
+    if any(leaks.values()):
+        print(f"publish: refused, canary records in {[p for p, n in leaks.items() if n]}")
+        return 1
     shutil.rmtree(out / "gold", ignore_errors=True)
     files = []
-    for path in sorted(gold.rglob("*.parquet")):
+    for path in sources:
         rel = path.relative_to(db.data_dir())
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, out / rel)

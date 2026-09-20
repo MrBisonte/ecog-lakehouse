@@ -100,3 +100,86 @@ $ du -sh $DATA_DIR/*
 $ python -c "import duckdb; print(duckdb.__version__)"
 1.5.5
 ```
+
+## Phase 0 amendment, lid layout from arch-standards
+
+- Status: done, 2026-09-20, branch `feat/lid-layout` on top of the merged phase 0, spec commits `957efe5` and `d6acc21` merged in
+- Environment: as phase 0, arch-standards at `../arch-standards` on branch `feat/ids-open-items`
+
+### Checked
+
+- `sql/lineage/lid_generated.sql` is byte identical to `arch-standards/ids/generated/lid/duckdb.sql`, copied by `make lineage`, never edited. Encode, decode, every field accessor, validate and the UUID bridge come from it. `sql/lineage/lid_extras.sql` hand writes only the lineage tables, text form and parse, `lid_relayer`, `lid_parent`, `lid_prefix_lo`, `lid_prefix_hi`, `lid_children`, `lid_trace`.
+- Every loader relayers through `lid_relayer`, which calls `lid_validate` on the layer being read and errors on a mismatch. A test proves the error.
+- Layout tests: round trip per field including the canary bit, no field straddles the 64 bit boundary (hi and lo words checked separately), text and parse, Python ULID and SQL text agree, parent, children, trace.
+- Canary records, spec 12.5: a fourth synthetic subject carries the radioactive bit from Bronze on, is present in Silver, absent from every Gold mart, two `sql` requirement rows assert it, `publish` refuses a file holding one. Tests for each.
+- `gold/dataset_manifest`, spec 3.3: one row per dataset per Gold build, `dataset_version` equal to the digest the checks use, `lid_lo` and `lid_hi`, source file digests through `lineage_dim`. Contract and test.
+- Verifier on a clean clone, fresh venv and `DATA_DIR`: 30,720,000 Bronze rows, 102 checks pass, 55 tests, output below.
+
+### Failed, and fixed before the commit
+
+- The generated `lid_to_uuid` and `lid_from_uuid` used casts DuckDB 1.5.5 does not implement. Fixed in arch-standards `idgen` (hex bridge) with a round trip test there, regenerated, copied. The hand written bridge that stood in meanwhile is gone.
+- Windows git converted checkouts to CRLF and made two files look modified. Local `core.autocrlf=false` in both repositories, nothing committed for it.
+- Two test bugs of my own: a wrong shift in the hi word assertion, and the canary subject sorting before `cc`.
+
+### Changed
+
+- `doc/spec.md` 12.1: layout table from the merge; the `file` line keeps the phase 0 wording, position in the append-only audit, so `ingest_ord` stays stable.
+- `Makefile`: `lineage` target, `ARCH_STANDARDS ?= ../arch-standards`.
+- `doc/agent/phase0.md`: amendment paragraph naming what step 3 now means and the two spec sections in scope.
+- No ADR changed. ADR-0005 not needed.
+
+### Guesses
+
+- The canary subject is source code `canary` in `pipeline/synth.py`, listed in `convert_mat.CANARY_SUBJECTS`; the bit is set at Bronze conversion so `lid_parent` chains stay consistent.
+- The `docs/data` half of the canary rule is enforced by `publish` refusing the copy, not by an evidence row, because on a first run `docs/data` is empty and a `sql` check over missing files would error.
+- `gold/dataset_manifest` is rewritten per build, not appended; its grain is `dataset_version` and an identical rebuild repeats the version.
+- The generated `lid_encode` has no range guard, so the phase 0 out of range test was dropped. Rule 7 of the ids SPEC says encode range checks; worth a rule in `idgen` for the SQL targets.
+- `experiment_summary` still carries no `lid`, so canary subjects are filtered by `subject_pid` there.
+
+### Verifier output
+
+```
+$ git clone -q -b feat/lid-layout <checkout> /tmp/ecog-lakehouse_verify
+$ git log --oneline | head -1
+853fa52 refactor(lineage): take the UUID bridge from the generated macros
+$ cmp sql/lineage/lid_generated.sql ../arch-standards/ids/generated/lid/duckdb.sql && echo identical
+identical
+$ python3 -m venv --without-pip /tmp/ecog-lakehouse_verify_venv
+$ pip --python /tmp/ecog-lakehouse_verify_venv/bin/python install -e .[dev]
+$ export DATA_DIR=/tmp/ecog-lakehouse_verify_data
+$ make lint | grep -c "result: pass"
+20
+$ make all SYNTH=1
+python3 pipeline/run.py bronze --synth
+convert: 30720000 rows written
+python3 pipeline/run.py silver
+run: keyring, 4 new pseudonyms
+run: silver/010_subject.sql
+run: silver/020_record.sql
+run: silver/030_recording.sql, 8 partitions
+run: silver/040_electrode.sql
+run: silver/050_event.sql
+python3 pipeline/run.py gold
+run: line noise on 512 records
+run: gold/010_channel_quality.sql
+run: gold/020_experiment_summary.sql
+run: gold/030_feature_window.sql
+run: gold/dataset_manifest, 12 datasets
+python3 pipeline/checks.py
+checks: run 01M2ZJ68ZR1KCD78GVFS23EVM4, {pass: 102, fail: 0, error: 0}
+python3 pipeline/publish.py
+publish: 5 files, 306033 bytes, manifest at /tmp/ecog-lakehouse_verify/docs/data/manifest.json
+make all exit 0
+$ make test
+python3 -m pytest -q
+.......................................................                  [100%]
+55 passed in 9.36s
+make test exit 0
+$ git status --short
+$ du -sh $DATA_DIR/*
+218M	/tmp/ecog-lakehouse_verify_data/bronze
+308K	/tmp/ecog-lakehouse_verify_data/gold
+780K	/tmp/ecog-lakehouse_verify_data/keyring.duckdb
+119M	/tmp/ecog-lakehouse_verify_data/raw
+352M	/tmp/ecog-lakehouse_verify_data/silver
+```

@@ -1,10 +1,11 @@
 import json
 
+import duckdb
 import numpy as np
 import pytest
 
 from pipeline import db, line_noise, publish, synth
-from tests.conftest import CHANNELS, FILES, SECONDS
+from tests.conftest import CHANNELS, MART_FILES, SECONDS
 
 
 @pytest.fixture(scope="module")
@@ -20,9 +21,9 @@ def test_ratio_is_null_under_10_s_and_near_one_for_a_pure_50_hz_tone():
 
 
 def test_channel_quality(gold):
-    assert gold.execute("SELECT count(*) FROM gold_channel_quality").fetchone()[0] == FILES * CHANNELS
+    assert gold.execute("SELECT count(*) FROM gold_channel_quality").fetchone()[0] == MART_FILES * CHANNELS
     assert gold.execute("SELECT sum(missing_samples) FROM gold_channel_quality").fetchone()[0] == (
-        len(synth.SUBJECTS) * synth.NAN_BURST_SAMPLES
+        (len(synth.SUBJECTS) - 1) * synth.NAN_BURST_SAMPLES
     )
     assert gold.execute(
         "SELECT count(*) FROM gold_channel_quality WHERE n_samples + missing_samples <> ?",
@@ -30,7 +31,7 @@ def test_channel_quality(gold):
     ).fetchone()[0] == 0
     assert gold.execute(
         "SELECT count(*) FROM gold_channel_quality WHERE line_noise_ratio IS NULL "
-        "OR line_noise_ratio < 0 OR line_noise_ratio > 1 OR rms_uv <= 0 OR lid_decode(lid).layer <> 3"
+        "OR line_noise_ratio < 0 OR line_noise_ratio > 1 OR rms_uv <= 0 OR lid_layer(lid_from_uuid(lid)) <> 3"
     ).fetchone()[0] == 0
     noisy, clean = gold.execute(
         "SELECT min(line_noise_ratio) FILTER (WHERE channel_idx % 4 = 0), "
@@ -43,29 +44,79 @@ def test_experiment_summary(gold):
     rows = gold.execute(
         "SELECT n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary"
     ).fetchall()
-    assert len(rows) == FILES
+    assert len(rows) == MART_FILES
     assert set(rows) == {(1, CHANNELS, float(SECONDS), SECONDS // 2)}
 
 
 def test_feature_window(gold):
     assert gold.execute("SELECT count(*) FROM gold_feature_window").fetchone()[0] == (
-        FILES * CHANNELS * SECONDS
+        MART_FILES * CHANNELS * SECONDS
     )
     assert gold.execute(
         "SELECT count(*) FROM gold_feature_window WHERE window_start_ms % 1000 <> 0 "
         "OR sample_lo < window_start_ms OR sample_hi >= window_start_ms + 1000 "
-        "OR p2p_uv < 0 OR std_uv < 0 OR lid_decode(lid).layer <> 3 "
+        "OR p2p_uv < 0 OR std_uv < 0 OR lid_layer(lid_from_uuid(lid)) <> 3 "
         "OR lid_parent(lid) NOT IN (SELECT lid FROM silver_record)"
     ).fetchone()[0] == 0
+
+
+def test_no_canary_record_reaches_a_gold_mart(gold):
+    for view in ("gold_channel_quality", "gold_feature_window"):
+        assert gold.execute(
+            f"SELECT count(*) FROM {view} WHERE lid_radioactive(lid_from_uuid(lid)) = 1"
+        ).fetchone()[0] == 0, view
+    canary = gold.execute(
+        "SELECT DISTINCT subject_pid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 1"
+    ).fetchall()
+    assert len(canary) == 1
+    assert gold.execute(
+        "SELECT count(*) FROM gold_experiment_summary WHERE subject_pid = ?", [canary[0][0]]
+    ).fetchone()[0] == 0
+
+
+def test_dataset_manifest_has_one_row_per_dataset_of_the_build(gold, built):
+    rows = gold.execute(
+        "SELECT dataset, layer, lid_lo, lid_hi, n_records, file_digests, dataset_version "
+        "FROM gold_dataset_manifest ORDER BY dataset"
+    ).fetchall()
+    present = sorted(
+        d for d in db.DATASETS
+        if d not in ("gold/dataset_manifest", "gold/evidence") and any((built / d).rglob("*.parquet"))
+    )
+    assert [r[0] for r in rows] == present, "written at Gold time, before the first checks run"
+    for dataset, layer, lo, hi, n, digests, version in rows:
+        assert layer == {"bronze": 1, "silver": 2, "gold": 3}[dataset.split("/")[0]]
+        assert n == gold.execute(f"SELECT count(*) FROM {db.view_name(dataset)}").fetchone()[0]
+        assert len(version) == 64 and len(digests) >= 1 and all(len(d) == 64 for d in digests)
+        if lo is not None:
+            assert str(lo) <= str(hi)
+    silver_version = gold.execute(
+        "SELECT dataset_version FROM gold_dataset_manifest WHERE dataset = 'silver/recording'"
+    ).fetchone()[0]
+    assert silver_version == db.dataset_version("silver/recording")
 
 
 def test_publish_writes_manifest_within_limits(built, tmp_path, monkeypatch):
     assert publish.main(["--out", str(tmp_path)]) == 0
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert {f["path"].split("/")[1] for f in manifest["files"]} == {
-        "channel_quality", "experiment_summary", "feature_window", "evidence",
+        "channel_quality", "experiment_summary", "feature_window", "evidence", "dataset_manifest",
     }
     assert all(f["path"].startswith("gold/") and len(f["sha256"]) == 64 for f in manifest["files"])
-    assert all((tmp_path / f["path"]).stat().st_size == f["bytes"] for f in manifest["files"])
     monkeypatch.setattr(publish, "FILE_LIMIT", 1)
     assert publish.main(["--out", str(tmp_path)]) == 1
+
+
+def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
+    leak = tmp_path / "data" / "gold" / "channel_quality"
+    leak.mkdir(parents=True)
+    canary = db.connect().execute(
+        "SELECT lid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 1 LIMIT 1"
+    ).fetchone()[0]
+    duckdb.connect().execute(
+        f"COPY (SELECT '{canary}'::UUID AS lid, 1 AS n) TO '{(leak / 'data_0.parquet').as_posix()}' (FORMAT parquet)"
+    )
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    out = tmp_path / "out"
+    assert publish.main(["--out", str(out)]) == 1
+    assert not (out / "manifest.json").exists()

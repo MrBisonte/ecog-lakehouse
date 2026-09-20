@@ -1,5 +1,6 @@
 """Paths, the SQL renderer and DuckDB connections shared by every pipeline script."""
 
+import hashlib
 import os
 import re
 import subprocess
@@ -25,6 +26,7 @@ DATASETS = [
     "gold/experiment_summary",
     "gold/feature_window",
     "gold/evidence",
+    "gold/dataset_manifest",
 ]
 
 # Datasets the lineage macros reference. A typed empty view stands in before they are written.
@@ -99,11 +101,20 @@ def views(con):
 
 
 def connect(database: str = ":memory:"):
-    """A connection with every dataset view and the lineage macros loaded."""
+    """A connection with every dataset view and the lineage macros loaded: the generated
+    macros first, then the hand written extras that build on them."""
     con = duckdb.connect(database)
     views(con)
-    run_sql(con, SQL / "lineage.sql")
+    run_sql(con, SQL / "lineage" / "lid_generated.sql")
+    run_sql(con, SQL / "lineage" / "lid_extras.sql")
     return con
+
+
+def dataset_version(dataset: str) -> str:
+    """sha256 of the sorted list of the dataset's Parquet file digests, spec 5.3."""
+    files = (data_dir() / dataset).rglob("*.parquet")
+    digests = sorted(hashlib.sha256(p.read_bytes()).hexdigest() for p in files)
+    return hashlib.sha256("\n".join(digests).encode()).hexdigest()
 
 
 def git_commit() -> str:
