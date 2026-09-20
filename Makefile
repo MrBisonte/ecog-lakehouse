@@ -7,25 +7,25 @@ export DATA_DIR ?= $(HOME)/data/ibrain
 all: bronze silver gold checks publish
 
 fetch:
-	$(PY) pipeline/fetch.py
+	$(PY) -m pipeline.fetch
 
 synth:
-	$(PY) pipeline/synth.py
+	$(PY) -m pipeline.synth
 
 bronze:
-	$(PY) pipeline/run.py bronze $(if $(filter 1,$(SYNTH)),--synth,)
+	$(PY) -m pipeline.run bronze $(if $(filter 1,$(SYNTH)),--synth,)
 
 silver:
-	$(PY) pipeline/run.py silver
+	$(PY) -m pipeline.run silver
 
 gold:
-	$(PY) pipeline/run.py gold
+	$(PY) -m pipeline.run gold
 
 checks:
-	$(PY) pipeline/checks.py
+	$(PY) -m pipeline.checks
 
 publish:
-	$(PY) pipeline/publish.py
+	$(PY) -m pipeline.publish
 
 bench:
 	for f in faults/*/bench.sh; do bash $$f; done
