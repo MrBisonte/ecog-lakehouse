@@ -104,6 +104,9 @@ def connect(database: str = ":memory:"):
     """A connection with every dataset view and the lineage macros loaded: the generated
     macros first, then the hand written extras that build on them."""
     con = duckdb.connect(database)
+    # Spill files belong under DATA_DIR, spec 7; the default is the working directory, the repo.
+    (data_dir() / "tmp").mkdir(parents=True, exist_ok=True)
+    con.execute(f"SET temp_directory = '{(data_dir() / 'tmp').as_posix()}'")
     views(con)
     run_sql(con, SQL / "lineage" / "lid_generated.sql")
     run_sql(con, SQL / "lineage" / "lid_extras.sql")
