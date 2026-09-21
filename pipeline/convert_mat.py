@@ -72,6 +72,7 @@ CANARY_SUBJECTS = {"canary"}
 SYNTHETIC_LABELS = {
     "fingerflex": {1: "thumb", 2: "index", 3: "middle", 4: "ring", 5: "little"},
     "motor_basic": {1: "hand", 2: "tongue"},
+    "faces_basic": {1: "house", 2: "face"},
 }
 
 
