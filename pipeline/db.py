@@ -89,6 +89,9 @@ def views(con):
     """One view per dataset on disk; a typed empty view for a dataset with a known schema."""
     for dataset in DATASETS:
         root = data_dir() / dataset
+        for aborted in (p for p in root.rglob("*.parquet") if p.stat().st_size == 0):
+            print(f"db: removed {aborted}, an empty file left by an aborted write")
+            aborted.unlink()
         if any(root.rglob("*.parquet")):
             con.execute(
                 f"CREATE OR REPLACE VIEW {view_name(dataset)} AS SELECT * FROM read_parquet("
@@ -115,6 +118,9 @@ def connect(database: str = ":memory:"):
     # Spill files belong under DATA_DIR, spec 7; the default is the working directory, the repo.
     (data_dir() / "tmp").mkdir(parents=True, exist_ok=True)
     con.execute(f"SET temp_directory = '{(data_dir() / 'tmp').as_posix()}'")
+    # Every ORDER BY in sql/ is explicit; keeping arrival order across parallel joins held
+    # 12 GB of Silver in memory on gold/channel_quality and failed on 871 million rows.
+    con.execute("SET preserve_insertion_order = false")
     views(con)
     run_sql(con, SQL / "lineage" / "lid_generated.sql")
     run_sql(con, SQL / "lineage" / "lid_extras.sql")
