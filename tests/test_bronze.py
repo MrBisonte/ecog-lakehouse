@@ -101,3 +101,14 @@ def test_rerun_is_a_no_op_and_unknown_directory_is_skipped(bronze, capsys):
     assert "no adapter registered for 'mystery'" in out
     assert out.count("sha256 already ingested") == FILES
     assert db.connect().execute("SELECT count(*) FROM bronze_recording").fetchone()[0] == before
+
+
+def test_connect_removes_an_empty_parquet_left_by_an_aborted_write(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    folder = tmp_path / "gold" / "channel_quality"
+    folder.mkdir(parents=True)
+    (folder / "data_0.parquet").write_bytes(b"")
+    con = db.connect()
+    assert not (folder / "data_0.parquet").exists()
+    assert "aborted write" in capsys.readouterr().out
+    assert con.execute("SELECT count(*) FROM gold_channel_quality").fetchone()[0] == 0

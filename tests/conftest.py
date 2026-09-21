@@ -6,9 +6,9 @@ from pipeline import checks, run, synth
 
 SECONDS = 30
 CHANNELS = 16
-FILES = len(synth.SUBJECTS) * len(synth.CUE_CODES)
+FILES = len(synth.SUBJECTS) * len(synth.EXPERIMENTS)
 # Files of subjects that reach the Gold marts: the canary subject stays in Silver.
-MART_FILES = (len(synth.SUBJECTS) - 1) * len(synth.CUE_CODES)
+MART_FILES = (len(synth.SUBJECTS) - 1) * len(synth.EXPERIMENTS)
 
 
 @pytest.fixture(scope="session")

@@ -19,9 +19,16 @@ def test_motor_basic_has_no_nan_and_round_trips(tmp_path, monkeypatch):
     assert synth.main(["--seconds", "1", "--channels", "3"]) == 0
     written = sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*.mat"))
     assert written == sorted(
-        f"raw/synthetic/{e}/{s}.mat" for e in synth.CUE_CODES for s in synth.SUBJECTS
+        f"raw/synthetic/{e}/{s}.mat" for e in synth.EXPERIMENTS for s in synth.SUBJECTS
     )
     m = loadmat(tmp_path / "raw/synthetic/motor_basic/aa.mat", simplify_cells=True)
     assert m["experiment"] == "motor_basic" and m["subject"] == "aa" and int(m["srate"]) == 1000
     assert not np.isnan(m["data"]).any()
     assert list(m["brain_area"][:2]) == ["precentral", "postcentral"]
+
+
+def test_canary_mode_writes_only_the_canary_of_the_named_experiments(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    assert synth.main(["--canary", "faces_basic", "fingerflex", "unknown", "--seconds", "1", "--channels", "2"]) == 0
+    written = sorted(p.relative_to(tmp_path / "raw" / "synthetic").as_posix() for p in tmp_path.rglob("*.mat"))
+    assert written == ["faces_basic/canary.mat", "fingerflex/canary.mat"]

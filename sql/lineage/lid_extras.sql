@@ -9,7 +9,7 @@
 -- with lid_from_uuid going in and lid_to_uuid coming out.
 
 CREATE OR REPLACE TABLE lineage_experiment (code TINYINT, experiment VARCHAR);
-INSERT INTO lineage_experiment VALUES (1, 'fingerflex'), (2, 'motor_basic');
+INSERT INTO lineage_experiment VALUES (1, 'fingerflex'), (2, 'motor_basic'), (3, 'faces_basic');
 
 CREATE OR REPLACE TABLE lineage_edge (child_lid UUID, parent_lid UUID);
 
