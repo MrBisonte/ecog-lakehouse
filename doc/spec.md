@@ -18,6 +18,8 @@ Experiments used, one directory each under `data/raw/<experiment>/`:
 | `motor_basic` | Cued hand and tongue movement | Event-driven task, exercises the `event` entity |
 | One further experiment chosen at conversion time | | Third dimension for Silver partitioning and a Gold use case |
 
+Adapter roadmap: `.mat` (phase 0 and 1), then NWB (`acquisition/ElectricalSeries`, `general/electrodes`, `intervals/trials` into the same Bronze schema) and BIDS-iEEG. NWB and BIDS are the formats neuroscience teams name; NWB's `acquisition` group carries the same rule as Bronze, raw data never changes. The NWB adapter needs `pynwb` (and with it `h5py`), an optional dependency introduced by its own ADR in phase 1, never in phase 0.
+
 > **Note.** Field names inside the `.mat` files differ per experiment. `pipeline/convert_mat.py` holds one adapter per experiment that maps the file's arrays to the Bronze schema. An experiment without an adapter is skipped with a logged reason, never guessed.
 
 ## 3. Layers
@@ -216,6 +218,10 @@ Gold is the enterprise model for consumers. Everything here is a query result.
 - `clipped_pct` is the share of samples at the amplifier's minimum or maximum, in percent.
 - `gold/dataset_manifest` has one row per dataset per build. `dataset_version` is the same digest `gold/evidence` uses; `lid_lo` and `lid_hi` bound the records included; `file_digests` lists the source sha256 values. This is the handle a model registry or a submission package holds to say exactly which data it was built on: one row, and every record and file it covers can be enumerated with `lid_children` and `lineage_dim`.
 - `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per channel in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.
+
+### 3.4 Export
+
+Gold exports one NWB file per subject and experiment for neuroscience teams, written by the same optional `pynwb` dependency as the adapter. The file carries provenance as HDF5 attributes: `/general/ecog_lakehouse_dataset_version`, `/general/ecog_lakehouse_source_sha256` (list), and on each series `ecog_lakehouse_lid_lo` and `ecog_lakehouse_lid_hi`. A consumer that records the dataset version it read can enumerate every record and source file behind it through `gold/dataset_manifest` and `lid_children`. Parquet slices and BIDS-iEEG folders are the other export forms; the middle of the platform never stores HDF5.
 
 ## 4. Contracts
 
