@@ -98,6 +98,14 @@ def views(con):
         elif (schema := columns(dataset)) is not None:
             cols = ", ".join(f"NULL::{t} AS {c}" for c, t in (p.split() for p in schema.split(", ")))
             con.execute(f"CREATE OR REPLACE VIEW {view_name(dataset)} AS SELECT {cols} WHERE false")
+    published = REPO / "docs" / "data"
+    if any(published.rglob("*.parquet")):
+        con.execute(
+            "CREATE OR REPLACE VIEW docs_data AS SELECT lid FROM read_parquet("
+            f"'{published.as_posix()}/**/*.parquet', union_by_name = true)"
+        )
+    else:
+        con.execute("CREATE OR REPLACE VIEW docs_data AS SELECT NULL::UUID AS lid WHERE false")
 
 
 def connect(database: str = ":memory:"):

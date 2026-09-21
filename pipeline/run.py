@@ -27,9 +27,14 @@ def layer_files(layer: str):
 
 
 def bronze(use_synth: bool) -> int:
+    """Synthetic set when asked or when raw/ holds no real experiment; otherwise only the
+    canary subject of each real experiment is generated (spec 12.5), then everything converts."""
     raw = db.data_dir() / "raw"
-    if use_synth or not raw.exists() or not any(raw.iterdir()):
-        synth.main([])
+    real = sorted(
+        d.name for d in (raw.iterdir() if raw.exists() else [])
+        if d.is_dir() and d.name != "synthetic" and d.name in convert_mat.ADAPTERS
+    )
+    synth.main([] if use_synth or not real else ["--canary", *real])
     return convert_mat.main([])
 
 

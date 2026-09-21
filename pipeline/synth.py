@@ -18,7 +18,10 @@ from pipeline.db import data_dir
 
 # The last subject is the canary of spec 12.5, named in convert_mat.CANARY_SUBJECTS.
 SUBJECTS = ["aa", "bb", "cc", "canary"]
-CUE_CODES = {"fingerflex": 5, "motor_basic": 2}
+# The full synthetic set covers two experiments; `--canary` can plant the canary of any
+# experiment that has cue codes here, so a real build gets one per experiment (spec 12.5).
+EXPERIMENTS = ["fingerflex", "motor_basic"]
+CUE_CODES = {"fingerflex": 5, "motor_basic": 2, "faces_basic": 2}
 SAMPLE_RATE_HZ = 1000
 CUE_EVERY_S = 2
 CUE_LENGTH_S = 1
@@ -60,17 +63,25 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--seconds", type=int, default=60)
     parser.add_argument("--channels", type=int, default=64)
+    parser.add_argument(
+        "--canary", nargs="+", metavar="EXPERIMENT",
+        help="write only the canary subject, for these experiments, next to a real build",
+    )
     args = parser.parse_args(argv)
     root = data_dir() / "raw" / "synthetic"
-    for experiment in CUE_CODES:
+    plan = (
+        [(e, SUBJECTS[-1]) for e in args.canary if e in CUE_CODES]
+        if args.canary
+        else [(e, s) for e in EXPERIMENTS for s in SUBJECTS]
+    )
+    for experiment, subject in plan:
         (root / experiment).mkdir(parents=True, exist_ok=True)
-        for subject in SUBJECTS:
-            path = root / experiment / f"{subject}.mat"
-            if path.exists():
-                print(f"synth: keep {path}")
-                continue
-            savemat(path, generate(experiment, subject, args.seconds, args.channels))
-            print(f"synth: wrote {path}")
+        path = root / experiment / f"{subject}.mat"
+        if path.exists():
+            print(f"synth: keep {path}")
+            continue
+        savemat(path, generate(experiment, subject, args.seconds, args.channels))
+        print(f"synth: wrote {path}")
     return 0
 
 
