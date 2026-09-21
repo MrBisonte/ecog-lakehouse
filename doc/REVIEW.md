@@ -238,3 +238,83 @@ $ python -m pytest -q
 55 passed in 10.00s
 $ git status --short
 ```
+## Phase 1, real data
+
+- Status: done, 2026-09-21, branch `feat/phase1`, fourteen commits after the merge of #4, not merged
+- Environment: as phase 0, WSL2 Ubuntu 26.04, Python 3.14.4, DuckDB 1.5.5, scipy 1.18.1, 15 GB of RAM in the WSL VM, 12 GB DuckDB memory limit
+- Spec: patch 0003 (NWB and BIDS on the roadmap, 3.4 Export) applied as `86dc21e`; patches 0001 and 0002 were already on master as `957efe5` and `d6acc21`, so "reach 9acef75" is satisfied by content
+
+### Pre-flight
+
+- `origin/master` at `747ea27`, `git status --short` empty, `make all SYNTH=1 && make test` rerun: exit 0, 55 passed.
+- `echo $DATA_DIR` prints nothing in a login shell; the Makefile exports `$(HOME)/data/ibrain` and every pipeline call went through `make` or an explicit export. Free under `$HOME`: 952 GB.
+- Sections 2, 3.4, 7 and 12 of the spec and plan phase 1 read after patch 0003.
+
+### Source facts, from the repository and the files, not assumed
+
+- Files at `https://stacks.stanford.edu/file/druid:zk881ps0522/<experiment>.zip`; the repository publishes md5 and sha1 only, sha256 computed after download. All 45 data files are MATLAB 5.0, none v7.3.
+- Sampling rate 1000 Hz for every experiment (manuscript Methods and each README; `faces_basic` files carry it in `srate`). Bandpass 0.15 to 200 Hz, Synamps2.
+- Units: `fingerflex` and `motor_basic` READMEs state 1 amplifier unit = 0.0298 microvolts. `faces_basic` README states no scale; the adapter takes 0.0298 because the manuscript states the same amplifiers and settings for every experiment. Guess, recorded in the adapter table.
+- Third experiment: `faces_basic`, 14 subjects, one stim code per picture onset (1 to 50 house, 51 to 100 face, 101 interstimulus, mapped to no event).
+- Electrode locations: `fingerflex` in the data file (`locs`, mm, `elec_regions` codes), `motor_basic` in `locs/<code>_electrodes.mat` (Talairach mm, no region), `faces_basic` in `locs/<code>_xslocs.mat` as MRI voxel indices, so `x_mm`, `y_mm`, `z_mm` are NULL there and `brain_area` comes from the Destrieux codes of `fhpred_master.m`.
+
+### Checked
+
+- Real download: 2,048,729,660 bytes in three zips over the Stanford host at about 1.4 MB/s; one stall at 359 MB of `motor_basic.zip`, resumed with a Range request.
+- Clean `make all` in `DATA_DIR`: 45 files (42 subjects and 3 canaries), Bronze 871,160,120 rows; Silver 2,433 records of which 192 canary; Gold 2,241 channel_quality rows, 860,889 feature windows, 42 experiment_summary rows; 103 checks pass, 0 fail, 0 error; publish 5 files, 10,883,540 bytes. Gold, checks and publish took 208 s after the memory fix below.
+- Verifier: see the output at the end. `make fetch && make all && make test` from a clean clone: fetch verified all three zips, `make all` exit 0 in 513 s, 103 checks pass, 68 tests pass, nothing untracked in the clone.
+- `make test`: 68 tests, `make lint` green, before every commit; 13 commits.
+
+### Failed, and fixed before the commit
+
+- `gold/channel_quality` spilled to `.tmp` in the working directory, the repo on the Windows mount, and died with "Cannot allocate memory" on 262 million Silver rows. `temp_directory` is `DATA_DIR/tmp` (spec 7 puts every DuckDB working file there).
+- The same mart then held 12.1 GB, the DuckDB limit, on 871 million rows, twice: once as written, once with insertion order preservation off. Cause: the join with the per run rails and the aggregate carried `experiment` and `subject_pid`, heap allocated strings, through every sample row, with a group estimate of 164 million. Both `channel_quality` and `feature_window` now aggregate by `lid` alone and take the labels from `silver/record` afterwards, one row per record. Same rows, same values, the synthetic Gold tests did not change.
+- An aborted `COPY` left a zero byte `data_0.parquet`, and the next `db.connect()` failed on it. `views()` removes an empty Parquet file with a printed reason; tested.
+- Staging a source without electrode locations called `float(None)`. Never exercised in phase 0; `faces_basic` exercised it. NULL now, tested.
+- The `faces_basic` canary had no event labels. Added.
+- The verifier's first run filled `/tmp`, a 7.6 GB tmpfs in this WSL, with the copied zips. It runs under `$HOME` now.
+
+### Checks that fail on real data and are right to fail
+
+None. 103 of 103 pass.
+
+### Observations, not fixed
+
+- `fingerflex` subject `mv` has one cue onset in its file (178,960 samples, `cue` holds 0 and 1 only); the task table notes truncated raw data for some patients. Bronze keeps what the file says: 1 event, 43 records.
+- `motor_basic` subjects `gf` and `zt` carry stim codes 13 and 15 that the README does not document: 61 events with a NULL label.
+- `faces_basic` subjects `aa`, `ha` and `jt` hold raw values up to 18.7 million on a few channels, beyond exact float32 (2^24). `value_raw` is FLOAT by spec, so those values are rounded to even integers in Bronze.
+- `clipped_pct` uses the observed extremes of the run as rails, so a run with one huge artefact channel reports near zero clipping on the others. Real amplifier rails are not in the files.
+- The WSL clock jumped by about an hour and a half during the first full build while the host was away, so the audit timestamps of that build are not a wall clock. The build wall clock in `docs/bench.md` comes from the verifier's single uninterrupted run.
+
+### Not in phase 1
+
+NWB adapter and export (ADR-0005 proposed, nothing imports `pynwb`), faults, the site, `docs/data/` committed content. Commits 4 (spill fix) and the Gold rewrite landed after the canary and manifest commits because the real data failures surfaced only in the full build; every commit is one logical change.
+
+### Verifier output
+
+Clean clone inside WSL under `$HOME`, fresh venv, fresh `DATA_DIR` with the three verified zips copied in so `make fetch` verifies and extracts without a second 2 GB download; the download path itself ran for real the same day. Run at commit `5ed73af`, the last code commit; the docs commits came after.
+
+```
+$ bash ~/verify_phase1.sh feat/phase1     # clone under $HOME, three verified zips copied into a fresh DATA_DIR
+commit 5ed73af
+duckdb 1.5.5 scipy 1.18.1
+python3 pipeline/fetch.py
+fetch: 3 of 3 files verified
+fetch exit=0
+all exit=0 seconds=513
+convert: 871160120 rows written
+run: silver/030_recording.sql, 45 partitions
+run: silver/050_event.sql
+run: line noise on 2433 records
+run: gold/dataset_manifest, 12 datasets
+checks: run 01M32SPQ2CVDTH7CNN3MS8WJYX, {'pass': 103, 'fail': 0, 'error': 0}
+publish: 5 files, 10883387 bytes, manifest at /home/bisonte/ibrain_verify/docs/data/manifest.json
+$ make test
+....................................................................             [100%]
+68 passed in 10.76s
+$ git status --short
+$ du -sh $DATA_DIR/bronze $DATA_DIR/silver $DATA_DIR/gold
+5.6G    /home/bisonte/ibrain_verify_data/bronze
+8.5G    /home/bisonte/ibrain_verify_data/silver
+11M     /home/bisonte/ibrain_verify_data/gold
+```

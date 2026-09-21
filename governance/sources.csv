@@ -1,1 +1,4 @@
 experiment,file,url,sha256,bytes
+fingerflex,fingerflex.zip,https://stacks.stanford.edu/file/druid:zk881ps0522/fingerflex.zip,2b08a9ce941a881feff8f35ee2224436a9ac1ca15bd744a80725067f7cd590bb,580522436
+motor_basic,motor_basic.zip,https://stacks.stanford.edu/file/druid:zk881ps0522/motor_basic.zip,1cc5f09d23ad44d4588b679c78a544f88aafb351bf3d8d70499dc9a23e4f4de8,855098279
+faces_basic,faces_basic.zip,https://stacks.stanford.edu/file/druid:zk881ps0522/faces_basic.zip,186e068e451003c9de6d5043758dd47a3bda0e078c88fad2393ce443e9bc7c76,613108945
