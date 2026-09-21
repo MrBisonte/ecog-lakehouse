@@ -22,7 +22,48 @@ from pipeline.lid import ulid
 TOOL = "convert_mat.py"
 
 # Microvolts per raw amplifier unit, per experiment. Silver applies it; Bronze stays raw.
-UV_PER_UNIT = {"fingerflex": 0.1, "motor_basic": 0.1}
+# Stanford values come from each experiment's README_<experiment>_dataset_notes.
+UV_PER_UNIT = {"fingerflex": 0.0298, "motor_basic": 0.0298, "faces_basic": 0.0298}
+
+STANFORD_URL = "https://stacks.stanford.edu/file/druid:zk881ps0522/{experiment}.zip"
+STANFORD_SAMPLE_RATE_HZ = 1000  # manuscript, Methods: "sampled at 1000 Hz", every experiment
+
+# elec_regions codes, README_fingerflex_dataset_notes. Codes outside the table are NULL.
+FINGERFLEX_REGIONS = {
+    1: "dorsal M1",
+    3: "dorsal S1",
+    4: "ventral sensorimotor",
+    6: "frontal",
+    7: "parietal",
+    8: "temporal",
+    9: "occipital",
+}
+FINGERFLEX_LABELS = {1: "thumb", 2: "index", 3: "middle", 4: "ring", 5: "little"}
+# stim codes, README_motor_basic_dataset_notes. Two files also carry 13 and 15, undocumented,
+# kept as events with a NULL label.
+MOTOR_BASIC_LABELS = {11: "tongue", 12: "hand"}
+# stim codes, README_faces_basic_dataset_notes: 1 to 50 a house, 51 to 100 a face, 101 the
+# interstimulus interval (mapped to 0, no event), 0 outside the task.
+FACES_BASIC_LABELS = {**{c: "house" for c in range(1, 51)}, **{c: "face" for c in range(51, 101)}}
+FACES_BASIC_ISI = 101
+# elcode labels, faces_basic/fhpred_master.m area_lbls (Destrieux et al. 2010). 15 to 19 are
+# blank there and 20 is "Non-included area"; both are NULL here.
+FACES_BASIC_REGIONS = {
+    1: "temporal pole",
+    2: "parahippocampal gyrus",
+    3: "inferior temporal gyrus",
+    4: "middle temporal gyrus",
+    5: "fusiform gyrus",
+    6: "lingual gyrus",
+    7: "inferior occipital gyrus",
+    8: "cuneus",
+    9: "posterior ventral cingulate gyrus",
+    10: "middle occipital gyrus",
+    11: "occipital pole",
+    12: "precuneus",
+    13: "superior occipital gyrus",
+    14: "posterior dorsal cingulate gyrus",
+}
 
 # Source codes of the canary subjects, spec 12.5. Their records carry the radioactive bit
 # from Bronze on, so no copy of a record can lose it.
@@ -68,7 +109,103 @@ def read_synthetic(path: Path) -> Source:
     )
 
 
-ADAPTERS = {"synthetic": read_synthetic}
+def read_fingerflex(path: Path) -> Source:
+    """Stanford `fingerflex`, one file per subject at `data/<code>/<code>_fingerflex.mat`.
+
+    | Bronze | Source | From |
+    |---|---|---|
+    | subject_src | file name prefix | README says a `subject` variable, the files carry none |
+    | run | 1 | one file per subject |
+    | sample_rate_hz | 1000 | README, "sampled at 1000Hz" |
+    | value_raw | `data` (time x channels, int32) | README, 1 unit = 0.0298 microvolts |
+    | event | `cue` (time x 1), 0 rest, 1 thumb to 5 little | README; `<code>_stim.mat` is the behaviour, not the cue, unused |
+    | x_mm, y_mm, z_mm | `locs` (channels x 3) | README |
+    | brain_area | `elec_regions` code through FINGERFLEX_REGIONS | README table |
+    """
+    m = loadmat(path, simplify_cells=True, variable_names=["data", "cue", "locs", "elec_regions"])
+    return Source(
+        experiment="fingerflex",
+        subject_src=path.name.split("_")[0],
+        run=1,
+        sample_rate_hz=STANFORD_SAMPLE_RATE_HZ,
+        source_url=STANFORD_URL.format(experiment="fingerflex"),
+        data=np.asarray(m["data"], dtype=np.float32),
+        stim=np.asarray(m["cue"]).reshape(-1).astype(np.int16),
+        locs=np.asarray(m["locs"], dtype=np.float32),
+        brain_area=[FINGERFLEX_REGIONS.get(int(c)) for c in np.asarray(m["elec_regions"]).reshape(-1)],
+        labels=FINGERFLEX_LABELS,
+    )
+
+
+def read_motor_basic(path: Path) -> Source:
+    """Stanford `motor_basic`, one file per subject at `data/<code>_mot_t_h.mat`.
+
+    | Bronze | Source | From |
+    |---|---|---|
+    | subject_src | file name prefix | README |
+    | run | 1 | one file per subject |
+    | sample_rate_hz | 1000 | README, "sampled at 1000Hz" |
+    | value_raw | `data` (time x channels, int16 or int32) | README, 1 unit = 0.0298 microvolts |
+    | event | `stim` (time x 1), 0 blank, 11 tongue, 12 hand | README |
+    | x_mm, y_mm, z_mm | `electrodes` (channels x 3) in `locs/<code>_electrodes.mat`, Talairach | README |
+    | brain_area | NULL | the files carry no region code |
+    """
+    code = path.name.split("_")[0]
+    m = loadmat(path, simplify_cells=True)
+    locs = loadmat(path.parent.parent / "locs" / f"{code}_electrodes.mat", simplify_cells=True)
+    return Source(
+        experiment="motor_basic",
+        subject_src=code,
+        run=1,
+        sample_rate_hz=STANFORD_SAMPLE_RATE_HZ,
+        source_url=STANFORD_URL.format(experiment="motor_basic"),
+        data=np.asarray(m["data"], dtype=np.float32),
+        stim=np.asarray(m["stim"]).reshape(-1).astype(np.int16),
+        locs=np.asarray(locs["electrodes"], dtype=np.float32),
+        brain_area=None,
+        labels=MOTOR_BASIC_LABELS,
+    )
+
+
+def read_faces_basic(path: Path) -> Source:
+    """Stanford `faces_basic`, one file per subject at `data/<code>/<code>_faceshouses.mat`.
+
+    | Bronze | Source | From |
+    |---|---|---|
+    | subject_src | file name prefix | README |
+    | run | 1 | one file per subject |
+    | sample_rate_hz | `srate` | the file, 1000 in all of them |
+    | value_raw | `data` (time x channels, float64 of integer amplifier units) | README gives no scale; UV_PER_UNIT takes the 0.0298 of the other two READMEs, same amplifiers and settings (manuscript, Methods) |
+    | event | `stim` (time x 1), 1 to 50 house, 51 to 100 face, 101 interstimulus | README; 101 is not an event |
+    | x_mm, y_mm, z_mm | NULL | `locs/<code>_xslocs.mat` holds MRI voxel indices, not millimetres |
+    | brain_area | `elcode` in `locs/<code>_xslocs.mat` through FACES_BASIC_REGIONS | fhpred_master.m area_lbls |
+    """
+    code = path.name.split("_")[0]
+    m = loadmat(path, simplify_cells=True)
+    locs = loadmat(path.parent.parent.parent / "locs" / f"{code}_xslocs.mat", simplify_cells=True)
+    stim = np.asarray(m["stim"]).reshape(-1).astype(np.int16)
+    stim[stim == FACES_BASIC_ISI] = 0
+    return Source(
+        experiment="faces_basic",
+        subject_src=code,
+        run=1,
+        sample_rate_hz=int(m["srate"]),
+        source_url=STANFORD_URL.format(experiment="faces_basic"),
+        data=np.asarray(m["data"], dtype=np.float32),
+        stim=stim,
+        locs=None,
+        brain_area=[FACES_BASIC_REGIONS.get(int(c)) for c in np.asarray(locs["elcode"]).reshape(-1)],
+        labels=FACES_BASIC_LABELS,
+    )
+
+
+# Directory under raw/ to (reader, glob of the data files inside that directory).
+ADAPTERS = {
+    "synthetic": (read_synthetic, "*/*.mat"),
+    "fingerflex": (read_fingerflex, "*/data/*/*_fingerflex.mat"),
+    "motor_basic": (read_motor_basic, "*/data/*_mot_t_h.mat"),
+    "faces_basic": (read_faces_basic, "*/data/*/*_faceshouses.mat"),
+}
 
 
 def stage(con, src: Source):
@@ -99,7 +236,7 @@ def stage(con, src: Source):
         [
             (
                 c,
-                *(float(v) for v in (src.locs[c] if src.locs is not None else (None,) * 3)),
+                *([float(v) for v in src.locs[c]] if src.locs is not None else [None] * 3),
                 src.brain_area[c] if src.brain_area is not None else None,
             )
             for c in range(ch)
@@ -113,6 +250,10 @@ def convert(con, path: Path, adapter) -> int:
     if con.execute("SELECT count(*) FROM bronze_ingest_audit WHERE sha256 = ?", [sha256]).fetchone()[0]:
         print(f"convert: skip {path}, sha256 already ingested")
         return 0
+    with path.open("rb") as f:
+        if b"MATLAB 7.3" in f.read(128):
+            print(f"convert: skip {path}, MATLAB v7.3 is HDF5 and needs h5py, see ADR-0005")
+            return 0
     src = adapter(path)
     code = con.execute(
         "SELECT code FROM lineage_experiment WHERE experiment = ?", [src.experiment]
@@ -161,11 +302,11 @@ def main(argv=None) -> int:
     con = db.connect()
     total = 0
     for directory in sorted(p for p in raw.iterdir() if p.is_dir()) if raw.exists() else []:
-        adapter = ADAPTERS.get(directory.name)
-        if adapter is None:
+        if directory.name not in ADAPTERS:
             print(f"convert: skip {directory}, no adapter registered for '{directory.name}'")
             continue
-        for path in sorted(directory.rglob("*.mat")):
+        adapter, pattern = ADAPTERS[directory.name]
+        for path in sorted(directory.glob(pattern)):
             total += convert(con, path, adapter)
     print(f"convert: {total} rows written")
     return 0
