@@ -4,7 +4,7 @@ One entry per phase. What was checked, what failed, what changed.
 
 ## Phase 0, skeleton
 
-- Status: done, 2026-09-19, branch `feat/phase0`, eleven commits after the scaffold, not merged
+- Status: done, 2026-09-19, branch `feat/phase0`, eleven commits after the scaffold, merged to master as pull request 1, `89c0ce1`
 - Environment: WSL2 Ubuntu 26.04, Python 3.14.4, DuckDB 1.5.5, scipy 1.18.1, PyYAML 6.0.3, pytest 9.1.1, ruff 0.16.8
 
 ### Checked
@@ -103,7 +103,7 @@ $ python -c "import duckdb; print(duckdb.__version__)"
 
 ## Phase 0 amendment, lid layout from arch-standards
 
-- Status: done, 2026-09-20, branch `feat/lid-layout` on top of the merged phase 0, spec commits `957efe5` and `d6acc21` merged in
+- Status: done, 2026-09-20, branch `feat/lid-layout` on top of the merged phase 0, spec commits `957efe5` and `d6acc21` merged in, merged to master as pull requests 2 and 4, `5e136b0` and `747ea27`
 - Environment: as phase 0, arch-standards at `../arch-standards` on branch `feat/ids-open-items`
 
 ### Checked
@@ -186,7 +186,7 @@ $ du -sh $DATA_DIR/*
 
 ## Phase 0 amendment, text, parse and relayer from the generator
 
-- Status: done, 2026-09-20, branch `feat/lid-generated-macros` on top of `feat/lid-layout`
+- Status: done, 2026-09-20, branch `feat/lid-generated-macros` on top of `feat/lid-layout`, merged as pull request 3, `f951eed`, and reached master through pull request 4
 - Environment: as phase 0, arch-standards at `../arch-standards` on branch `feat/ids-text-parse-relayer`, its pull requests 2 and 3 open
 
 ### Checked
