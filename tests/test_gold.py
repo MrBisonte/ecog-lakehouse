@@ -139,3 +139,15 @@ def test_published_copy_is_checked_for_canary_lids(gold, built):
         "SELECT result FROM gold_evidence WHERE dataset = 'docs/data' AND check_kind = 'sql'"
     ).fetchall()
     assert result and all(r[0] == "pass" for r in result)
+
+
+def test_publish_default_out_follows_the_working_directory(built, tmp_path, monkeypatch):
+    """An editable install points at the checkout it was installed from, so a verifier running
+    from a clone must not publish into that checkout."""
+    install = tmp_path / "install"
+    (install / "docs" / "data").mkdir(parents=True)
+    monkeypatch.setattr(db, "REPO", install)
+    monkeypatch.chdir(tmp_path)
+    assert publish.main([]) == 0
+    assert json.loads((tmp_path / "docs" / "data" / "manifest.json").read_text())["files"]
+    assert list((install / "docs" / "data").iterdir()) == []
