@@ -120,3 +120,10 @@ def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
     out = tmp_path / "out"
     assert publish.main(["--out", str(out)]) == 1
     assert not (out / "manifest.json").exists()
+
+
+def test_published_copy_is_checked_for_canary_lids(gold, built):
+    result = gold.execute(
+        "SELECT result FROM gold_evidence WHERE dataset = 'docs/data' AND check_kind = 'sql'"
+    ).fetchall()
+    assert result and all(r[0] == "pass" for r in result)
