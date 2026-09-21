@@ -28,7 +28,8 @@ publish:
 	$(PY) pipeline/publish.py
 
 bench:
-	for f in faults/*/bench.sh; do bash $$f; done
+	$(PY) pipeline/bench_doc.py
+	for f in $(wildcard faults/*/bench.sh); do bash $$f; done
 
 test:
 	$(PY) -m pytest -q
