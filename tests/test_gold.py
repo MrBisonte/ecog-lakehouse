@@ -122,6 +122,18 @@ def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
     assert not (out / "manifest.json").exists()
 
 
+def test_dataset_version_in_manifest_equals_the_one_evidence_recorded(gold, built):
+    rows = gold.execute(
+        "SELECT m.dataset, m.dataset_version, e.dataset_version "
+        "FROM gold_dataset_manifest m "
+        "JOIN (SELECT DISTINCT dataset, dataset_version FROM gold_evidence "
+        "      WHERE run_id = (SELECT max(run_id) FROM gold_evidence)) e USING (dataset) "
+        "ORDER BY 1"
+    ).fetchall()
+    assert len(rows) >= 3, "Silver and Gold datasets are checked and listed in the manifest"
+    assert all(manifest == evidence for _, manifest, evidence in rows), rows
+
+
 def test_published_copy_is_checked_for_canary_lids(gold, built):
     result = gold.execute(
         "SELECT result FROM gold_evidence WHERE dataset = 'docs/data' AND check_kind = 'sql'"
