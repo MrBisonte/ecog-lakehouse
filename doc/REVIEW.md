@@ -318,3 +318,24 @@ $ du -sh $DATA_DIR/bronze $DATA_DIR/silver $DATA_DIR/gold
 8.5G    /home/bisonte/ibrain_verify_data/silver
 11M     /home/bisonte/ibrain_verify_data/gold
 ```
+
+## Phase 3, site
+
+- Status: done, 2026-09-22, branch `feat/phase3`, three commits after the merge of #9, not merged; GitHub Pages not yet enabled, Alex's call after this step
+- Environment: as phase 1; DuckDB-WASM 1.32.0 from cdn.jsdelivr.net, pinned in `docs/index.html`; a local range capable server (`faults/serve.py` from phase 2) on 127.0.0.1 for the check below
+
+### Checked
+
+- `docs/index.html`, one file, system font stack, no request to any host but the page's origin and `cdn.jsdelivr.net` (the resource timing list in the browser shows those two hosts and no other). On load it reads `data/manifest.json` with a cache busting query, registers the Gold Parquet files for HTTP range reads, creates one view per Gold dataset, loads `data/lid.sql`, runs every check in `data/checks.json`, and renders the checks table, `experiment_summary` (42 rows), the 100 `channel_quality` records with the highest line noise ratio out of 2,241, the evidence runs the pipeline recorded, and the published files with their digests.
+- In the browser over the phase 1 publish: 61 checks rerun, 61 pass, 0 fail, 0 error; the pipeline's own run in `gold/evidence` shows 103 of 103. The 42 checks the page does not rerun read `DATA_DIR` or the source files (`hash_match`, `partition_layout`, `retention`) or Silver and Bronze datasets the site does not publish.
+- `pipeline/publish.py` writes `docs/data/checks.json`, the Gold checks of the kinds that need only the views, and `docs/data/lid.sql`, a copy of the generated lineage macros. `tests/test_gold.py` reruns every published check in a fresh DuckDB over the published files alone, the way the page does: pass.
+- `make lint` green, `make test` 70 tests.
+
+### Failed, and fixed before the commit
+
+- Timestamps came back from Arrow as epoch milliseconds and rendered as numbers; columns ending in `_at` are formatted as UTC text.
+- The evidence runs section was inserted into the DOM by the script; it is a static section now.
+
+### Not in phase 3
+
+Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger's browser" and `BASE_URL=https://... make bench` for the phase 2 tables with real latency), the fault files on the page (spec 7 lists them under `docs/data/faults`, the page reads Gold only), rails per run or per record for `channel_quality` (open).
