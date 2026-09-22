@@ -11,10 +11,13 @@ import shutil
 import sys
 from pathlib import Path
 
-from pipeline import db
+from pipeline import checks, db
 
 FILE_LIMIT = 95 * 1024**2
 TOTAL_LIMIT = 500 * 1024**2
+# Check kinds whose SQL needs only the Gold views, so the browser page (spec 8) can rerun them
+# over the published files. The others read DATA_DIR or the source files.
+BROWSER_KINDS = {"not_null", "unique", "row_count_min", "no_direct_identifier", "sql"}
 
 
 def radioactive_rows(con, path: Path) -> int:
@@ -26,6 +29,17 @@ def radioactive_rows(con, path: Path) -> int:
         f"SELECT count(*) FROM read_parquet('{path.as_posix()}') "
         "WHERE lid IS NOT NULL AND lid_radioactive(lid_from_uuid(lid)) = 1"
     ).fetchone()[0]
+
+
+def browser_checks() -> list[dict]:
+    """The checks the page reruns: Gold datasets, kinds that need only the views and lid.sql."""
+    return [
+        {"check_id": c.check_id, "requirement_id": c.requirement_id, "framework": c.framework,
+         "dataset": c.dataset, "check_kind": c.check_kind, "sql": c.sql, "expected": c.expected,
+         "compare": c.compare}
+        for c in checks.from_requirements() + checks.from_contracts()
+        if c.dataset.startswith("gold/") and c.check_kind in BROWSER_KINDS
+    ]
 
 
 def publish(out: Path) -> int:
@@ -55,6 +69,8 @@ def publish(out: Path) -> int:
         print(f"publish: refused, over the limit: files {over}, total {total} bytes")
         return 1
     (out / "manifest.json").write_text(json.dumps({"files": files, "bytes": total}, indent=1) + "\n")
+    (out / "checks.json").write_text(json.dumps(browser_checks(), indent=1) + "\n")
+    shutil.copyfile(db.SQL / "lineage" / "lid_generated.sql", out / "lid.sql")
     print(f"publish: {len(files)} files, {total} bytes, manifest at {out / 'manifest.json'}")
     return 0
 
