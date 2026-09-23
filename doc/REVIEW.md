@@ -373,3 +373,20 @@ GitHub Pages and the site (phase 3), a verifier rerun of `make all` (the pipelin
 ### Not in phase 3
 
 Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger's browser" and `BASE_URL=https://... make bench` for the phase 2 tables with real latency), the fault files on the page (spec 7 lists them under `docs/data/faults`, the page reads Gold only), rails per run or per record for `channel_quality` (open).
+
+## Phase 3 addendum, GitHub Pages
+
+- Status: done, 2026-09-23, branch `docs/bench-pages`; Pages enabled on the private repository (GitHub Pro), site at https://mrbisonte.github.io/ecog-lakehouse/
+- The page from the Pages origin: 61 checks rerun in the browser, 61 pass, 42 experiment_summary rows, 100 channel_quality rows shown of 2,241, 8 published files listed; resource timing lists `mrbisonte.github.io` and `cdn.jsdelivr.net` and no other host; no console errors.
+- `docs/bench.md` rewritten from `BASE_URL=https://mrbisonte.github.io/ecog-lakehouse/data`, the four fault tables against real latency; the counts table at the top keeps the phase 1 verifier numbers.
+
+### Failed, and fixed before the commit
+
+- Pages serves one file with a different ETag from different Fastly edges (`6ab394b5-...` from MAD, `6ab394b4-...` from TOJ, seen with three HEAD requests). DuckDB sends the first ETag as If-Match on the next range request and gets a 412, "ETag changed after it was opened". `SET unsafe_disable_etag_checks = true` on every remote read of faults A, D and F; the sha256 in `manifest.json` stays the integrity check. DuckDB-WASM on the page did not hit it.
+- The Fault A "after" layout is two files on Pages, the alpha's partitioned writer split the partition, and the bench measured one. It measures every file of a layout now, with a files column; against a remote it no longer replants, the published copy is what is measured.
+- DuckDB 1.5.5 raised `UnicodeDecodeError`, not its own error, on one 503 body from the proxy in front of Pages; the Fault F attempts count any exception as a failure.
+
+### Observations, not fixed
+
+- Fault A over Pages reads the opposite way from the loopback run and from the story in spec 6: the single row group file, 52 MB, takes about 1.0 s and the partitioned, sorted layout of 38 row groups in 76 MB about 2.7 s, with `read_ahead_depth` making no difference either way. Each row group is a range request and each request is a CDN round trip; on this file and this network the request count dominates the parallelism. The layout still wins the partition_layout check and the range retrieval story (`lid_children` reads one row group, not the file); the wall clock claim needs a bigger file or a closer host. Recorded as measured.
+- Fault D over Pages: 5.1 s for the sequential loop against 0.33 s for one statement over 15,336,887 rows in 8 files. Fault F: 0 of 10 without retries, 10 of 10 with. Fault G unchanged.
