@@ -2,7 +2,7 @@
 
 Paste as the first message in Claude Code inside `/mnt/c/Prj/ecog-lakehouse`. This is the version that was actually used; it supersedes the earlier draft.
 
-Amendment of 2026-09-23: the project was renamed from ibrain to ecog-lakehouse. The prompt below is the text that was actually used, with every occurrence of the old name and its paths rewritten to the new ones, so it still runs.
+Amendment of 2026-09-23: the project was renamed to ecog-lakehouse. The prompt below is the text that was actually used, with every occurrence of the old name and its paths rewritten to the new ones, so it still runs.
 
 Amendment of 2026-09-20, after the `lid` layout moved to arch-standards: step 3 below means use the generated macros in `sql/lineage/lid_generated.sql` (copied by `make lineage`, never edited) for encode, decode and validate, and hand write only the navigation, `lid_trace`, `lid_children` and `lid_parent`, plus the tables, text form and UUID bridge they need, in `sql/lineage/lid_extras.sql`. Spec sections 12.5 (canary records) and 3.3 (`gold/dataset_manifest`) are in scope as well.
 
