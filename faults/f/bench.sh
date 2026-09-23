@@ -17,7 +17,7 @@ PROXY_PID=$!
 trap 'kill $PROXY_PID ${SERVER_PID:-} 2>/dev/null' EXIT
 sleep 1
 export FAULT_URL="http://127.0.0.1:8766/${FILE#docs/data/}"
-BEFORE="SET http_retries = 0; SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet(getenv('FAULT_URL')) GROUP BY 1;"
+BEFORE="SET unsafe_disable_etag_checks = true; SET http_retries = 0; SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet(getenv('FAULT_URL')) GROUP BY 1;"
 AFTER=$(cat faults/f/fix.sql)
 
 # Ten attempts of one statement list on the pipeline's DuckDB: "successes/10 mean_seconds".
@@ -32,7 +32,7 @@ for _ in range(10):
     try:
         con.execute(sql).fetchone()
         ok += 1
-    except duckdb.Error:
+    except Exception:  # noqa: BLE001, any failure is a failed attempt, DuckDB 1.5.5 raises UnicodeDecodeError on some 503 bodies
         pass
     total += time.perf_counter() - t0
 print(f"{ok}/10 {total / 10:.3f}")

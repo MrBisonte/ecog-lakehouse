@@ -116,3 +116,11 @@ Decision pending: the spec defines rails per run, so A stayed. Switching to B is
 6. **A failed write is a state, handle it.** Zero byte files and stale spill directories broke the next run twice. The pipeline now cleans what it can and puts the rest where the spec says.
 7. **Know the machine.** `/tmp` as tmpfs, a clock that jumps when the host sleeps, a mount that reports ENOMEM on a temp file: none of these were in the plan and all three cost a run.
 8. **Write the definition down before optimising it.** B is faster because it computes something else. The spec's rails per run is the reason A is still in place, and the reason the choice is Alex's, not the optimizer's.
+
+## 6. Addendum, the same faults against GitHub Pages
+
+The tables in section 3 were loopback. With Pages on and `BASE_URL` pointing at it, three things changed the picture.
+
+- **The CDN lies about identity.** Pages returned `6ab394b5-385b0b5` for a file from one Fastly edge and `6ab394b4-385b0b5` from another. DuckDB pins the first ETag with If-Match, the next range request lands on the other edge, 412. The read that worked on loopback failed on the real host. `unsafe_disable_etag_checks` is the documented way through, and the sha256 in the manifest is the integrity check that remains. Lesson: a correctness check inside the client can fail on infrastructure the client does not control; know which check you are relying on.
+- **Fault A inverted.** Loopback showed no gap; Pages showed the partitioned layout slower, 2.7 s against 1.0 s, because 38 row groups are 38 round trips. The layout is still right for the range retrieval that `lid_children` does, and still what the partition_layout check demands, but the "faster aggregate" claim needs a file big enough for parallel streams to beat request latency. Lesson: measure the claim on the network it will be made on, and write down the one that did not hold.
+- **Fault D and F held.** 5.1 s against 0.3 s for the download loop; 0 of 10 against 10 of 10 without and with retries. The stories that are about request count and failure handling survive real latency; the one about parallel streams did not at this size.
