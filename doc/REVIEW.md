@@ -319,6 +319,40 @@ $ du -sh $DATA_DIR/bronze $DATA_DIR/silver $DATA_DIR/gold
 11M     /home/bisonte/ibrain_verify_data/gold
 ```
 
+## Phase 2, faults and bench
+
+- Status: done, 2026-09-21, branch `feat/phase2`, nine commits after the merge of #8, not merged
+- Environment: as phase 1 for the pipeline, DuckDB 1.5.5; the benches run on the DuckDB CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`, installed from the official installer's staged alpha channel into `~/.local/duckdb-alpha`, no GitHub release exists yet
+- Data: the phase 1 build in `DATA_DIR`, 45 files, 871,160,120 Bronze rows
+
+### Checked
+
+- `make bench` writes `docs/bench.md`: the counts table, then one section per fault with a before and after table, every number a query result or a timer. `make publish` after the benches lists 8 files, 139,113,249 bytes under `docs/data`, under the 500 MB limit; the largest, the Fault A single row group file, is 51,960,395 bytes, under 95 MB.
+- Fault A: the v2.0 `COPY ... PARTITION_BY ... ORDER BY ... ROW_GROUP_SIZE 198656` writes a sorted file, checked by a window query over the output. The alpha warns about unquoted identifiers in `PARTITION_BY`, the syntax the spec gives.
+- Fault D: both approaches count the same 863,287 rows over the five published files; one httpfs statement is about three times faster than the sequential loop on loopback.
+- Fault F: on DuckDB 1.5.5, `http_retries = 0` fails the query whenever a range request meets a 503, and the tuned retries recover every attempt. The 2.0 alpha CLI retries a 503 on its own with `http_retries = 0` and fails only when every range request fails; reported as a third row rather than hidden.
+- Fault G: the 512 level nested OR parses and binds in about twice the time of the IN list; the malformed variant gets the parser's message with the token underlined. The generator's guard rejects both bad variants, tested.
+- `make lint` green, `make test` 71 tests before every commit.
+
+### Failed, and fixed before the commit
+
+- Python's stock `http.server` answers a Range request with the whole file. DuckDB printed "the server does not support HTTP range requests" and downloaded every file whole, so the first run of faults A and F measured nothing. `faults/serve.py`, a 50 line static server with Range support, replaces it; the test for the proxy serves through it too.
+- The first Fault F bench timed each attempt with one run and counted success with another, doubling the proxy's request counter. One timed run per attempt now.
+- `getenv()` exists in the CLI only; the Python attempts of Fault F splice the URL in as a literal.
+- Single timings on loopback varied by a factor of three between runs of the same query. Fault A reports the median of three.
+- `ruff` refused two `noqa` comments for a rule that is not enabled; removed.
+
+### Observations, not fixed
+
+- Loopback has no latency, so the async read-ahead of Fault A shows no gap between layouts here; the row group and sortedness columns show the layout difference, the seconds will only once `BASE_URL` points at GitHub Pages (phase 3).
+- The "bad" file of Fault A is sorted, because it is read from the pipeline's sorted partition; the fault is the single row group and the missing partition columns, and the spec's "unsorted" would need an ORDER BY random() that makes the file larger.
+- The 2.0 alpha's partitioned COPY produced 21, 24 and 25 row groups for the same 7,236,800 rows on three runs, a parallel writer deciding the split; each row group stays under the 198,656 limit.
+- The WSL clock still jumps when the host sleeps; the counts table at the top of `docs/bench.md` keeps the verifier's numbers from phase 1.
+
+### Not in phase 2
+
+GitHub Pages and the site (phase 3), a verifier rerun of `make all` (the pipeline did not change; `publish.py` gained the fault file listing, covered by the existing publish test and `make bench` on the phase 1 build), the choice between rails per run and per record for `channel_quality` (open, Alex's call).
+
 ## Phase 3, site
 
 - Status: done, 2026-09-22, branch `feat/phase3`, three commits after the merge of #9, not merged; GitHub Pages not yet enabled, Alex's call after this step
