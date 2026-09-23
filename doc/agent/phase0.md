@@ -1,27 +1,29 @@
 # Agent prompt, phase 0
 
-Paste as the first message in Claude Code inside `/mnt/c/Prj/ibrain`. This is the version that was actually used; it supersedes the earlier draft.
+Paste as the first message in Claude Code inside `/mnt/c/Prj/ecog-lakehouse`. This is the version that was actually used; it supersedes the earlier draft.
+
+Amendment of 2026-09-23: the project was renamed from ibrain to ecog-lakehouse. The prompt below is the text that was actually used, with every occurrence of the old name and its paths rewritten to the new ones, so it still runs.
 
 Amendment of 2026-09-20, after the `lid` layout moved to arch-standards: step 3 below means use the generated macros in `sql/lineage/lid_generated.sql` (copied by `make lineage`, never edited) for encode, decode and validate, and hand write only the navigation, `lid_trace`, `lid_children` and `lid_parent`, plus the tables, text form and UUID bridge they need, in `sql/lineage/lid_extras.sql`. Spec sections 12.5 (canary records) and 3.3 (`gold/dataset_manifest`) are in scope as well.
 
 ```
-You are building phase 0 of the repository ibrain at /mnt/c/Prj/ibrain
-(Windows path C:\Prj\ibrain, a Windows drive mounted in WSL2). A zip named
-ibrain.zip is in or next to that folder; it contains the repository with its
+You are building phase 0 of the repository ecog-lakehouse at /mnt/c/Prj/ecog-lakehouse
+(Windows path C:\Prj\ecog-lakehouse, a Windows drive mounted in WSL2). A zip named
+ecog-lakehouse.zip is in or next to that folder; it contains the repository with its
 .git history.
 
 Pre-flight, do this first and report the result of each line before
 anything else:
 
-1. If /mnt/c/Prj/ibrain has no .git directory, unzip ibrain.zip so that the
-   repository root is /mnt/c/Prj/ibrain itself, not /mnt/c/Prj/ibrain/ibrain.
+1. If /mnt/c/Prj/ecog-lakehouse has no .git directory, unzip ecog-lakehouse.zip so that the
+   repository root is /mnt/c/Prj/ecog-lakehouse itself, not /mnt/c/Prj/ecog-lakehouse/ecog-lakehouse.
    Then `git log --oneline`: expect exactly one commit, "chore: scaffold
-   ibrain with intent, spec, plan, ADRs, references and phase 0 agent prompt".
+   ecog-lakehouse with intent, spec, plan, ADRs, references and phase 0 agent prompt".
    `git status --short` must be empty. If either is not true, stop and show me.
 2. `python3 --version` must be 3.12 or newer. Create a venv inside WSL, not on
-   the Windows mount: `python3 -m venv ~/.venvs/ibrain && source
-   ~/.venvs/ibrain/bin/activate && pip install -e ".[dev]"`.
-3. `export DATA_DIR=$HOME/data/ibrain && mkdir -p $DATA_DIR`. All data and
+   the Windows mount: `python3 -m venv ~/.venvs/ecog-lakehouse && source
+   ~/.venvs/ecog-lakehouse/bin/activate && pip install -e ".[dev]"`.
+3. `export DATA_DIR=$HOME/data/ecog-lakehouse && mkdir -p $DATA_DIR`. All data and
    DuckDB working files live there: raw/, bronze/, silver/, gold/,
    keyring.duckdb. Only docs/data/ stays inside the repo. Never write anything
    but source, docs and docs/data/ inside the repo root; if a script wants to

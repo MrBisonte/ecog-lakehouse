@@ -376,9 +376,9 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Phase 3 addendum, GitHub Pages
 
-- Status: done, 2026-09-23, branch `docs/bench-pages`; Pages enabled on the private repository (GitHub Pro), site at https://mrbisonte.github.io/ibrain/
+- Status: done, 2026-09-23, branch `docs/bench-pages`; Pages enabled on the private repository (GitHub Pro), site at https://mrbisonte.github.io/ecog-lakehouse/
 - The page from the Pages origin: 61 checks rerun in the browser, 61 pass, 42 experiment_summary rows, 100 channel_quality rows shown of 2,241, 8 published files listed; resource timing lists `mrbisonte.github.io` and `cdn.jsdelivr.net` and no other host; no console errors.
-- `docs/bench.md` rewritten from `BASE_URL=https://mrbisonte.github.io/ibrain/data`, the four fault tables against real latency; the counts table at the top keeps the phase 1 verifier numbers.
+- `docs/bench.md` rewritten from `BASE_URL=https://mrbisonte.github.io/ecog-lakehouse/data`, the four fault tables against real latency; the counts table at the top keeps the phase 1 verifier numbers.
 
 ### Failed, and fixed before the commit
 

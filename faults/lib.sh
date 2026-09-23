@@ -2,7 +2,7 @@
 # Shared by every faults/*/bench.sh: the DuckDB CLI, DATA_DIR, a BASE_URL that serves docs/data
 # over HTTP (GitHub Pages when set, a local python http.server otherwise), a timer and the
 # smallest non canary Silver partition. Source it from the repo root.
-export DATA_DIR=${DATA_DIR:-$HOME/data/ibrain}
+export DATA_DIR=${DATA_DIR:-$HOME/data/ecog-lakehouse}
 DUCKDB=${DUCKDB:-$HOME/.local/duckdb-alpha/duckdb}
 PY=${PY:-python3}
 BENCH_MD=docs/bench.md

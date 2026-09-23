@@ -9,7 +9,7 @@ Python 3.12, DuckDB, Parquet, `make`. Plain SQL in `sql/`, no ORM. DuckDB-WASM i
 - Every number shown anywhere is a query result. Nothing typed by hand.
 - Bronze is append-only. Never rewrite a Bronze partition.
 - `subject_src` never appears outside Bronze and `keyring.duckdb`. A test enforces it.
-- All data and DuckDB working files live in `DATA_DIR` (default `$HOME/data/ibrain`), outside the repo: `data/raw`, `data/bronze`, `data/silver`, `data/gold`, `keyring.duckdb`. The repo is on a Windows mount (`/mnt/c/Prj/ibrain`); writing data inside it is a bug. `docs/data/` is the only published data and the only data inside the repo.
+- All data and DuckDB working files live in `DATA_DIR` (default `$HOME/data/ecog-lakehouse`), outside the repo: `data/raw`, `data/bronze`, `data/silver`, `data/gold`, `keyring.duckdb`. The repo is on a Windows mount (`/mnt/c/Prj/ecog-lakehouse`); writing data inside it is a bug. `docs/data/` is the only published data and the only data inside the repo.
 - `.gitignore` is an allow list: only code, SQL, contracts, governance CSVs, docs and the site are tracked. A new file type needs a new allow line.
 - Published file under 95 MB, `docs/data/` under 500 MB. `make publish` enforces.
 - No third-party request at view time except the pinned DuckDB-WASM CDN. System font stack.

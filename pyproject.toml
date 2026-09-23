@@ -1,5 +1,5 @@
 [project]
-name = "ibrain"
+name = "ecog-lakehouse"
 version = "0.0.1"
 description = "Governed lakehouse over public ECoG recordings with planted performance faults"
 requires-python = ">=3.12"

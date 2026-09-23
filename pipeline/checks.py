@@ -136,7 +136,7 @@ def from_requirements(path=REQUIREMENTS) -> list[Check]:
 
 
 def from_contracts(folder=CONTRACTS) -> list[Check]:
-    """required and unique properties, and every ibrain quality rule, become checks."""
+    """required and unique properties, and every ecog-lakehouse quality rule, become checks."""
     checks = []
     for path in sorted(folder.glob("*.yaml")):
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -148,7 +148,7 @@ def from_contracts(folder=CONTRACTS) -> list[Check]:
             if prop.get("unique"):
                 rules.append(("unique", {"columns": [prop["name"]]}))
         for rule in obj.get("quality", []):
-            if rule.get("engine") == "ibrain":
+            if rule.get("engine") == "ecog-lakehouse":
                 rules.append((rule["implementation"]["check_kind"], rule["implementation"]["params"]))
         for kind, params in rules:
             checks += generate("contract", doc["id"], kind, doc["name"], params)

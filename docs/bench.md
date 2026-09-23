@@ -57,7 +57,7 @@ Malformed variant, one parenthesis short, as the parser reports it:
 
 ## Fault A: single row group, unpartitioned, unsorted
 
-DuckDB CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`. Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one. Query: `SET unsafe_disable_etag_checks = true; SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet([URLS]) GROUP BY 1` over `https://mrbisonte.github.io/ibrain/data`, every file of the layout in one read_parquet. Seconds are the median of three CLI runs each.
+DuckDB CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`. Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one. Query: `SET unsafe_disable_etag_checks = true; SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet([URLS]) GROUP BY 1` over `https://mrbisonte.github.io/ecog-lakehouse/data`, every file of the layout in one read_parquet. Seconds are the median of three CLI runs each.
 
 | layout | files | row groups | bytes | sorted by lid, sample_idx | read_ahead_depth = 0 | default |
 |---|---|---|---|---|---|---|
@@ -66,7 +66,7 @@ DuckDB CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`. Subject partition `exper
 
 ## Fault D: synchronous one-file-at-a-time loop
 
-8 Parquet files from `docs/data/manifest.json` over `https://mrbisonte.github.io/ibrain/data`. Before: `faults/d/plant.py`, urllib, one file after another into a temp directory, then count. After: `faults/d/fix.sql`, one `read_parquet` over the URL list. Seconds are wall clock of one run each.
+8 Parquet files from `docs/data/manifest.json` over `https://mrbisonte.github.io/ecog-lakehouse/data`. Before: `faults/d/plant.py`, urllib, one file after another into a temp directory, then count. After: `faults/d/fix.sql`, one `read_parquet` over the URL list. Seconds are wall clock of one run each.
 
 | approach | rows | seconds |
 |---|---|---|
@@ -75,7 +75,7 @@ DuckDB CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`. Subject partition `exper
 
 ## Fault F: flaky remote reads without retries
 
-`faults/f/flaky_proxy.py` in front of `https://mrbisonte.github.io/ibrain/data`, 503 on a fraction 0.1 of range requests, deterministic. Query: the Fault A aggregate, one range request per row group, over `faults/a/good/experiment=faces_basic/subject_pid=72d88db77f3716bb/data_0.parquet`. Ten attempts per row, each timed. The first two rows run on DuckDB 1.5.5, the pipeline's engine; the third on the CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`, which retries a 503 on its own whatever http_retries says.
+`faults/f/flaky_proxy.py` in front of `https://mrbisonte.github.io/ecog-lakehouse/data`, 503 on a fraction 0.1 of range requests, deterministic. Query: the Fault A aggregate, one range request per row group, over `faults/a/good/experiment=faces_basic/subject_pid=72d88db77f3716bb/data_0.parquet`. Ten attempts per row, each timed. The first two rows run on DuckDB 1.5.5, the pipeline's engine; the third on the CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`, which retries a 503 on its own whatever http_retries says.
 
 | engine, setting | successes | mean seconds |
 |---|---|---|

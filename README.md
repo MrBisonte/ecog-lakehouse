@@ -1,4 +1,4 @@
-# ibrain
+# ecog-lakehouse
 
 Governed lakehouse over public ECoG recordings. Every number traces to bytes. Four planted faults, fixed live.
 
