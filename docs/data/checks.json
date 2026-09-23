@@ -1,0 +1,612 @@
+[
+ {
+  "check_id": "GDPR-Art9/no_direct_identifier/gold/channel_quality/['subject_src']",
+  "requirement_id": "GDPR-Art9",
+  "framework": "GDPR-Art9",
+  "dataset": "gold/channel_quality",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_channel_quality' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "GDPR-Art9/no_direct_identifier/gold/experiment_summary/['subject_src']",
+  "requirement_id": "GDPR-Art9",
+  "framework": "GDPR-Art9",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_experiment_summary' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "GDPR-Art9/no_direct_identifier/gold/feature_window/['subject_src']",
+  "requirement_id": "GDPR-Art9",
+  "framework": "GDPR-Art9",
+  "dataset": "gold/feature_window",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_feature_window' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "GDPR-Art9/no_direct_identifier/gold/evidence/['subject_src']",
+  "requirement_id": "GDPR-Art9",
+  "framework": "GDPR-Art9",
+  "dataset": "gold/evidence",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_evidence' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "GDPR-Art9/no_direct_identifier/gold/dataset_manifest/['subject_src']",
+  "requirement_id": "GDPR-Art9",
+  "framework": "GDPR-Art9",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_dataset_manifest' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "GDPR-Art9/sql/gold/channel_quality/SELECT 1 FROM gold_channel_quality WHERE lid_radioactive(lid_from_uuid(lid)) = 1",
+  "requirement_id": "GDPR-Art9",
+  "framework": "GDPR-Art9",
+  "dataset": "gold/channel_quality",
+  "check_kind": "sql",
+  "sql": "-- sql: rows returned by the requirement's own query. Expected 0.\nSELECT count(*) AS observed FROM (SELECT 1 FROM gold_channel_quality WHERE lid_radioactive(lid_from_uuid(lid)) = 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "GDPR-Art9/sql/gold/feature_window/SELECT 1 FROM gold_feature_window WHERE lid_radioactive(lid_from_uuid(lid)) = 1",
+  "requirement_id": "GDPR-Art9",
+  "framework": "GDPR-Art9",
+  "dataset": "gold/feature_window",
+  "check_kind": "sql",
+  "sql": "-- sql: rows returned by the requirement's own query. Expected 0.\nSELECT count(*) AS observed FROM (SELECT 1 FROM gold_feature_window WHERE lid_radioactive(lid_from_uuid(lid)) = 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/experiment",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE experiment IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/subject_pid",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE subject_pid IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/run",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE run IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/channel_idx",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE channel_idx IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/n_samples",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE n_samples IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/missing_samples",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE missing_samples IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/rms_uv",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE rms_uv IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/clipped_pct",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE clipped_pct IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/lid",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE lid IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/unique/gold/channel_quality/['lid']",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "unique",
+  "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_channel_quality GROUP BY lid HAVING count(*) > 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/no_direct_identifier/gold/channel_quality/['subject_src']",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_channel_quality' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/not_null/gold/dataset_manifest/dataset_version",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE dataset_version IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/unique/gold/dataset_manifest/['dataset_version']",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "unique",
+  "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_dataset_manifest GROUP BY dataset_version HAVING count(*) > 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/not_null/gold/dataset_manifest/dataset",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE dataset IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/unique/gold/dataset_manifest/['dataset']",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "unique",
+  "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_dataset_manifest GROUP BY dataset HAVING count(*) > 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/not_null/gold/dataset_manifest/layer",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE layer IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/not_null/gold/dataset_manifest/n_records",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE n_records IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/not_null/gold/dataset_manifest/file_digests",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE file_digests IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/not_null/gold/dataset_manifest/produced_at",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE produced_at IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/not_null/gold/dataset_manifest/git_commit",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE git_commit IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-dataset-manifest/no_direct_identifier/gold/dataset_manifest/['subject_src']",
+  "requirement_id": "gold-dataset-manifest",
+  "framework": "contract",
+  "dataset": "gold/dataset_manifest",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_dataset_manifest' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/run_id",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE run_id IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/check_id",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE check_id IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/requirement_id",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE requirement_id IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/framework",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE framework IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/dataset",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE dataset IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/dataset_version",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE dataset_version IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/check_kind",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE check_kind IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/result",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE result IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/ran_at",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE ran_at IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/engine_version",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE engine_version IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/not_null/gold/evidence/git_commit",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE git_commit IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-evidence/unique/gold/evidence/['run_id', 'check_id']",
+  "requirement_id": "gold-evidence",
+  "framework": "contract",
+  "dataset": "gold/evidence",
+  "check_kind": "unique",
+  "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_evidence GROUP BY run_id, check_id HAVING count(*) > 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/not_null/gold/experiment_summary/experiment",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE experiment IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/not_null/gold/experiment_summary/subject_pid",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE subject_pid IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/not_null/gold/experiment_summary/n_runs",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE n_runs IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/not_null/gold/experiment_summary/n_channels",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE n_channels IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/not_null/gold/experiment_summary/duration_s",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE duration_s IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/not_null/gold/experiment_summary/n_events",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE n_events IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/unique/gold/experiment_summary/['experiment', 'subject_pid']",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "unique",
+  "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_experiment_summary GROUP BY experiment, subject_pid HAVING count(*) > 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-experiment-summary/no_direct_identifier/gold/experiment_summary/['subject_src']",
+  "requirement_id": "gold-experiment-summary",
+  "framework": "contract",
+  "dataset": "gold/experiment_summary",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_experiment_summary' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/experiment",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE experiment IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/subject_pid",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE subject_pid IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/run",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE run IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/channel_idx",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE channel_idx IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/window_start_ms",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE window_start_ms IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/mean_uv",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE mean_uv IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/std_uv",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE std_uv IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/p2p_uv",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE p2p_uv IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/lid",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE lid IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/sample_lo",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE sample_lo IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/not_null/gold/feature_window/sample_hi",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "not_null",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE sample_hi IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/unique/gold/feature_window/['lid', 'window_start_ms']",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "unique",
+  "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_feature_window GROUP BY lid, window_start_ms HAVING count(*) > 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-feature-window/no_direct_identifier/gold/feature_window/['subject_src']",
+  "requirement_id": "gold-feature-window",
+  "framework": "contract",
+  "dataset": "gold/feature_window",
+  "check_kind": "no_direct_identifier",
+  "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_feature_window' AND column_name IN ('subject_src')\n",
+  "expected": "0",
+  "compare": "eq"
+ }
+]
