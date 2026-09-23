@@ -1,7 +1,7 @@
 """Copy Gold to docs/data/gold and write docs/data/manifest.json, within the limits of spec 9.
 
 A file holding a canary record (radioactive bit, spec 12.5) is refused before anything is
-copied. Phase 0 publishes Gold only; fault files and checks.json arrive with the site.
+copied. Gold is copied from DATA_DIR; fault files under docs/data/faults are listed as found.
 """
 
 import argparse
@@ -28,6 +28,10 @@ def radioactive_rows(con, path: Path) -> int:
     ).fetchone()[0]
 
 
+def entry(rel: str, path: Path) -> dict:
+    return {"path": rel, "bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
 def publish(out: Path) -> int:
     gold = db.data_dir() / "gold"
     sources = sorted(gold.rglob("*.parquet"))
@@ -42,13 +46,11 @@ def publish(out: Path) -> int:
         rel = path.relative_to(db.data_dir())
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, out / rel)
-        files.append(
-            {
-                "path": rel.as_posix(),
-                "bytes": path.stat().st_size,
-                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-            }
-        )
+        files.append(entry(rel.as_posix(), path))
+    # Fault files (spec 6) are written under docs/data/faults by faults/*/bench.sh, not copied
+    # from DATA_DIR; they count against the same limits and enter the manifest when present.
+    for path in sorted((out / "faults").rglob("*.parquet")):
+        files.append(entry(path.relative_to(out).as_posix(), path))
     total = sum(f["bytes"] for f in files)
     over = [f["path"] for f in files if f["bytes"] > FILE_LIMIT]
     if over or total > TOTAL_LIMIT:
