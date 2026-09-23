@@ -26,6 +26,12 @@
 /data/
 /docs/data/**
 !/docs/data/LICENSE.md
+# The published copy is the one data inside the repo (spec 9): Gold, fault files, manifest,
+# checks and lineage macros, written by make publish and make bench, within the limits.
+!/docs/data/**/
+!/docs/data/**/*.parquet
+!/docs/data/**/*.json
+!/docs/data/**/*.sql
 keyring.duckdb
 *.duckdb
 *.duckdb.wal
