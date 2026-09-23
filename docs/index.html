@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ecog-lakehouse evidence</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 16px; max-width: 1200px; line-height: 1.4; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 24px 0 8px; }
+  p, td, th { font-size: 0.9rem; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; }
+  table { border-collapse: collapse; width: 100%; overflow-x: auto; display: block; }
+  th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid #8884; white-space: nowrap; }
+  th { position: sticky; top: 0; background: Canvas; }
+  .pass { color: #1a7f37; } .fail, .error { color: #b3261e; font-weight: 600; }
+  #status { font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>ecog-lakehouse, governance evidence</h1>
+<p>Every number on this page is a query result computed in your browser by DuckDB-WASM over the published Gold Parquet files, read by HTTP range requests from this site. The checks are the same SQL the pipeline ran; <code>lid.sql</code> holds the lineage identifier macros they use.</p>
+<p id="status">Loading DuckDB-WASM</p>
+<h2>Checks</h2>
+<p id="checks-summary"></p>
+<div id="checks"></div>
+<h2>Experiment summary</h2>
+<div id="summary"></div>
+<h2>Channel quality</h2>
+<p id="quality-note"></p>
+<div id="quality"></div>
+<h2>Evidence runs recorded by the pipeline</h2>
+<div id="runs"></div>
+<h2>Published files</h2>
+<div id="files"></div>
+
+<script type="module">
+import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/+esm";
+
+const status = document.getElementById("status");
+const say = (text) => { status.textContent = text; };
+const cell = (v, name) => v === null || v === undefined ? "NULL"
+  : name.endsWith("_at") ? new Date(Number(v)).toISOString().replace("T", " ").slice(0, 19)
+  : typeof v === "number" && !Number.isInteger(v) ? v.toFixed(4) : String(v);
+
+function table(id, columns, rows, klass) {
+  const html = ["<table><thead><tr>", ...columns.map((c) => `<th>${c}</th>`), "</tr></thead><tbody>"];
+  for (const r of rows) {
+    const cls = klass ? ` class="${klass(r)}"` : "";
+    html.push(`<tr${cls}>`, ...columns.map((c) => `<td>${cell(r[c], c)}</td>`), "</tr>");
+  }
+  html.push("</tbody></table>");
+  document.getElementById(id).innerHTML = html.join("");
+}
+
+async function query(conn, sql) {
+  const result = await conn.query(sql);
+  const columns = result.schema.fields.map((f) => f.name);
+  const rows = result.toArray().map((row) => {
+    const o = row.toJSON();
+    for (const k of Object.keys(o)) if (typeof o[k] === "bigint") o[k] = Number(o[k]);
+    return o;
+  });
+  return { columns, rows };
+}
+
+const compare = { eq: (o, e) => o === e, ge: (o, e) => o >= e, le: (o, e) => o <= e };
+
+try {
+  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+  const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
+  const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  URL.revokeObjectURL(workerUrl);
+
+  say("Reading data/manifest.json");
+  const manifest = await (await fetch(`data/manifest.json?v=${Date.now()}`)).json();
+  const gold = manifest.files.filter((f) => f.path.startsWith("gold/"));
+  for (const f of gold) {
+    await db.registerFileURL(f.path, new URL(`data/${f.path}`, location.href).href, duckdb.DuckDBDataProtocol.HTTP, false);
+  }
+  const conn = await db.connect();
+  const datasets = [...new Set(gold.map((f) => f.path.split("/")[1]))];
+  for (const d of datasets) {
+    const files = gold.filter((f) => f.path.split("/")[1] === d).map((f) => `'${f.path}'`).join(", ");
+    await conn.query(`CREATE VIEW gold_${d} AS SELECT * FROM read_parquet([${files}], hive_partitioning = true)`);
+  }
+  say("Loading data/lid.sql");
+  const lid = await (await fetch("data/lid.sql")).text();
+  for (const statement of lid.split(/;\s*\n/)) if (statement.trim()) await conn.query(statement);
+
+  say("Running data/checks.json");
+  const checks = await (await fetch(`data/checks.json?v=${Date.now()}`)).json();
+  const results = [];
+  for (const c of checks) {
+    let observed, result;
+    try {
+      observed = (await query(conn, c.sql)).rows[0];
+      observed = Number(Object.values(observed)[0]);
+      result = compare[c.compare](observed, Number(c.expected)) ? "pass" : "fail";
+    } catch (e) {
+      observed = null; result = "error";
+    }
+    results.push({ result, framework: c.framework, requirement_id: c.requirement_id, dataset: c.dataset, check_kind: c.check_kind, observed, expected: c.expected, check_id: c.check_id });
+  }
+  const counts = results.reduce((a, r) => ((a[r.result] = (a[r.result] || 0) + 1), a), {});
+  document.getElementById("checks-summary").textContent =
+    `${results.length} checks rerun here: ${counts.pass || 0} pass, ${counts.fail || 0} fail, ${counts.error || 0} error. ` +
+    `The pipeline's own runs are in gold/evidence below the marts.`;
+  table("checks", ["result", "framework", "requirement_id", "dataset", "check_kind", "observed", "expected", "check_id"], results, (r) => r.result);
+
+  const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
+  table("summary", summary.columns, summary.rows);
+
+  const total = (await query(conn, "SELECT count(*) AS n FROM gold_channel_quality")).rows[0].n;
+  const quality = await query(conn,
+    "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, rms_uv, clipped_pct, line_noise_ratio, lid " +
+    "FROM gold_channel_quality ORDER BY line_noise_ratio DESC NULLS LAST LIMIT 100");
+  document.getElementById("quality-note").textContent = `${total} records in gold/channel_quality; the 100 with the highest line noise ratio:`;
+  table("quality", quality.columns, quality.rows);
+
+  const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
+  const files = manifest.files.map((f) => ({ path: f.path, bytes: f.bytes, sha256: f.sha256 }));
+  table("files", ["path", "bytes", "sha256"], files);
+  table("runs", evidence.columns, evidence.rows);
+
+  say(`Ready. ${gold.length} Gold files, ${manifest.bytes} bytes published, DuckDB-WASM 1.32.0.`);
+} catch (e) {
+  say(`Failed: ${e.message || e}`);
+  console.error(e);
+}
+</script>
+</body>
+</html>

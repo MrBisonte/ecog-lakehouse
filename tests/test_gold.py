@@ -4,7 +4,7 @@ import duckdb
 import numpy as np
 import pytest
 
-from pipeline import db, line_noise, publish, synth
+from pipeline import checks, db, line_noise, publish, synth
 from tests.conftest import CHANNELS, MART_FILES, SECONDS
 
 
@@ -151,3 +151,21 @@ def test_publish_default_out_follows_the_working_directory(built, tmp_path, monk
     assert publish.main([]) == 0
     assert json.loads((tmp_path / "docs" / "data" / "manifest.json").read_text())["files"]
     assert list((install / "docs" / "data").iterdir()) == []
+
+
+def test_published_checks_rerun_over_the_published_files_alone(built, tmp_path):
+    """What docs/index.html does: views over the published Parquet, lid.sql, then checks.json."""
+    assert publish.main(["--out", str(tmp_path)]) == 0
+    browser = json.loads((tmp_path / "checks.json").read_text())
+    assert {c["dataset"] for c in browser} >= {"gold/channel_quality", "gold/feature_window"}
+    assert all(c["dataset"].startswith("gold/") for c in browser)
+    con = duckdb.connect()
+    for dataset in {c["dataset"] for c in browser}:
+        con.execute(
+            f"CREATE VIEW {db.view_name(dataset)} AS SELECT * FROM read_parquet("
+            f"'{(tmp_path / dataset).as_posix()}/**/*.parquet', hive_partitioning = true)"
+        )
+    con.execute((tmp_path / "lid.sql").read_text())
+    for c in browser:
+        observed = con.execute(c["sql"]).fetchone()[0]
+        assert checks.passes(c["compare"], str(observed), c["expected"]), c["check_id"]
