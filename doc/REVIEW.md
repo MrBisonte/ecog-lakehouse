@@ -390,3 +390,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 - Fault A over Pages reads the opposite way from the loopback run and from the story in spec 6: the single row group file, 52 MB, takes about 1.0 s and the partitioned, sorted layout of 38 row groups in 76 MB about 2.7 s, with `read_ahead_depth` making no difference either way. Each row group is a range request and each request is a CDN round trip; on this file and this network the request count dominates the parallelism. The layout still wins the partition_layout check and the range retrieval story (`lid_children` reads one row group, not the file); the wall clock claim needs a bigger file or a closer host. Recorded as measured.
 - Fault D over Pages: 5.1 s for the sequential loop against 0.33 s for one statement over 15,336,887 rows in 8 files. Fault F: 0 of 10 without retries, 10 of 10 with. Fault G unchanged.
+
+## Rename, 2026-09-23
+
+2026-09-23: project renamed to ecog-lakehouse.
