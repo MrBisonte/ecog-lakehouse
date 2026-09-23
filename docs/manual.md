@@ -1,6 +1,6 @@
 # Operating manual
 
-Run, prove, inspect and reset the ibrain demo, end to end, on this machine. Every command here was run before it was written. Only what is built is in this page; real data, faults and the browser page are in `doc/plan.md`.
+Run, prove, inspect and reset the ecog-lakehouse demo, end to end, on this machine. Every command here was run before it was written. Only what is built is in this page; real data, faults and the browser page are in `doc/plan.md`.
 
 ## 0. The map
 
@@ -27,10 +27,10 @@ wsl
 Then, inside WSL, every time:
 
 ```bash
-cd /mnt/c/Prj/ibrain
-source ~/.venvs/ibrain/bin/activate
+cd /mnt/c/Prj/ecog-lakehouse
+source ~/.venvs/ecog-lakehouse/bin/activate
 export PATH=$HOME/.local/bin:$PATH
-export DATA_DIR=$HOME/data/ibrain
+export DATA_DIR=$HOME/data/ecog-lakehouse
 ```
 
 Done when this prints a version and no error:
@@ -137,13 +137,13 @@ The `lid` bit layout lives in arch-standards, not here. The macros are generated
 ```mermaid
 flowchart LR
   Y[arch-standards<br>ids/layouts/lid.yaml] -->|make gen| D[ids/generated/lid/duckdb.sql]
-  D -->|make lineage, in ibrain| L[sql/lineage/lid_generated.sql]
+  D -->|make lineage, in ecog-lakehouse| L[sql/lineage/lid_generated.sql]
   L --> X[sql/lineage/lid_extras.sql<br>hand written: parent, children, trace]
 ```
 
 ```bash
 cd /mnt/c/Prj/arch-standards && source ~/.venvs/arch/bin/activate && make test
-cd /mnt/c/Prj/ibrain && source ~/.venvs/ibrain/bin/activate && make lineage && make test
+cd /mnt/c/Prj/ecog-lakehouse && source ~/.venvs/ecog-lakehouse/bin/activate && make lineage && make test
 ```
 
 Never edit `lid_generated.sql`. A layout change is a decision: it needs an ADR in arch-standards, and every `lid` in `DATA_DIR` was built with the old layout, so reset (section 9) and rebuild.

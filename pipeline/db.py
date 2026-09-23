@@ -49,7 +49,7 @@ EMPTY = {
 
 def data_dir() -> Path:
     """Root for raw, bronze, silver, gold and keyring.duckdb. Never inside the repository."""
-    return Path(os.environ.get("DATA_DIR", Path.home() / "data" / "ibrain"))
+    return Path(os.environ.get("DATA_DIR", Path.home() / "data" / "ecog-lakehouse"))
 
 
 def view_name(dataset: str) -> str:

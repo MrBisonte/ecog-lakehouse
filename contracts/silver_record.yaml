@@ -40,7 +40,7 @@ schema:
         description: Source samples of the record in Bronze, NaN included.
     quality:
       - type: custom
-        engine: ibrain
+        engine: ecog-lakehouse
         implementation:
           check_kind: no_direct_identifier
           params: {"forbidden_columns": ["subject_src"]}

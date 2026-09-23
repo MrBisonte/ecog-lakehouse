@@ -2,7 +2,7 @@
 PY ?= python3
 SYNTH ?= 0
 ARCH_STANDARDS ?= ../arch-standards
-export DATA_DIR ?= $(HOME)/data/ibrain
+export DATA_DIR ?= $(HOME)/data/ecog-lakehouse
 
 all: bronze silver gold checks publish
 

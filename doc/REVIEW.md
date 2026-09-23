@@ -376,9 +376,9 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Phase 3 addendum, GitHub Pages
 
-- Status: done, 2026-09-23, branch `docs/bench-pages`; Pages enabled on the private repository (GitHub Pro), site at https://mrbisonte.github.io/ibrain/
+- Status: done, 2026-09-23, branch `docs/bench-pages`; Pages enabled on the private repository (GitHub Pro), site at https://mrbisonte.github.io/ecog-lakehouse/
 - The page from the Pages origin: 61 checks rerun in the browser, 61 pass, 42 experiment_summary rows, 100 channel_quality rows shown of 2,241, 8 published files listed; resource timing lists `mrbisonte.github.io` and `cdn.jsdelivr.net` and no other host; no console errors.
-- `docs/bench.md` rewritten from `BASE_URL=https://mrbisonte.github.io/ibrain/data`, the four fault tables against real latency; the counts table at the top keeps the phase 1 verifier numbers.
+- `docs/bench.md` rewritten from `BASE_URL=https://mrbisonte.github.io/ecog-lakehouse/data`, the four fault tables against real latency; the counts table at the top keeps the phase 1 verifier numbers.
 
 ### Failed, and fixed before the commit
 
@@ -390,3 +390,15 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 - Fault A over Pages reads the opposite way from the loopback run and from the story in spec 6: the single row group file, 52 MB, takes about 1.0 s and the partitioned, sorted layout of 38 row groups in 76 MB about 2.7 s, with `read_ahead_depth` making no difference either way. Each row group is a range request and each request is a CDN round trip; on this file and this network the request count dominates the parallelism. The layout still wins the partition_layout check and the range retrieval story (`lid_children` reads one row group, not the file); the wall clock claim needs a bigger file or a closer host. Recorded as measured.
 - Fault D over Pages: 5.1 s for the sequential loop against 0.33 s for one statement over 15,336,887 rows in 8 files. Fault F: 0 of 10 without retries, 10 of 10 with. Fault G unchanged.
+
+## Rename, 2026-09-23
+
+- Status: done, branch `chore/rename-ecog-lakehouse`. The project is renamed from `ibrain` to `ecog-lakehouse`. The GitHub repository was renamed first, then `origin` was pointed at `https://github.com/MrBisonte/ecog-lakehouse.git`.
+- Renamed in tracked text by a script that printed every file it touched: 27 files, 50 lines. The distribution name in `pyproject.toml`, the `README.md` title, the `docs/index.html` title and heading, the `DATA_DIR` default in `Makefile`, `pipeline/db.py`, `faults/lib.sh`, `doc/spec.md` and `CLAUDE.md`, the repository and venv paths in `docs/manual.md` and `doc/agent/phase0.md`, the quality rule tag `engine:` in all ten contracts with the matching comparison in `pipeline/checks.py`, and the source repository URL in `docs/data/LICENSE.md`.
+- The Pages URL `https://mrbisonte.github.io/ibrain/` became `https://mrbisonte.github.io/ecog-lakehouse/` in `docs/bench.md` and in the phase 3 addendum above. The site moves with the repository, so that URL is live, not history.
+- The proposed NWB provenance attributes took the underscore form, `ecog_lakehouse_dataset_version`, `ecog_lakehouse_source_sha256`, `ecog_lakehouse_lid_lo` and `ecog_lakehouse_lid_hi`, in `doc/spec.md` and `adr/ADR-0005.md`. A hyphen is poor form in an HDF5 attribute name and ADR-0005 is proposed, not taken.
+- Unchanged by design: the Python package `pipeline`, the identifier `lid` and its layout, the dataset names, the SQL, and the Stanford source file names.
+- `DATA_DIR` moved from `$HOME/data/ibrain` to `$HOME/data/ecog-lakehouse`, and the virtual environment from `~/.venvs/ibrain` to `~/.venvs/ecog-lakehouse`. The working copy moves from `C:\Prj\ibrain` to `C:\Prj\ecog-lakehouse` after this pull request is open, with the editable install relinked against the new path.
+- `git grep -n ibrain` returns 29 lines, all in this file, all history: 24 lines of verbatim verifier transcripts and their captured output from phases 0, 1 and 2 under `/tmp/ibrain_verify` and `/home/bisonte/ibrain_verify`; line 48, a phase 1 observation quoting `engine: ibrain` as the contracts read at that pass; line 215, a phase 2 lesson naming the venv and repository paths of that run; line 250, a phase 2 note quoting the Makefile's `DATA_DIR` at that time. Captured output is evidence of a run that happened, so it stays verbatim.
+- `doc/agent/phase0.md` carries a 2026-09-23 amendment recording that the prompt below it is the text actually used with the old name rewritten, because the file presents itself as the version that was actually used.
+- Verified before each commit: `make lint` exit 0, `make test` 72 passed.

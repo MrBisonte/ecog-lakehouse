@@ -221,7 +221,7 @@ Gold is the enterprise model for consumers. Everything here is a query result.
 
 ### 3.4 Export
 
-Gold exports one NWB file per subject and experiment for the science and ML teams, written by the same optional `pynwb` dependency as the adapter. The file carries provenance as HDF5 attributes: `/general/ibrain_dataset_version`, `/general/ibrain_source_sha256` (list), and on each series `ibrain_lid_lo` and `ibrain_lid_hi`. A consumer that records the dataset version it read can enumerate every record and source file behind it through `gold/dataset_manifest` and `lid_children`. Parquet slices and BIDS-iEEG folders are the other export forms; the middle of the platform never stores HDF5.
+Gold exports one NWB file per subject and experiment for the science and ML teams, written by the same optional `pynwb` dependency as the adapter. The file carries provenance as HDF5 attributes: `/general/ecog_lakehouse_dataset_version`, `/general/ecog_lakehouse_source_sha256` (list), and on each series `ecog_lakehouse_lid_lo` and `ecog_lakehouse_lid_hi`. A consumer that records the dataset version it read can enumerate every record and source file behind it through `gold/dataset_manifest` and `lid_children`. Parquet slices and BIDS-iEEG folders are the other export forms; the middle of the platform never stores HDF5.
 
 ## 4. Contracts
 
@@ -327,7 +327,7 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 
 `pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `pyyaml` and nothing else. Orchestration is `make`. Every target invokes an entry point as a module, `python -m pipeline.<name>`, never as a script path: a script path puts `pipeline/` first on `sys.path`, an editable install then supplies the package from the checkout it was installed from, and a run inside a clone would execute another checkout's code. As a module the working directory comes first, so a clone runs its own code and the verifier pass of a clean clone holds whatever virtual environment is active.
 
-All data and DuckDB working files live under `DATA_DIR`, an environment variable defaulting to `$HOME/data/ibrain`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. The repository sits on a Windows mount under WSL2, where per-file operations are slow and OneDrive style syncing can lock files, so nothing but source, documentation and `docs/data/` is written inside it. `DATA_DIR` is created on first run. Paths in this document written as `data/<layer>/` mean `$DATA_DIR/<layer>/`. `publish` resolves `docs/data/` against the working directory, not against the location the `pipeline` package was installed from, so a run inside a clone publishes into that clone even when the active virtual environment holds an editable install of another checkout.
+All data and DuckDB working files live under `DATA_DIR`, an environment variable defaulting to `$HOME/data/ecog-lakehouse`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. The repository sits on a Windows mount under WSL2, where per-file operations are slow and OneDrive style syncing can lock files, so nothing but source, documentation and `docs/data/` is written inside it. `DATA_DIR` is created on first run. Paths in this document written as `data/<layer>/` mean `$DATA_DIR/<layer>/`. `publish` resolves `docs/data/` against the working directory, not against the location the `pipeline` package was installed from, so a run inside a clone publishes into that clone even when the active virtual environment holds an editable install of another checkout.
 
 Targets:
 

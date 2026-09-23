@@ -13,7 +13,7 @@ MART_FILES = (len(synth.SUBJECTS) - 1) * len(synth.EXPERIMENTS)
 
 @pytest.fixture(scope="session")
 def data_root(tmp_path_factory):
-    root = tmp_path_factory.mktemp("ibrain")
+    root = tmp_path_factory.mktemp("ecog-lakehouse")
     patch = pytest.MonkeyPatch()
     patch.setenv("DATA_DIR", str(root))
     yield root

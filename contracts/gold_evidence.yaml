@@ -72,7 +72,7 @@ schema:
         description: NULL for dataset-level checks.
     quality:
       - type: custom
-        engine: ibrain
+        engine: ecog-lakehouse
         implementation:
           check_kind: unique
           params: {"columns": ["run_id", "check_id"]}

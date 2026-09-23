@@ -1,1 +1,1 @@
-"""ibrain pipeline: synthetic generator, Bronze conversion, layer runner, checks."""
+"""ecog-lakehouse pipeline: synthetic generator, Bronze conversion, layer runner, checks."""
