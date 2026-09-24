@@ -2,6 +2,7 @@
 and F's flaky proxy. A and D are benchmarks over published files, run by make bench."""
 
 import importlib.util
+import json
 import subprocess
 import sys
 import threading
@@ -12,9 +13,10 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import duckdb
 import pytest
 
-from pipeline import checks, db
+from pipeline import checks, db, publish
 
 FAULTS = db.REPO / "faults"
 
@@ -78,3 +80,20 @@ def test_fault_f_proxy_fails_the_configured_fraction_of_range_requests(served):
     assert [ranged(f"{tenth}/file.bin") for _ in range(10)].count(503) == 1
     with urlopen(f"{never}/file.bin", timeout=5) as r:  # a plain GET is never failed
         assert r.status == 200 and len(r.read()) == 256 * 64
+
+
+def test_fault_d_fix_verifies_every_fetched_file_against_the_manifest(built, tmp_path):
+    """verify.sql on local files, the way the bench runs it on URLs.
+    getenv() exists in the CLI only, so the values are spliced in."""
+    assert publish.main(["--out", str(tmp_path)]) == 0
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    paths = [f["path"] for f in manifest["files"] if f["path"].endswith(".parquet")]
+    files = "[" + ", ".join(f"'{(tmp_path / p).as_posix()}'" for p in paths) + "]"
+    verify = (FAULTS / "d" / "verify.sql").read_text().split(";")[-2]
+    sql = (verify.replace("getenv('FAULT_FILES')::VARCHAR[]", files)
+                 .replace("getenv('FAULT_MANIFEST')", f"'{(tmp_path / 'manifest.json').as_posix()}'")
+                 .replace("getenv('FAULT_BASE')", f"'{tmp_path.as_posix()}'"))
+    con = duckdb.connect()
+    assert con.execute(sql).fetchone() == (len(paths), 0)
+    (tmp_path / paths[0]).write_bytes(b"not the published bytes")
+    assert con.execute(sql).fetchone() == (len(paths), 1)
