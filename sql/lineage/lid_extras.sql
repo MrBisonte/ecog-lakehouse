@@ -19,7 +19,9 @@ CREATE OR REPLACE VIEW lineage_dim AS
 SELECT
     row_number() OVER (ORDER BY a.ingested_at, a.sha256)::SMALLINT AS ingest_ord,
     a.ingest_id,
-    a.source_path,
+    -- The audit stores the lakehouse root and the path below it, never the two joined.
+    CASE WHEN starts_with(a.source_path_rel, '/') THEN a.source_path_rel
+         ELSE a.data_root || '/' || a.source_path_rel END AS source_path,
     a.source_url,
     a.sha256,
     epoch_ms(a.ingested_at) AS ts_ms,

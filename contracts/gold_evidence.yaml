@@ -40,6 +40,11 @@ schema:
         logicalType: string
         physicalType: VARCHAR
         required: true
+      - name: severity
+        logicalType: string
+        physicalType: VARCHAR
+        required: false
+        description: block, a failure stops the build, or flag, a failure is recorded and does not.
       - name: clause
         logicalType: string
         physicalType: VARCHAR

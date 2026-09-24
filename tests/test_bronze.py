@@ -15,7 +15,8 @@ SPEC_RECORDING = [
 ]
 SPEC_AUDIT = [
     ("ingest_id", "VARCHAR"),
-    ("source_path", "VARCHAR"),
+    ("data_root", "VARCHAR"),
+    ("source_path_rel", "VARCHAR"),
     ("source_url", "VARCHAR"),
     ("sha256", "VARCHAR"),
     ("bytes", "BIGINT"),
@@ -24,6 +25,7 @@ SPEC_AUDIT = [
     ("tool", "VARCHAR"),
     ("tool_version", "VARCHAR"),
     ("duckdb_version", "VARCHAR"),
+    ("ingest_host", "VARCHAR"),
     ("ingested_at", "TIMESTAMP"),
 ]
 
@@ -75,7 +77,8 @@ def test_lid_is_layer_1_and_traces_to_the_audit_row(bronze):
     decoded = bronze.execute("SELECT lid_decode(lid_from_uuid(?))", [row[0]]).fetchone()[0]
     assert decoded["layer"] == 1 and decoded["channel"] == 2 and decoded["run"] == 1
     audit = bronze.execute(
-        "SELECT source_path, source_url, sha256 FROM bronze_ingest_audit WHERE ingest_id = ?",
+        "SELECT data_root || '/' || source_path_rel, source_url, sha256 "
+        "FROM bronze_ingest_audit WHERE ingest_id = ?",
         [row[1]],
     ).fetchone()
     trace = bronze.execute("SELECT source_path, source_url, sha256 FROM lid_trace(?)", [row[0]])
@@ -112,3 +115,20 @@ def test_connect_removes_an_empty_parquet_left_by_an_aborted_write(tmp_path, mon
     assert not (folder / "data_0.parquet").exists()
     assert "aborted write" in capsys.readouterr().out
     assert con.execute("SELECT count(*) FROM gold_channel_quality").fetchone()[0] == 0
+
+
+def test_the_audit_names_the_machine_by_pseudonym_only(bronze):
+    """ALCOA+ Attributable, without a device identifier in an append-only file."""
+    from pipeline import keyring
+
+    hosts = bronze.execute("SELECT DISTINCT ingest_host FROM bronze_ingest_audit").fetchall()
+    assert [h[0] for h in hosts] == [keyring.host()]
+    assert len(keyring.host()) == 16 and keyring.host() != keyring.host_source()
+    raw = keyring.host_source()
+    assert bronze.execute(
+        "SELECT count(*) FROM bronze_ingest_audit WHERE ingest_host = ?", [raw]
+    ).fetchone()[0] == 0
+    kept = keyring.open_keyring().execute(
+        "SELECT host_src FROM host_map WHERE host_pid = ?", [keyring.host()]
+    ).fetchone()
+    assert kept[0] == raw, "the hostname stays in the keyring"

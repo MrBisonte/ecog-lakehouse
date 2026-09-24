@@ -16,7 +16,7 @@ import duckdb
 import numpy as np
 from scipy.io import loadmat
 
-from pipeline import db
+from pipeline import db, keyring
 from pipeline.lid import ulid
 
 TOOL = "convert_mat.py"
@@ -279,10 +279,15 @@ def convert(con, path: Path, adapter) -> int:
     for name in ("recording", "electrode", "event"):
         db.run_sql(con, db.SQL / "bronze" / f"{name}.sql", **values)
     rows = con.execute("SELECT count(*) FROM src_recording").fetchone()[0]
+    # A source read from outside DATA_DIR has no path below it, so it keeps its absolute one
+    # and hash_match will not find it, which is the honest answer for a file that is not here.
+    root = db.data_dir()
+    below = path.relative_to(root) if path.is_relative_to(root) else path
     db.run_sql(
         con,
         db.SQL / "bronze" / "ingest_audit.sql",
-        source_path=path.as_posix(),
+        data_root=root.as_posix(),
+        source_path_rel=below.as_posix(),
         source_url=src.source_url,
         sha256=sha256,
         bytes=path.stat().st_size,
@@ -291,6 +296,7 @@ def convert(con, path: Path, adapter) -> int:
         tool=TOOL,
         tool_version=db.git_commit(),
         duckdb_version=duckdb.__version__,
+        ingest_host=keyring.host(),
         **values,
     )
     db.views(con)

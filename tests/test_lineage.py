@@ -76,10 +76,10 @@ def lineage_fixture(con):
     """Three ingested files, records for each, as the macros would see them after Silver."""
     con.execute(
         "CREATE OR REPLACE VIEW bronze_ingest_audit AS SELECT * FROM (VALUES "
-        "('I1', 'raw/a.mat', 'https://x/a', 'ha', TIMESTAMP '2026-09-19 10:00:00'), "
-        "('I2', 'raw/b.mat', 'https://x/b', 'hb', TIMESTAMP '2026-09-19 10:00:01'), "
-        "('I3', 'raw/c.mat', 'https://x/c', 'hc', TIMESTAMP '2026-09-19 10:00:02')) "
-        "t(ingest_id, source_path, source_url, sha256, ingested_at)"
+        "('I1', '/lake', 'raw/a.mat', 'https://x/a', 'ha', TIMESTAMP '2026-09-19 10:00:00'), "
+        "('I2', '/lake', 'raw/b.mat', 'https://x/b', 'hb', TIMESTAMP '2026-09-19 10:00:01'), "
+        "('I3', '/lake', 'raw/c.mat', 'https://x/c', 'hc', TIMESTAMP '2026-09-19 10:00:02')) "
+        "t(ingest_id, data_root, source_path_rel, source_url, sha256, ingested_at)"
     )
     con.execute(
         "CREATE OR REPLACE VIEW bronze_recording AS SELECT * FROM (VALUES "
@@ -119,5 +119,5 @@ def test_trace_on_a_bronze_row_returns_the_ingested_file(con):
         "source_path", "source_url", "sha256", "ts_ms", "layer", "experiment",
         "run", "channel", "segment",
     ]
-    assert row[:3] == ("raw/b.mat", "https://x/b", "hb")
+    assert row[:3] == ("/lake/raw/b.mat", "https://x/b", "hb"), "the root and the path join here"
     assert row[4:] == (1, "motor_basic", 1, 17, 0)

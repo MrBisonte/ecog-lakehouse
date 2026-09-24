@@ -36,9 +36,11 @@ EMPTY = {
         "sample_idx INTEGER, value_raw FLOAT, ingest_id VARCHAR, lid UUID"
     ),
     "bronze/ingest_audit": (
-        "ingest_id VARCHAR, source_path VARCHAR, source_url VARCHAR, sha256 VARCHAR, "
+        "ingest_id VARCHAR, data_root VARCHAR, source_path_rel VARCHAR, "
+        "source_url VARCHAR, sha256 VARCHAR, "
         "bytes BIGINT, sample_rate_hz INTEGER, rows_written BIGINT, tool VARCHAR, "
-        "tool_version VARCHAR, duckdb_version VARCHAR, ingested_at TIMESTAMP"
+        "tool_version VARCHAR, duckdb_version VARCHAR, ingest_host VARCHAR, "
+        "ingested_at TIMESTAMP"
     ),
     "silver/record": (
         "lid UUID, experiment VARCHAR, subject_pid VARCHAR, run SMALLINT, channel_idx SMALLINT, "
@@ -57,7 +59,7 @@ def view_name(dataset: str) -> str:
     return dataset.replace("/", "_")
 
 
-def render(sql: str, **values) -> str:
+def render(text: str, **values) -> str:
     """Replace every `{{name}}` with its value. An unknown name is an error, not an empty string."""
 
     def one(match):
@@ -66,7 +68,7 @@ def render(sql: str, **values) -> str:
             raise KeyError(f"placeholder {{{{{name}}}}} has no value, pass {name}=...")
         return str(values[name])
 
-    return re.sub(r"\{\{(\w+)\}\}", one, sql)
+    return re.sub(r"\{\{(\w+)\}\}", one, text)
 
 
 def run_sql(con, path: Path, **values):
