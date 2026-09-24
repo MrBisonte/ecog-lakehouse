@@ -65,7 +65,7 @@ def test_hash_match(write, tmp_path):
     digest = hashlib.sha256(b"original bytes").hexdigest()
     write(
         "bronze/ingest_audit",
-        f"SELECT 'I1' AS ingest_id, '{raw.as_posix()}' AS source_path, "
+        f"SELECT 'I1' AS ingest_id, '{tmp_path.as_posix()}' AS data_root, "
         "'raw/synthetic/x.bin' AS source_path_rel, 'u' AS source_url, "
         f"'{digest}' AS sha256, 14::BIGINT AS bytes, 1000 AS sample_rate_hz, 1::BIGINT AS rows_written, "
         "'t' AS tool, 'v' AS tool_version, 'd' AS duckdb_version, 'h' AS ingest_host, "
@@ -86,7 +86,7 @@ def test_hash_match_survives_a_moved_lakehouse(write, tmp_path, monkeypatch):
     digest = hashlib.sha256(b"original bytes").hexdigest()
     write(
         "bronze/ingest_audit",
-        "SELECT 'I1' AS ingest_id, '/gone/raw/synthetic/x.bin' AS source_path, "
+        "SELECT 'I1' AS ingest_id, '/gone' AS data_root, "
         "'raw/synthetic/x.bin' AS source_path_rel, 'u' AS source_url, "
         f"'{digest}' AS sha256, 14::BIGINT AS bytes, 1000 AS sample_rate_hz, 1::BIGINT AS rows_written, "
         "'t' AS tool, 'v' AS tool_version, 'd' AS duckdb_version, 'h' AS ingest_host, "

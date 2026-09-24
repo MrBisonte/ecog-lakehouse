@@ -36,7 +36,7 @@ EMPTY = {
         "sample_idx INTEGER, value_raw FLOAT, ingest_id VARCHAR, lid UUID"
     ),
     "bronze/ingest_audit": (
-        "ingest_id VARCHAR, source_path VARCHAR, source_path_rel VARCHAR, "
+        "ingest_id VARCHAR, data_root VARCHAR, source_path_rel VARCHAR, "
         "source_url VARCHAR, sha256 VARCHAR, "
         "bytes BIGINT, sample_rate_hz INTEGER, rows_written BIGINT, tool VARCHAR, "
         "tool_version VARCHAR, duckdb_version VARCHAR, ingest_host VARCHAR, "

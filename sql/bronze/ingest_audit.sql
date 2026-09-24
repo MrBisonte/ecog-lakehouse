@@ -2,7 +2,7 @@
 COPY (
     SELECT
         '{{ingest_id}}' AS ingest_id,
-        '{{source_path}}' AS source_path,
+        '{{data_root}}' AS data_root,
         '{{source_path_rel}}' AS source_path_rel,
         '{{source_url}}' AS source_url,
         '{{sha256}}' AS sha256,
