@@ -16,6 +16,11 @@
    "sha256": "3fd17e30c94f1852117a1cc2be848fd778b3828bd47a9cfe44a07ce7d9a4ad14"
   },
   {
+   "path": "gold/evidence/run_id=01M3ATXEH51KEY8V5DR5M1J71T/data_0.parquet",
+   "bytes": 10529,
+   "sha256": "8968ac1ac545331540ad4f14c6f8352196246781b0be945eceeaa5b3d40ab03a"
+  },
+  {
    "path": "gold/experiment_summary/data_0.parquet",
    "bytes": 1929,
    "sha256": "6fce2b6d48c199967c5f113ef82a6ba466bf0fa7a80ae369c94465bfc9213825"
@@ -41,5 +46,5 @@
    "sha256": "ca57b778302e8c5b48a23d6a6ddb47b2582c02323ae61642be8d25a3c39852c8"
   }
  ],
- "bytes": 139116833
+ "bytes": 139127362
 }

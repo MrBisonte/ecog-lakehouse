@@ -99,8 +99,8 @@
   "severity": "flag",
   "clause": "Accurate",
   "control": "the root mean square amplitude of a channel is between 1 and 1000 microvolts, the range a cortical electrode records",
-  "sql": "-- sql at severity flag: the records the requirement's own query found, not how many. A failure\n-- is recorded and does not stop the build, so the evidence has to name what to go and look at.\n-- The query returns one column, `offender`, already ordered. Expected: the empty string.\nWITH found AS (SELECT lid_text(lid_from_uuid(lid)) AS offender FROM gold_channel_quality WHERE rms_uv < 1 OR rms_uv > 1000 ORDER BY rms_uv DESC)\nSELECT CASE WHEN count(*) = 0 THEN ''\n            ELSE count(*)::VARCHAR || ' of ' || (SELECT count(*) FROM gold_channel_quality)::VARCHAR || ': '\n                 || list_aggregate(list_slice(list(offender), 1, 5), 'string_agg', ', ')\n                 || CASE WHEN count(*) > 5 THEN ' and more' ELSE '' END\n       END AS observed\nFROM found;\n",
-  "expected": "",
+  "sql": "-- sql at severity flag: the records the requirement's own query found, not how many. A failure\n-- is recorded and does not stop the build, so the evidence has to name what to go and look at.\n-- The query returns one column, `offender`, already ordered. Expected: 'no records'.\nWITH found AS (SELECT lid_text(lid_from_uuid(lid)) AS offender FROM gold_channel_quality WHERE rms_uv < 1 OR rms_uv > 1000 ORDER BY rms_uv DESC)\nSELECT CASE WHEN count(*) = 0 THEN 'no records'\n            ELSE count(*)::VARCHAR || ' of ' || (SELECT count(*) FROM gold_channel_quality)::VARCHAR || ': '\n                 || list_aggregate(list_slice(list(offender), 1, 5), 'string_agg', ', ')\n                 || CASE WHEN count(*) > 5 THEN ' and more' ELSE '' END\n       END AS observed\nFROM found;\n",
+  "expected": "no records",
   "compare": "eq"
  },
  {
@@ -112,8 +112,8 @@
   "severity": "flag",
   "clause": "Accurate",
   "control": "less than 0.5 of a channel's power sits at the mains frequency",
-  "sql": "-- sql at severity flag: the records the requirement's own query found, not how many. A failure\n-- is recorded and does not stop the build, so the evidence has to name what to go and look at.\n-- The query returns one column, `offender`, already ordered. Expected: the empty string.\nWITH found AS (SELECT lid_text(lid_from_uuid(lid)) AS offender FROM gold_channel_quality WHERE line_noise_ratio >= 0.5 ORDER BY line_noise_ratio DESC)\nSELECT CASE WHEN count(*) = 0 THEN ''\n            ELSE count(*)::VARCHAR || ' of ' || (SELECT count(*) FROM gold_channel_quality)::VARCHAR || ': '\n                 || list_aggregate(list_slice(list(offender), 1, 5), 'string_agg', ', ')\n                 || CASE WHEN count(*) > 5 THEN ' and more' ELSE '' END\n       END AS observed\nFROM found;\n",
-  "expected": "",
+  "sql": "-- sql at severity flag: the records the requirement's own query found, not how many. A failure\n-- is recorded and does not stop the build, so the evidence has to name what to go and look at.\n-- The query returns one column, `offender`, already ordered. Expected: 'no records'.\nWITH found AS (SELECT lid_text(lid_from_uuid(lid)) AS offender FROM gold_channel_quality WHERE line_noise_ratio >= 0.5 ORDER BY line_noise_ratio DESC)\nSELECT CASE WHEN count(*) = 0 THEN 'no records'\n            ELSE count(*)::VARCHAR || ' of ' || (SELECT count(*) FROM gold_channel_quality)::VARCHAR || ': '\n                 || list_aggregate(list_slice(list(offender), 1, 5), 'string_agg', ', ')\n                 || CASE WHEN count(*) > 5 THEN ' and more' ELSE '' END\n       END AS observed\nFROM found;\n",
+  "expected": "no records",
   "compare": "eq"
  },
  {
@@ -125,8 +125,8 @@
   "severity": "flag",
   "clause": "Accurate",
   "control": "a subject records events at between 0.5 and 2 times the median rate of its experiment",
-  "sql": "-- sql at severity flag: the records the requirement's own query found, not how many. A failure\n-- is recorded and does not stop the build, so the evidence has to name what to go and look at.\n-- The query returns one column, `offender`, already ordered. Expected: the empty string.\nWITH found AS (WITH rate AS (SELECT experiment, subject_pid, 60.0 * n_events / nullif(duration_s, 0) AS per_minute FROM gold_experiment_summary), band AS (SELECT experiment, median(per_minute) AS middle FROM rate GROUP BY experiment) SELECT r.experiment || ' ' || r.subject_pid AS offender FROM rate r JOIN band b USING (experiment) WHERE r.per_minute < 0.5 * b.middle OR r.per_minute > 2 * b.middle ORDER BY r.per_minute DESC)\nSELECT CASE WHEN count(*) = 0 THEN ''\n            ELSE count(*)::VARCHAR || ' of ' || (SELECT count(*) FROM gold_experiment_summary)::VARCHAR || ': '\n                 || list_aggregate(list_slice(list(offender), 1, 5), 'string_agg', ', ')\n                 || CASE WHEN count(*) > 5 THEN ' and more' ELSE '' END\n       END AS observed\nFROM found;\n",
-  "expected": "",
+  "sql": "-- sql at severity flag: the records the requirement's own query found, not how many. A failure\n-- is recorded and does not stop the build, so the evidence has to name what to go and look at.\n-- The query returns one column, `offender`, already ordered. Expected: 'no records'.\nWITH found AS (WITH rate AS (SELECT experiment, subject_pid, 60.0 * n_events / nullif(duration_s, 0) AS per_minute FROM gold_experiment_summary), band AS (SELECT experiment, median(per_minute) AS middle FROM rate GROUP BY experiment) SELECT r.experiment || ' ' || r.subject_pid AS offender FROM rate r JOIN band b USING (experiment) WHERE r.per_minute < 0.5 * b.middle OR r.per_minute > 2 * b.middle ORDER BY r.per_minute DESC)\nSELECT CASE WHEN count(*) = 0 THEN 'no records'\n            ELSE count(*)::VARCHAR || ' of ' || (SELECT count(*) FROM gold_experiment_summary)::VARCHAR || ': '\n                 || list_aggregate(list_slice(list(offender), 1, 5), 'string_agg', ', ')\n                 || CASE WHEN count(*) > 5 THEN ' and more' ELSE '' END\n       END AS observed\nFROM found;\n",
+  "expected": "no records",
   "compare": "eq"
  },
  {

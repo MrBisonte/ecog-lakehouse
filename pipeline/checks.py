@@ -113,7 +113,7 @@ def template_values(kind: str, dataset: str, params: dict, severity: str = "bloc
             values["query"] = db.render(params["sql"], **{k: v for k, v in params.items()
                                                           if k != "sql"})
             if severity == "flag":
-                expected = ""
+                expected = "no records"
         case _:
             raise ValueError(f"unknown check_kind '{kind}', the kinds are in doc/spec.md section 5.2")
     return values, expected

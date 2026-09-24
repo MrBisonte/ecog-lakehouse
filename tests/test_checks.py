@@ -178,9 +178,9 @@ def test_a_flag_check_names_the_records_and_reads_its_threshold_from_the_row(wri
           "SELECT unnest(['a', 'b', 'c']) AS subject_pid, now()::TIMESTAMP AS first_seen_at")
     above = {"sql": "SELECT subject_pid AS offender FROM silver_subject "
                     "WHERE subject_pid > '{{floor}}' ORDER BY 1", "floor": "a"}
-    assert outcome("sql", "silver/subject", above, "flag") == ("fail", "2 of 3: b, c", "")
+    assert outcome("sql", "silver/subject", above, "flag") == ("fail", "2 of 3: b, c", "no records")
     clean = dict(above, floor="z")
-    assert outcome("sql", "silver/subject", clean, "flag") == ("pass", "", "")
+    assert outcome("sql", "silver/subject", clean, "flag") == ("pass", "no records", "no records")
     with pytest.raises(ValueError, match="'block' or 'flag'"):
         checks.generate("t", "T", "sql", "silver/subject", {"sql": "SELECT 1"}, severity="warn")
 
