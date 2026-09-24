@@ -24,8 +24,8 @@ def write(tmp_path, monkeypatch):
     return _write
 
 
-def outcome(kind, dataset, params):
-    [check] = checks.generate("test", "T-1", kind, dataset, params)
+def outcome(kind, dataset, params, severity="block"):
+    [check] = checks.generate("test", "T-1", kind, dataset, params, severity=severity)
     [row] = checks.run(db.connect(), [check])
     return row["result"], row["observed"], row["expected"]
 
@@ -148,3 +148,26 @@ def test_evidence_records_why_each_check_exists(built):
     ).fetchone()
     assert rows[0] == rows[1], "every evidence row says what it checked"
     assert 0 < rows[2] < rows[0], "only requirement rows carry a regulation clause"
+
+
+def test_a_flag_check_names_the_records_and_reads_its_threshold_from_the_row(write):
+    """A plausibility check reports which records it found, and never stops the build."""
+    write("silver/subject",
+          "SELECT unnest(['a', 'b', 'c']) AS subject_pid, now()::TIMESTAMP AS first_seen_at")
+    above = {"sql": "SELECT subject_pid AS offender FROM silver_subject "
+                    "WHERE subject_pid > '{{floor}}' ORDER BY 1", "floor": "a"}
+    assert outcome("sql", "silver/subject", above, "flag") == ("fail", "2 of 3: b, c", "")
+    clean = dict(above, floor="z")
+    assert outcome("sql", "silver/subject", clean, "flag") == ("pass", "", "")
+    with pytest.raises(ValueError, match="'block' or 'flag'"):
+        checks.generate("t", "T", "sql", "silver/subject", {"sql": "SELECT 1"}, severity="warn")
+
+
+def test_every_check_declares_whether_a_failure_blocks(built):
+    con = db.connect()
+    kinds = con.execute(
+        "SELECT DISTINCT severity FROM gold_evidence "
+        "WHERE run_id = (SELECT max(run_id) FROM gold_evidence) ORDER BY 1"
+    ).fetchall()
+    assert kinds and all(k[0] in ("block", "flag") for k in kinds)
+    assert all(c.severity == "block" for c in checks.from_contracts()), "a contract rule blocks"
