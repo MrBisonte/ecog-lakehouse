@@ -13,21 +13,26 @@ import json, sys
 files = [f['path'] for f in json.load(open('docs/data/manifest.json'))['files'] if f['path'].endswith('.parquet')]
 print('[' + ', '.join(repr('$BASE_URL/' + f) for f in files) + ']')")
 export FAULT_FILES
+export FAULT_MANIFEST="$BASE_URL/manifest.json"
+export FAULT_BASE="$BASE_URL"
 n_files=$("$PY" -c "import json; print(sum(f['path'].endswith('.parquet') for f in json.load(open('docs/data/manifest.json'))['files']))")
 
 t_plant=$(seconds "$PY" faults/d/plant.py "$BASE_URL")
 rows_plant=$("$PY" faults/d/plant.py "$BASE_URL")
 t_fix=$(seconds "$DUCKDB" -c "$(cat faults/d/fix.sql)")
 rows_fix=$("$DUCKDB" -csv -noheader -c "$(cat faults/d/fix.sql)")
+t_verify=$(seconds "$DUCKDB" -c "$(cat faults/d/verify.sql)")
+verified=$("$DUCKDB" -csv -noheader -c "$(cat faults/d/verify.sql)")
+files_fix=${verified%,*}; mismatches=${verified#*,}
 
 {
   echo
   echo "## Fault D: synchronous one-file-at-a-time loop"
   echo
-  echo "$n_files Parquet files from \`docs/data/manifest.json\` over \`$BASE_URL\`. Before: \`faults/d/plant.py\`, urllib, one file after another into a temp directory, then count. After: \`faults/d/fix.sql\`, one \`read_parquet\` over the URL list. Seconds are wall clock of one run each."
+  echo "$n_files Parquet files from \`docs/data/manifest.json\` over \`$BASE_URL\`. Before: \`faults/d/plant.py\`, urllib, one file after another into a temp directory, then count. After: \`faults/d/fix.sql\`, one \`read_parquet\` over the URL list, then \`faults/d/verify.sql\`, every file read once more in full with read_blob and its sha256 compared with the manifest, the integrity check that replaces the CDN's ETag. Seconds are wall clock of one run each; the digest check downloads every byte, so it is timed apart."
   echo
-  echo "| approach | rows | seconds |"
-  echo "|---|---|---|"
-  echo "| before, sequential download then count | $rows_plant | $t_plant |"
-  echo "| after, one httpfs statement | $rows_fix | $t_fix |"
+  echo "| approach | rows | seconds | digest check seconds | files hashed | digest mismatches |"
+  echo "|---|---|---|---|---|---|"
+  echo "| before, sequential download then count | $rows_plant | $t_plant | | 0 | not checked |"
+  echo "| after, one httpfs statement, then verify.sql | $rows_fix | $t_fix | $t_verify | $files_fix | $mismatches |"
 } | tee -a "$BENCH_MD"
