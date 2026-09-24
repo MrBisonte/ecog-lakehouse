@@ -65,15 +65,37 @@ def test_hash_match(write, tmp_path):
     digest = hashlib.sha256(b"original bytes").hexdigest()
     write(
         "bronze/ingest_audit",
-        f"SELECT 'I1' AS ingest_id, '{raw.as_posix()}' AS source_path, 'u' AS source_url, "
+        f"SELECT 'I1' AS ingest_id, '{raw.as_posix()}' AS source_path, "
+        "'raw/synthetic/x.bin' AS source_path_rel, 'u' AS source_url, "
         f"'{digest}' AS sha256, 14::BIGINT AS bytes, 1000 AS sample_rate_hz, 1::BIGINT AS rows_written, "
-        "'t' AS tool, 'v' AS tool_version, 'd' AS duckdb_version, now()::TIMESTAMP AS ingested_at",
+        "'t' AS tool, 'v' AS tool_version, 'd' AS duckdb_version, 'h' AS ingest_host, "
+        "now()::TIMESTAMP AS ingested_at",
     )
     assert outcome("hash_match", "bronze/ingest_audit", {}) == ("pass", "0", "0")
     raw.write_bytes(b"tampered bytes")
     assert outcome("hash_match", "bronze/ingest_audit", {}) == ("fail", "1", "0")
     raw.unlink()
     assert outcome("hash_match", "bronze/ingest_audit", {}) == ("fail", "1", "0")
+
+
+def test_hash_match_survives_a_moved_lakehouse(write, tmp_path, monkeypatch):
+    """The row records where the file was; the check reads the digest, not the mount point."""
+    raw = tmp_path / "raw" / "synthetic" / "x.bin"
+    raw.parent.mkdir(parents=True)
+    raw.write_bytes(b"original bytes")
+    digest = hashlib.sha256(b"original bytes").hexdigest()
+    write(
+        "bronze/ingest_audit",
+        "SELECT 'I1' AS ingest_id, '/gone/raw/synthetic/x.bin' AS source_path, "
+        "'raw/synthetic/x.bin' AS source_path_rel, 'u' AS source_url, "
+        f"'{digest}' AS sha256, 14::BIGINT AS bytes, 1000 AS sample_rate_hz, 1::BIGINT AS rows_written, "
+        "'t' AS tool, 'v' AS tool_version, 'd' AS duckdb_version, 'h' AS ingest_host, "
+        "now()::TIMESTAMP AS ingested_at",
+    )
+    moved = tmp_path.parent / (tmp_path.name + "-moved")
+    tmp_path.rename(moved)
+    monkeypatch.setenv("DATA_DIR", str(moved))
+    assert outcome("hash_match", "bronze/ingest_audit", {}) == ("pass", "0", "0")
 
 
 def test_partition_layout(write):
