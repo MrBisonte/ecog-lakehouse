@@ -60,13 +60,7 @@ COPY (
 
 </details>
 
-| ingest_id | source_path | source_url | sha256 | bytes | sample_rate_hz | rows_written | tool | tool_version | duckdb_version | ingested_at |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 01M30739CGE2JX4EXKR65BTC6E | fingerflex/aa.mat | synthetic://fingerflex/aa.mat | 65c157a67f68 | 15485896 | 1000 | 3840000 | convert_mat.py | 868ab53 | 1.5.5 | 2026-09-20 20:11:08.561115 |
-| 01M3073A6E8SR2B7JF97DG0H07 | fingerflex/bb.mat | synthetic://fingerflex/bb.mat | 51bdb94158ef | 15485896 | 1000 | 3840000 | convert_mat.py | 868ab53 | 1.5.5 | 2026-09-20 20:11:09.391338 |
-| 01M3073AZA3B2PSZTSGH07Y31Y | fingerflex/canary.mat | synthetic://fingerflex/canary.mat | b8a002899aac | 15485904 | 1000 | 3840000 | convert_mat.py | 868ab53 | 1.5.5 | 2026-09-20 20:11:10.188543 |
-| 01M3073CEHVGSATDYM49B26G2H | motor_basic/aa.mat | synthetic://motor_basic/aa.mat | d78878cdb442 | 15485896 | 1000 | 3840000 | convert_mat.py | 868ab53 | 1.5.5 | 2026-09-20 20:11:11.698465 |
-| 01M3073EJFREB8YATMZYFR5981 | motor_basic/cc.mat | synthetic://motor_basic/cc.mat | c96c66f737e3 | 15485896 | 1000 | 3840000 | convert_mat.py | 868ab53 | 1.5.5 | 2026-09-20 20:11:13.872694 |
+The row's columns are listed in `doc/spec.md` section 3.1, where they are defined once. The five files appear below with the identifiers that matter here.
 
 `lineage_dim` is a view over the audit. It numbers the files in ingestion order and gives each its first ingestion time in milliseconds; both go into every identifier of that file.
 
