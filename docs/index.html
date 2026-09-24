@@ -32,7 +32,7 @@
 <div id="quality"></div>
 <h2>Evidence runs recorded by the pipeline</h2>
 <div id="runs"></div>
-<h2>Published files</h2>
+<h2>Published files, digests checked in this browser</h2>
 <div id="files"></div>
 
 <script type="module">
@@ -121,11 +121,26 @@ try {
   table("quality", quality.columns, quality.rows);
 
   const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
-  const files = manifest.files.map((f) => ({ path: f.path, bytes: f.bytes, sha256: f.sha256 }));
-  table("files", ["path", "bytes", "sha256"], files);
   table("runs", evidence.columns, evidence.rows);
 
-  say(`Ready. ${gold.length} Gold files, ${manifest.bytes} bytes published, DuckDB-WASM 1.32.0.`);
+  // Every Gold file the page read is fetched once more in full and hashed here; the digest
+  // column says whether the bytes match manifest.json. Fault files are listed, not read.
+  say("Hashing the Gold files read");
+  const digestOf = async (url) => {
+    const hash = await crypto.subtle.digest("SHA-256", await (await fetch(url)).arrayBuffer());
+    return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  const files = [];
+  for (const f of manifest.files) {
+    const read = f.path.startsWith("gold/");
+    const digest = read ? await digestOf(new URL(`data/${f.path}`, location.href).href) : null;
+    files.push({ path: f.path, bytes: f.bytes, sha256: f.sha256, digest: read ? (digest === f.sha256 ? "match" : "MISMATCH") : "not read" });
+  }
+  table("files", ["path", "bytes", "sha256", "digest"], files, (r) => r.digest === "MISMATCH" ? "fail" : r.digest === "match" ? "pass" : "");
+  const matched = files.filter((f) => f.digest === "match").length;
+  const mismatched = files.filter((f) => f.digest === "MISMATCH").length;
+
+  say(`Ready. ${gold.length} Gold files, ${manifest.bytes} bytes published, DuckDB-WASM 1.32.0. ${matched} Gold files hashed in this browser, ${mismatched} mismatch.`);
 } catch (e) {
   say(`Failed: ${e.message || e}`);
   console.error(e);
