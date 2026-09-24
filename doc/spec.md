@@ -129,6 +129,7 @@ One row per source file converted. Not partitioned.
 |---|---|
 | ingest_id | VARCHAR |
 | source_path | VARCHAR |
+| source_path_rel | VARCHAR |
 | source_url | VARCHAR |
 | sha256 | VARCHAR |
 | bytes | BIGINT |
@@ -137,9 +138,12 @@ One row per source file converted. Not partitioned.
 | tool | VARCHAR |
 | tool_version | VARCHAR |
 | duckdb_version | VARCHAR |
+| ingest_host | VARCHAR |
 | ingested_at | TIMESTAMP |
 
 - `sha256` is the hex digest of the source file. Not NULL. This is the "original" of ALCOA+.
+- `source_path` is the absolute path the file had when it was read, the historical fact. Not NULL. `source_path_rel` is the same file below `DATA_DIR`, so `hash_match` still finds it after the lakehouse is moved or renamed. Not NULL. A path is where a file was; the digest is what it was, and only the digest decides whether the check passes.
+- `ingest_host` is the pseudonym of the machine that performed the conversion, ALCOA+ Attributable. Not NULL. It is HMAC-SHA256 of the hostname and the installation id under the same keyring secret that pseudonymises a subject; a hostname and a machine id are device identifiers under GDPR recital 30, and Bronze is append-only, so the raw values stay in `keyring.duckdb` in `host_map` and never enter a dataset. A MAC address is not recorded: it is link-local, so the source server's is never observable, and the ingesting machine's changes with the adapter.
 - `tool` and `tool_version` identify the converter, for example `convert_mat.py` and the git commit hash. Not NULL.
 - `ingested_at` is UTC. Not NULL.
 
