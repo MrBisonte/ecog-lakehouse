@@ -15,7 +15,7 @@ SPEC_RECORDING = [
 ]
 SPEC_AUDIT = [
     ("ingest_id", "VARCHAR"),
-    ("source_path", "VARCHAR"),
+    ("data_root", "VARCHAR"),
     ("source_path_rel", "VARCHAR"),
     ("source_url", "VARCHAR"),
     ("sha256", "VARCHAR"),
@@ -77,7 +77,8 @@ def test_lid_is_layer_1_and_traces_to_the_audit_row(bronze):
     decoded = bronze.execute("SELECT lid_decode(lid_from_uuid(?))", [row[0]]).fetchone()[0]
     assert decoded["layer"] == 1 and decoded["channel"] == 2 and decoded["run"] == 1
     audit = bronze.execute(
-        "SELECT source_path, source_url, sha256 FROM bronze_ingest_audit WHERE ingest_id = ?",
+        "SELECT data_root || '/' || source_path_rel, source_url, sha256 "
+        "FROM bronze_ingest_audit WHERE ingest_id = ?",
         [row[1]],
     ).fetchone()
     trace = bronze.execute("SELECT source_path, source_url, sha256 FROM lid_trace(?)", [row[0]])

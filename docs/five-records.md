@@ -43,7 +43,8 @@ One character of the identifier's text form moves as a record climbs: `2`, `4`, 
 COPY (
     SELECT
         '{{ingest_id}}' AS ingest_id,
-        '{{source_path}}' AS source_path,
+        '{{data_root}}' AS data_root,
+        '{{source_path_rel}}' AS source_path_rel,
         '{{source_url}}' AS source_url,
         '{{sha256}}' AS sha256,
         {{bytes}}::BIGINT AS bytes,
@@ -52,6 +53,7 @@ COPY (
         '{{tool}}' AS tool,
         '{{tool_version}}' AS tool_version,
         '{{duckdb_version}}' AS duckdb_version,
+        '{{ingest_host}}' AS ingest_host,
         TIMESTAMP '{{ingested_at}}' AS ingested_at
 ) TO '{{data_dir}}/bronze/ingest_audit/{{ingest_id}}.parquet' (FORMAT parquet);
 ```
@@ -76,7 +78,9 @@ CREATE OR REPLACE VIEW lineage_dim AS
 SELECT
     row_number() OVER (ORDER BY a.ingested_at, a.sha256)::SMALLINT AS ingest_ord,
     a.ingest_id,
-    a.source_path,
+    -- The audit stores the lakehouse root and the path below it, never the two joined.
+    CASE WHEN starts_with(a.source_path_rel, '/') THEN a.source_path_rel
+         ELSE a.data_root || '/' || a.source_path_rel END AS source_path,
     a.source_url,
     a.sha256,
     epoch_ms(a.ingested_at) AS ts_ms,

@@ -286,7 +286,7 @@ def convert(con, path: Path, adapter) -> int:
     db.run_sql(
         con,
         db.SQL / "bronze" / "ingest_audit.sql",
-        source_path=path.as_posix(),
+        data_root=root.as_posix(),
         source_path_rel=below.as_posix(),
         source_url=src.source_url,
         sha256=sha256,
