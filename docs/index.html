@@ -183,7 +183,7 @@ try {
   const total = (await query(conn, "SELECT count(*) AS n FROM gold_channel_quality")).rows[0].n;
   const quality = await query(conn,
     "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, " +
-    "rms_uv AS \"rms_uv µV\", clipped_pct AS \"clipped_pct %\", line_noise_ratio, " +
+    "rms_uv AS \"rms_uv µV\", clipped_pct AS \"clipped_pct %\", clipped_own_pct AS \"clipped_own_pct %\", line_noise_ratio, " +
     "lid_text(lid_from_uuid(lid)) AS lid " +
     "FROM gold_channel_quality ORDER BY line_noise_ratio DESC NULLS LAST LIMIT 100");
   document.getElementById("quality-note").textContent = `${cell(total, "total")} records in gold/channel_quality; the 100 with the highest line noise ratio:`;

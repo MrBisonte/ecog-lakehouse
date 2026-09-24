@@ -1,5 +1,6 @@
 -- gold/channel_quality, spec 3.3. One row per record. Silver carries no amplifier range, so
--- the rails for clipped_pct are the observed extremes of value_uv within the run.
+-- the rails for clipped_pct are the observed extremes of value_uv within the run, the hardware
+-- reading; clipped_own_pct measures each record against its own extremes, the signal reading.
 -- missing_samples is the record's source sample count minus the samples present in Silver.
 -- Canary records (radioactive bit, spec 12.5) never enter a Gold mart.
 -- The rails come from the first pass, not from a second aggregate over every sample row.
@@ -35,9 +36,12 @@ COPY (
             count(*)::BIGINT AS n_samples,
             sqrt(avg(r.value_uv * r.value_uv))::FLOAT AS rms_uv,
             (100.0 * count(*) FILTER (WHERE r.value_uv = b.lo OR r.value_uv = b.hi)
-                / count(*))::FLOAT AS clipped_pct
+                / count(*))::FLOAT AS clipped_pct,
+            (100.0 * count(*) FILTER (WHERE r.value_uv = e.lo OR r.value_uv = e.hi)
+                / count(*))::FLOAT AS clipped_own_pct
         FROM silver_recording r
         JOIN rails_by_lid b USING (lid)
+        JOIN extremes e USING (lid)
         GROUP BY r.lid
     )
     SELECT
@@ -49,6 +53,7 @@ COPY (
         (k.n_samples_src - q.n_samples)::BIGINT AS missing_samples,
         q.rms_uv,
         q.clipped_pct,
+        q.clipped_own_pct,
         n.line_noise_ratio::FLOAT AS line_noise_ratio,
         lid_to_uuid(lid_relayer(lid_from_uuid(q.lid), 2)) AS lid
     FROM q
