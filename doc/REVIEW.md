@@ -410,3 +410,36 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 ### Failed, and fixed before the commit
 
 - The first cut put the digest check inside `fix.sql`; the after row then took 10.9 s and the 0.3 s gap of Fault D vanished into the download the hash needs. The check is its own file and its own column now.
+
+## Plausibility checks and the evidence page, 2026-09-25
+
+- Status: done, branch `feat/evidence-page`, on top of `e1f2bcb`.
+- Alex's ask, five parts: checks that are allowed to fail, the frameworks that do not run in the browser, order and grouping in the checks table, lids as text, and a set of small fixes. Two decisions came back mid flight: the ingest audit gains the machine that captured the file, and it stores the data root with the path below it rather than the absolute path twice.
+
+### The two implausible subjects, investigated before anything was built
+
+- Asked: are `8728e2d4b6d6e219` (faces_basic, rms_uv 15,000 to 84,000) and `72d88db77f3716bb` (motor_basic, rms_uv about 1) an adapter bug or the data as published.
+- Answer: the data, in both cases. No adapter change.
+- `8728e2d4b6d6e219` has a Bronze `value_raw` RMS of 795,000 with extremes at plus and minus 18.7 million, against roughly 2,500 for the other faces_basic subjects; two further subjects of that experiment sit at 666,000 and 80,000. The adapter applies the one documented scale, 0.0298 microvolts per unit from the README of the other two experiments, to every file of the experiment, and `convert_mat.read_faces_basic` already records that the faces_basic README gives no scale of its own. Inventing a per subject factor would be inventing a number.
+- `72d88db77f3716bb` is not unusual at the subject level: Bronze RMS 2,535, ordinary for motor_basic. Two of its 49 channels, run 1 channels 31 and 43, read 1.10 and 1.00 microvolts while the median channel reads 72.9. Two flat electrodes, not a unit error.
+- Also seen while looking: many subjects clip at exactly plus and minus 32,767, the signed 16 bit limit, in the published files themselves.
+- Both are now reported by the plausibility checks rather than by a person reading a table.
+
+### Checked
+
+- Rebuilt from the sources after the audit change, `make all` exit 0 in 355.6 s wall clock, first ingestion to last evidence row: 45 files, Bronze 871,160,120 rows, Silver 2,433 records, Gold 2,241 channel_quality rows, 860,889 feature windows, 42 experiment_summary rows. Publish 8 files, 139,116,833 bytes.
+- 106 checks in that run: 103 pass, 3 fail, all three at severity `flag`, 0 blocking, so `make all` returns 0. The 45 `hash_match` rows that were failing before this branch now pass, because the check reads `source_path_rel` against the current root.
+- The three flags on real data: 101 of 2,241 channels outside 1 to 1000 microvolts, 48 of 2,241 at or above 0.5 line noise, and 1 of 42 subjects outside the event rate band, `fingerflex 74ad3b8f18e75291`. The mart spans 0.996 to 84,441.9 microvolts, which is the pair of findings above seen from the other end.
+- The page over the published copy, from a clean origin: 64 checks rerun, 61 pass, 3 flagged, 0 error; the coverage line reads 106 checks in the pipeline's run with 42 of them outside Gold; the framework table shows ALCOA+ 5 with 3 not passing, GDPR 9, ISO 13485 2, Part 11 2, ODCS contract 88; the three flags sort to the top and name their records; contract rules collapse to five `details` groups; `lid` reads `01M3AS9Q5W60R0008GA0000000`; 5 Gold files hashed in the browser, 0 mismatch. No console errors.
+- `ruff` clean, 79 tests pass, `scripts/lint_doc.py` pass on every document.
+
+### Failed, and fixed before the commit
+
+- The first cut of the audit stored `source_path` and `source_path_rel` side by side, and Alex pointed out that the second is a suffix of the first, character for character. The audit now stores `data_root` and `source_path_rel` and stores the absolute path nowhere; `lineage_dim` composes it, so `lid_trace` is unchanged and a test asserts the composition. That cost the first rebuild, which was thrown away half way through Silver.
+- A batch of edits written with `newline=""` silently matched nothing, because most files in this repository are CRLF and the search strings were LF. Three files were left unchanged while the script reported success, and the first full test run found it. Edits are applied one line at a time now, with an assertion per replacement.
+- `keyring.host()` was memoised with `functools.cache`. The pseudonym derives from the secret of the keyring of the current `DATA_DIR`, so a cached answer carried one lakehouse's pseudonym into another's audit rows and the test suite caught it across two temporary directories. The cache is gone.
+
+### Observed, not changed
+
+- The rebuild starts a new evidence chain. `gold/evidence` is append-only within a lakehouse, and this one was rebuilt from the sources, so the published copy now holds one run instead of two. The previous build, Bronze, Silver, Gold and its evidence, is preserved outside the repository at `~/data/ecog-lakehouse-before-20260925-002704` and was not deleted.
+- A returning visitor can see the digest column read MISMATCH for a few minutes after a republish. `manifest.json` is fetched with a cache buster and the Parquet files are not, so a browser holding the previous bytes compares them against the new digests. Seen here between two local origins and confirmed to be cache, not corruption: the same page from a clean origin reads 0 mismatch. Leaving the fix to Alex, since it is a caching decision.
