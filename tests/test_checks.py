@@ -120,3 +120,31 @@ def test_gold_star_expands_to_every_gold_dataset_and_error_is_recorded(tmp_path,
     [bad] = checks.generate("g", "G", "sql", "silver/subject", {"sql": "SELECT 1 FROM no_such_view"})
     [row] = checks.run(db.connect(), [bad])
     assert (row["result"], row["observed"], row["expected"]) == ("error", None, None)
+
+
+def test_every_check_carries_one_plain_sentence():
+    """A reader who does not read SQL still learns what each check asserts."""
+    from_csv = checks.from_requirements()
+    from_yaml = checks.from_contracts()
+    assert all(c.control for c in from_csv + from_yaml)
+    # a requirement row's own words, verbatim, clause and all
+    gdpr = next(c for c in from_csv if c.framework == "GDPR-Art9")
+    assert gdpr.clause == "Processing of data concerning health is prohibited without safeguards"
+    assert gdpr.control == (
+        "pseudonymisation at the Silver boundary; no source identifier in Silver"
+    )
+    # a contract rule has no regulation behind it, so the sentence is built from the rule
+    unique = next(c for c in from_yaml if c.check_kind == "unique")
+    assert unique.clause is None
+    assert unique.control.startswith("No two rows share the same ") and unique.control.endswith(".")
+    assert next(c for c in from_yaml if c.check_kind == "not_null").control.startswith("Every row has")
+
+
+def test_evidence_records_why_each_check_exists(built):
+    con = db.connect()
+    rows = con.execute(
+        "SELECT count(*), count(control), count(clause) FROM gold_evidence "
+        "WHERE run_id = (SELECT max(run_id) FROM gold_evidence)"
+    ).fetchone()
+    assert rows[0] == rows[1], "every evidence row says what it checked"
+    assert 0 < rows[2] < rows[0], "only requirement rows carry a regulation clause"
