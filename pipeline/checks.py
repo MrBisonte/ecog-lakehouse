@@ -144,7 +144,8 @@ def generate(framework, requirement_id, check_kind, dataset, params, clause=None
     """One check per dataset matching the pattern; `gold/*` expands to every Gold dataset.
 
     `clause` and `control` are the regulation text and the plain sentence of a requirement row.
-    A contract rule has no clause, and its sentence comes from CONTROL.
+    A contract rule has no clause, and its sentence comes from CONTROL. A threshold is written
+    once, in `params`, and both the query and the sentence read it from there.
     `severity` is `block` or `flag`; a flag check reports its offending records instead of a count.
     """
     if severity not in ("block", "flag"):
@@ -160,8 +161,8 @@ def generate(framework, requirement_id, check_kind, dataset, params, clause=None
         check_id = "/".join([requirement_id, check_kind, name, *detail])
         checks.append(
             Check(check_id, requirement_id, framework, name, check_kind, severity, clause or None,
-                  control or CONTROL[check_kind](params), sql, str(expected),
-                  COMPARE[check_kind])
+                  db.render(control, **params) if control else CONTROL[check_kind](params),
+                  sql, str(expected), COMPARE[check_kind])
         )
     return checks
 
