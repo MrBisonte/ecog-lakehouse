@@ -15,6 +15,9 @@
   th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid #8884; white-space: nowrap; }
   th { position: sticky; top: 0; background: Canvas; }
   .pass { color: #1a7f37; } .fail, .error { color: #b3261e; font-weight: 600; }
+  .flag { color: #9a6700; font-weight: 600; }
+  details summary { cursor: pointer; }
+  details table { margin-top: 4px; }
   td.wrap { white-space: normal; min-width: 24rem; }
   #status { font-weight: 600; }
 </style>
@@ -24,6 +27,8 @@
 <p>Every number on this page is a query result computed in your browser by DuckDB-WASM over the published Gold Parquet files, read by HTTP range requests from this site. The checks are the same SQL the pipeline ran; <code>lid.sql</code> holds the lineage identifier macros they use.</p>
 <p id="status">Loading DuckDB-WASM</p>
 <h2>Checks</h2>
+<p id="coverage"></p>
+<div id="frameworks"></div>
 <p id="checks-summary"></p>
 <div id="checks"></div>
 <h2>Experiment summary</h2>
@@ -43,7 +48,8 @@ const status = document.getElementById("status");
 const say = (text) => { status.textContent = text; };
 const cell = (v, name) => v === null || v === undefined ? "NULL"
   : name.endsWith("_at") ? new Date(Number(v)).toISOString().replace("T", " ").slice(0, 19)
-  : typeof v === "number" && !Number.isInteger(v) ? v.toFixed(4) : String(v);
+  : typeof v === "number" ? v.toLocaleString("en-US", { maximumFractionDigits: 4 })
+  : String(v);
 const escape = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 // A control sentence comes from governance/requirements.csv as its author wrote it, so the
 // page tidies the first letter and the full stop rather than the file doing it.
@@ -60,6 +66,31 @@ function table(id, columns, rows, klass, wrap = []) {
   document.getElementById(id).innerHTML = html.join("");
 }
 
+const CHECK_COLUMNS = ["result", "what it checks", "clause", "framework", "dataset", "observed", "expected"];
+const CHECK_WRAP = ["what it checks", "clause", "observed"];
+const checkRow = (r) => `<tr class="${r.result}">` + CHECK_COLUMNS.map(
+  (c) => `<td${CHECK_WRAP.includes(c) ? ' class="wrap"' : ""}>${escape(cell(r[c], c))}</td>`).join("") + "</tr>";
+
+function checksTable(id, rows) {
+  const head = `<thead><tr>${CHECK_COLUMNS.map((c) => `<th>${escape(c)}</th>`).join("")}</tr></thead>`;
+  const sorted = [...rows].sort((a, b) => a._rank - b._rank || a.dataset.localeCompare(b.dataset));
+  const body = [];
+  const collapsed = new Set();
+  for (const r of sorted) {
+    if (!r._group) { body.push(checkRow(r)); continue; }
+    if (collapsed.has(r._group)) continue;
+    collapsed.add(r._group);
+    // A contract rule is read as one group per dataset; anything that did not pass stays
+    // above, on its own row, because that is what a reader came to see.
+    const rules = sorted.filter((g) => g._group === r._group);
+    body.push(
+      `<tr><td colspan="${CHECK_COLUMNS.length}"><details><summary>${escape(r._group)}, ` +
+      `${rules.length} contract checks, all pass</summary>` +
+      `<table>${head}<tbody>${rules.map(checkRow).join("")}</tbody></table></details></td></tr>`);
+  }
+  document.getElementById(id).innerHTML = `<table>${head}<tbody>${body.join("")}</tbody></table>`;
+}
+
 async function query(conn, sql) {
   const result = await conn.query(sql);
   const columns = result.schema.fields.map((f) => f.name);
@@ -72,6 +103,21 @@ async function query(conn, sql) {
 }
 
 const compare = { eq: (o, e) => o === e, ge: (o, e) => o >= e, le: (o, e) => o <= e };
+// A flag check reports the records it found, so it is compared as text. pipeline/checks.py
+// `passes` does the same, and the two have to agree or the page contradicts the evidence.
+const holds = (c, observed) => {
+  const [o, e] = [Number(observed), Number(c.expected)];
+  return Number.isNaN(o) || Number.isNaN(e) ? String(observed) === String(c.expected)
+    : compare[c.compare](o, e);
+};
+const FRAMEWORK = { Part11: "Part 11", "ALCOA+": "ALCOA+", ISO13485: "ISO 13485",
+                    "GDPR-Art9": "GDPR", contract: "ODCS contract" };
+const named = (f) => FRAMEWORK[f] || f;
+// Reading order of the checks table: what failed, then privacy, then lineage, then the
+// plausibility flags, then the contract rules, which are collapsed one group per dataset.
+const rank = (r) => r.result !== "pass" ? 0 : r.framework === "GDPR-Art9" ? 1
+  : r.framework !== "contract" && /lid/.test(r.check_id) ? 2
+  : r.severity === "flag" ? 3 : r.framework === "contract" ? 5 : 4;
 
 try {
   const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
@@ -102,40 +148,50 @@ try {
   for (const c of checks) {
     let observed, result;
     try {
-      observed = (await query(conn, c.sql)).rows[0];
-      observed = Number(Object.values(observed)[0]);
-      result = compare[c.compare](observed, Number(c.expected)) ? "pass" : "fail";
+      observed = Object.values((await query(conn, c.sql)).rows[0])[0];
+      result = holds(c, observed) ? "pass" : c.severity === "flag" ? "flag" : "fail";
     } catch (e) {
       observed = null; result = "error";
     }
     results.push({
-      result, "what it checks": sentence(c.control), clause: c.clause || "",
-      framework: c.framework, requirement_id: c.requirement_id, dataset: c.dataset,
-      observed, expected: c.expected,
+      result, "what it checks": sentence(c.control),
+      clause: c.clause || (c.framework === "contract" ? "ODCS contract" : ""),
+      framework: named(c.framework), dataset: c.dataset, observed, expected: c.expected,
+      _rank: rank({ result, framework: c.framework, check_id: c.check_id, severity: c.severity }),
+      _group: c.framework === "contract" && result === "pass" ? c.dataset : null,
     });
   }
   const counts = results.reduce((a, r) => ((a[r.result] = (a[r.result] || 0) + 1), a), {});
   const checksSummary = document.getElementById("checks-summary");
   checksSummary.textContent =
-    `${results.length} checks rerun here: ${counts.pass || 0} pass, ${counts.fail || 0} fail, ${counts.error || 0} error. ` +
-    `Each row says what it asserts. The pipeline's own runs are in gold/evidence below the marts. `;
+    `${results.length} checks rerun here: ${counts.pass || 0} pass, ${counts.fail || 0} fail, ` +
+    `${counts.flag || 0} flagged, ${counts.error || 0} error. A flag is a plausibility range the ` +
+    `recordings fall outside; it is recorded and does not stop the build. `;
   const sqlLink = document.createElement("a");
   sqlLink.href = "data/checks.json";
   sqlLink.textContent = "Read the SQL of every check.";
   checksSummary.append(sqlLink);
-  table("checks",
-    ["result", "what it checks", "clause", "framework", "requirement_id", "dataset", "observed", "expected"],
-    results, (r) => r.result, ["what it checks", "clause"]);
+  checksTable("checks", results);
 
   const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
   table("summary", summary.columns, summary.rows);
 
   const total = (await query(conn, "SELECT count(*) AS n FROM gold_channel_quality")).rows[0].n;
   const quality = await query(conn,
-    "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, rms_uv, clipped_pct, line_noise_ratio, lid " +
+    "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, " +
+    "rms_uv AS \"rms_uv µV\", clipped_pct AS \"clipped_pct %\", line_noise_ratio, " +
+    "lid_text(lid_from_uuid(lid)) AS lid " +
     "FROM gold_channel_quality ORDER BY line_noise_ratio DESC NULLS LAST LIMIT 100");
-  document.getElementById("quality-note").textContent = `${total} records in gold/channel_quality; the 100 with the highest line noise ratio:`;
+  document.getElementById("quality-note").textContent = `${cell(total, "total")} records in gold/channel_quality; the 100 with the highest line noise ratio:`;
   table("quality", quality.columns, quality.rows);
+
+  const latest = "(SELECT max(run_id) FROM gold_evidence)";
+  const ran = (await query(conn, "SELECT count(*) AS total, count(*) FILTER (WHERE dataset NOT LIKE 'gold/%') AS elsewhere FROM gold_evidence WHERE run_id = " + latest)).rows[0];
+  document.getElementById("coverage").textContent =
+    `The pipeline's own run covered ${cell(ran.total, "total")} checks. ${cell(ran.elsewhere, "elsewhere")} of them ran on Bronze, ` +
+    `Silver and the published copy, which this page cannot read, so they are reported here rather than rerun:`;
+  const byFramework = await query(conn, "SELECT framework, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass FROM gold_evidence WHERE run_id = " + latest + " GROUP BY 1 ORDER BY 1");
+  table("frameworks", byFramework.columns, byFramework.rows.map((r) => ({ ...r, framework: named(r.framework) })));
 
   const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
   table("runs", evidence.columns, evidence.rows);
@@ -157,7 +213,7 @@ try {
   const matched = files.filter((f) => f.digest === "match").length;
   const mismatched = files.filter((f) => f.digest === "MISMATCH").length;
 
-  say(`Ready. ${gold.length} Gold files, ${manifest.bytes} bytes published, DuckDB-WASM 1.32.0. ${matched} Gold files hashed in this browser, ${mismatched} mismatch.`);
+  say(`Ready. ${gold.length} Gold files, ${cell(manifest.bytes, "bytes")} bytes published, DuckDB-WASM 1.32.0. ${matched} Gold files hashed in this browser, ${mismatched} mismatch.`);
 } catch (e) {
   say(`Failed: ${e.message || e}`);
   console.error(e);
