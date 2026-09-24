@@ -405,3 +405,19 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - A moved virtual environment is not relocatable: `activate`, `activate.csh`, `activate.fish`, `pyvenv.cfg` and nine script shebangs held the old absolute path, so `make test` fell through to the system `python3` and failed on a missing `pytest`. The path was rewritten in all twelve files. `pip install -e` from the new path also left the earlier distribution registered with its own editable finder for the same `pipeline` package, which was uninstalled.
 - Nothing published carries the previous name: all 20 files under `docs/`, the Parquet binaries included, and the served copies of the page, `manifest.json`, `checks.json`, `LICENSE.md` and `lid.sql` return no hits. The repository is private.
 - Verified before each commit: `make lint` exit 0, `make test` 72 passed. After the working copy was renamed, `make test` from the new path: 72 passed.
+
+## Digests verified by consumers, 2026-09-24
+
+- Status: done, branch `feat/verify-digests`, four commits after the merge of #15
+- Alex's decision, option 3 of three: the sha256 in `manifest.json` is checked by the consumers that rely on it, not only displayed. Chosen after the ETag finding of the phase 3 addendum, where a server invented label failed on a correct file and a digest computed from the bytes was the check that held.
+
+### Checked
+
+- `faults/d/verify.sql`: after the fix statement, every published file is read once more in full with `read_blob` and its `sha256()` compared with the manifest, one query, two numbers, files and mismatches. Against Pages: 8 files, 0 mismatches, 9.4 s, timed apart from the 0.58 s fix statement because it downloads every byte. The before row, the sequential loop, stays at 9.5 s and checks nothing.
+- `docs/index.html`: every Gold file the page read is fetched once more and hashed with SubtleCrypto; the files table gained a digest column, match or MISMATCH, and the status line counts them. Locally over the published copy: 5 Gold files hashed, 0 mismatch; fault files listed as not read. Two hosts, no console errors.
+- `tests/test_faults.py`: `verify.sql` on local files gives (files, 0), then (files, 1) after one file is overwritten.
+- `docs/bench.md` rewritten against `https://mrbisonte.github.io/ecog-lakehouse/data`, the renamed site. `make lint` green, `make test` 73 tests.
+
+### Failed, and fixed before the commit
+
+- The first cut put the digest check inside `fix.sql`; the after row then took 10.9 s and the 0.3 s gap of Fault D vanished into the download the hash needs. The check is its own file and its own column now.
