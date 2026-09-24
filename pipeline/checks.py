@@ -36,6 +36,28 @@ COMPARE = {
 }
 
 
+# One plain sentence per check kind, for a reader who does not read SQL. A requirement row
+# carries its own `control` text; a contract rule has none, so the sentence is built from the
+# rule itself. Neither is ever typed per check.
+CONTROL = {
+    "not_null": lambda p: f"Every row has a value for {p['column']}.",
+    "unique": lambda p: "No two rows share the same " + " and ".join(p["columns"]) + ".",
+    "row_count_min": lambda p: (
+        "The dataset is not empty." if p["min"] == 1 else f"At least {p['min']} rows are present."
+    ),
+    "no_direct_identifier": lambda p: (
+        "No column here is named " + " or ".join(p["forbidden_columns"]) + "."
+    ),
+    "hash_match": lambda p: "Every ingested file still matches the digest recorded for it.",
+    "partition_layout": lambda p: (
+        f"Files keep row groups of at most {p['max_rows_per_row_group']:,} rows, so a reader "
+        "can fetch part of a file instead of all of it."
+    ),
+    "retention": lambda p: f"No file here is older than {p['max_age_days']} days.",
+    "sql": lambda p: "A rule of this dataset, written as a query that must return nothing.",
+}
+
+
 @dataclass
 class Check:
     check_id: str
@@ -43,6 +65,8 @@ class Check:
     framework: str
     dataset: str
     check_kind: str
+    clause: str | None
+    control: str
     sql: str
     expected: str
     compare: str
@@ -105,8 +129,13 @@ def validate(sql: str) -> str:
     return sql
 
 
-def generate(framework, requirement_id, check_kind, dataset, params) -> list[Check]:
-    """One check per dataset matching the pattern; `gold/*` expands to every Gold dataset."""
+def generate(framework, requirement_id, check_kind, dataset, params, clause=None,
+             control=None) -> list[Check]:
+    """One check per dataset matching the pattern; `gold/*` expands to every Gold dataset.
+
+    `clause` and `control` are the regulation text and the plain sentence of a requirement row.
+    A contract rule has no clause, and its sentence comes from CONTROL.
+    """
     names = [d for d in db.DATASETS if fnmatch(d, dataset)] or [dataset]
     checks = []
     for name in names:
@@ -116,7 +145,8 @@ def generate(framework, requirement_id, check_kind, dataset, params) -> list[Che
         detail = [str(v) for v in params.values()]
         check_id = "/".join([requirement_id, check_kind, name, *detail])
         checks.append(
-            Check(check_id, requirement_id, framework, name, check_kind, sql, str(expected),
+            Check(check_id, requirement_id, framework, name, check_kind, clause or None,
+                  control or CONTROL[check_kind](params), sql, str(expected),
                   COMPARE[check_kind])
         )
     return checks
@@ -130,7 +160,7 @@ def from_requirements(path=REQUIREMENTS) -> list[Check]:
         for row in rows
         for c in generate(
             row["framework"], row["requirement_id"], row["check_kind"], row["dataset"],
-            json.loads(row["params"]),
+            json.loads(row["params"]), row["clause"], row["control"],
         )
     ]
 
@@ -184,6 +214,8 @@ def run(con, checks: list[Check]) -> list[dict]:
                 "dataset": c.dataset,
                 "dataset_version": version,
                 "check_kind": c.check_kind,
+                "clause": c.clause,
+                "control": c.control,
                 "result": result,
                 "observed": observed,
                 "expected": expected,

@@ -40,8 +40,8 @@ def browser_checks() -> list[dict]:
     """The checks the page reruns: Gold datasets, kinds that need only the views and lid.sql."""
     return [
         {"check_id": c.check_id, "requirement_id": c.requirement_id, "framework": c.framework,
-         "dataset": c.dataset, "check_kind": c.check_kind, "sql": c.sql, "expected": c.expected,
-         "compare": c.compare}
+         "dataset": c.dataset, "check_kind": c.check_kind, "clause": c.clause,
+         "control": c.control, "sql": c.sql, "expected": c.expected, "compare": c.compare}
         for c in checks.from_requirements() + checks.from_contracts()
         if c.dataset.startswith("gold/") and c.check_kind in BROWSER_KINDS
     ]

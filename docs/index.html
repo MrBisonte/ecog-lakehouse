@@ -15,6 +15,7 @@
   th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid #8884; white-space: nowrap; }
   th { position: sticky; top: 0; background: Canvas; }
   .pass { color: #1a7f37; } .fail, .error { color: #b3261e; font-weight: 600; }
+  td.wrap { white-space: normal; min-width: 24rem; }
   #status { font-weight: 600; }
 </style>
 </head>
@@ -43,12 +44,17 @@ const say = (text) => { status.textContent = text; };
 const cell = (v, name) => v === null || v === undefined ? "NULL"
   : name.endsWith("_at") ? new Date(Number(v)).toISOString().replace("T", " ").slice(0, 19)
   : typeof v === "number" && !Number.isInteger(v) ? v.toFixed(4) : String(v);
+const escape = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+// A control sentence comes from governance/requirements.csv as its author wrote it, so the
+// page tidies the first letter and the full stop rather than the file doing it.
+const sentence = (t) => !t ? "" : t[0].toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".");
 
-function table(id, columns, rows, klass) {
-  const html = ["<table><thead><tr>", ...columns.map((c) => `<th>${c}</th>`), "</tr></thead><tbody>"];
+function table(id, columns, rows, klass, wrap = []) {
+  const html = ["<table><thead><tr>", ...columns.map((c) => `<th>${escape(c)}</th>`), "</tr></thead><tbody>"];
   for (const r of rows) {
     const cls = klass ? ` class="${klass(r)}"` : "";
-    html.push(`<tr${cls}>`, ...columns.map((c) => `<td>${cell(r[c], c)}</td>`), "</tr>");
+    html.push(`<tr${cls}>`, ...columns.map(
+      (c) => `<td${wrap.includes(c) ? ' class="wrap"' : ""}>${escape(cell(r[c], c))}</td>`), "</tr>");
   }
   html.push("</tbody></table>");
   document.getElementById(id).innerHTML = html.join("");
@@ -102,13 +108,24 @@ try {
     } catch (e) {
       observed = null; result = "error";
     }
-    results.push({ result, framework: c.framework, requirement_id: c.requirement_id, dataset: c.dataset, check_kind: c.check_kind, observed, expected: c.expected, check_id: c.check_id });
+    results.push({
+      result, "what it checks": sentence(c.control), clause: c.clause || "",
+      framework: c.framework, requirement_id: c.requirement_id, dataset: c.dataset,
+      observed, expected: c.expected,
+    });
   }
   const counts = results.reduce((a, r) => ((a[r.result] = (a[r.result] || 0) + 1), a), {});
-  document.getElementById("checks-summary").textContent =
+  const checksSummary = document.getElementById("checks-summary");
+  checksSummary.textContent =
     `${results.length} checks rerun here: ${counts.pass || 0} pass, ${counts.fail || 0} fail, ${counts.error || 0} error. ` +
-    `The pipeline's own runs are in gold/evidence below the marts.`;
-  table("checks", ["result", "framework", "requirement_id", "dataset", "check_kind", "observed", "expected", "check_id"], results, (r) => r.result);
+    `Each row says what it asserts. The pipeline's own runs are in gold/evidence below the marts. `;
+  const sqlLink = document.createElement("a");
+  sqlLink.href = "data/checks.json";
+  sqlLink.textContent = "Read the SQL of every check.";
+  checksSummary.append(sqlLink);
+  table("checks",
+    ["result", "what it checks", "clause", "framework", "requirement_id", "dataset", "observed", "expected"],
+    results, (r) => r.result, ["what it checks", "clause"]);
 
   const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
   table("summary", summary.columns, summary.rows);

@@ -40,6 +40,16 @@ schema:
         logicalType: string
         physicalType: VARCHAR
         required: true
+      - name: clause
+        logicalType: string
+        physicalType: VARCHAR
+        required: false
+        description: The regulation text a requirement row quotes. NULL for a contract rule.
+      - name: control
+        logicalType: string
+        physicalType: VARCHAR
+        required: false
+        description: One plain sentence saying what this check asserts, for a reader who does not read SQL.
       - name: result
         logicalType: string
         physicalType: VARCHAR
