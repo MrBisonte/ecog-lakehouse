@@ -43,6 +43,10 @@ schema:
         logicalType: number
         physicalType: FLOAT
         required: true
+      - name: clipped_own_pct
+        logicalType: number
+        physicalType: FLOAT
+        required: true
       - name: line_noise_ratio
         logicalType: number
         physicalType: FLOAT
