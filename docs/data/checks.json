@@ -5,6 +5,8 @@
   "framework": "GDPR-Art9",
   "dataset": "gold/channel_quality",
   "check_kind": "no_direct_identifier",
+  "clause": "Processing of data concerning health is prohibited without safeguards",
+  "control": "no source identifier in any Gold dataset",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_channel_quality' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -15,6 +17,8 @@
   "framework": "GDPR-Art9",
   "dataset": "gold/experiment_summary",
   "check_kind": "no_direct_identifier",
+  "clause": "Processing of data concerning health is prohibited without safeguards",
+  "control": "no source identifier in any Gold dataset",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_experiment_summary' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -25,6 +29,8 @@
   "framework": "GDPR-Art9",
   "dataset": "gold/feature_window",
   "check_kind": "no_direct_identifier",
+  "clause": "Processing of data concerning health is prohibited without safeguards",
+  "control": "no source identifier in any Gold dataset",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_feature_window' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -35,6 +41,8 @@
   "framework": "GDPR-Art9",
   "dataset": "gold/evidence",
   "check_kind": "no_direct_identifier",
+  "clause": "Processing of data concerning health is prohibited without safeguards",
+  "control": "no source identifier in any Gold dataset",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_evidence' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -45,6 +53,8 @@
   "framework": "GDPR-Art9",
   "dataset": "gold/dataset_manifest",
   "check_kind": "no_direct_identifier",
+  "clause": "Processing of data concerning health is prohibited without safeguards",
+  "control": "no source identifier in any Gold dataset",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_dataset_manifest' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -55,6 +65,8 @@
   "framework": "GDPR-Art9",
   "dataset": "gold/channel_quality",
   "check_kind": "sql",
+  "clause": "Processing of data concerning health is prohibited without safeguards",
+  "control": "canary records planted in Silver never reach the channel_quality mart (spec 12.5)",
   "sql": "-- sql: rows returned by the requirement's own query. Expected 0.\nSELECT count(*) AS observed FROM (SELECT 1 FROM gold_channel_quality WHERE lid_radioactive(lid_from_uuid(lid)) = 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -65,6 +77,8 @@
   "framework": "GDPR-Art9",
   "dataset": "gold/feature_window",
   "check_kind": "sql",
+  "clause": "Processing of data concerning health is prohibited without safeguards",
+  "control": "canary records planted in Silver never reach the feature_window mart (spec 12.5)",
   "sql": "-- sql: rows returned by the requirement's own query. Expected 0.\nSELECT count(*) AS observed FROM (SELECT 1 FROM gold_feature_window WHERE lid_radioactive(lid_from_uuid(lid)) = 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -75,6 +89,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for experiment.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE experiment IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -85,6 +101,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for subject_pid.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE subject_pid IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -95,6 +113,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for run.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE run IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -105,6 +125,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for channel_idx.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE channel_idx IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -115,6 +137,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for n_samples.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE n_samples IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -125,6 +149,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for missing_samples.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE missing_samples IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -135,6 +161,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for rms_uv.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE rms_uv IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -145,6 +173,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for clipped_pct.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE clipped_pct IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -155,6 +185,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for lid.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE lid IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -165,6 +197,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "unique",
+  "clause": null,
+  "control": "No two rows share the same lid.",
   "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_channel_quality GROUP BY lid HAVING count(*) > 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -175,6 +209,8 @@
   "framework": "contract",
   "dataset": "gold/channel_quality",
   "check_kind": "no_direct_identifier",
+  "clause": null,
+  "control": "No column here is named subject_src.",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_channel_quality' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -185,6 +221,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for dataset_version.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE dataset_version IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -195,6 +233,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "unique",
+  "clause": null,
+  "control": "No two rows share the same dataset_version.",
   "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_dataset_manifest GROUP BY dataset_version HAVING count(*) > 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -205,6 +245,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for dataset.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE dataset IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -215,6 +257,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "unique",
+  "clause": null,
+  "control": "No two rows share the same dataset.",
   "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_dataset_manifest GROUP BY dataset HAVING count(*) > 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -225,6 +269,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for layer.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE layer IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -235,6 +281,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for n_records.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE n_records IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -245,6 +293,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for file_digests.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE file_digests IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -255,6 +305,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for produced_at.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE produced_at IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -265,6 +317,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for git_commit.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_dataset_manifest WHERE git_commit IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -275,6 +329,8 @@
   "framework": "contract",
   "dataset": "gold/dataset_manifest",
   "check_kind": "no_direct_identifier",
+  "clause": null,
+  "control": "No column here is named subject_src.",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_dataset_manifest' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -285,6 +341,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for run_id.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE run_id IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -295,6 +353,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for check_id.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE check_id IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -305,6 +365,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for requirement_id.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE requirement_id IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -315,6 +377,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for framework.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE framework IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -325,6 +389,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for dataset.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE dataset IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -335,6 +401,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for dataset_version.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE dataset_version IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -345,6 +413,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for check_kind.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE check_kind IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -355,6 +425,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for result.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE result IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -365,6 +437,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for ran_at.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE ran_at IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -375,6 +449,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for engine_version.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE engine_version IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -385,6 +461,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for git_commit.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_evidence WHERE git_commit IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -395,6 +473,8 @@
   "framework": "contract",
   "dataset": "gold/evidence",
   "check_kind": "unique",
+  "clause": null,
+  "control": "No two rows share the same run_id and check_id.",
   "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_evidence GROUP BY run_id, check_id HAVING count(*) > 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -405,6 +485,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for experiment.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE experiment IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -415,6 +497,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for subject_pid.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE subject_pid IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -425,6 +509,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for n_runs.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE n_runs IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -435,6 +521,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for n_channels.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE n_channels IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -445,6 +533,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for duration_s.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE duration_s IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -455,6 +545,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for n_events.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_experiment_summary WHERE n_events IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -465,6 +557,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "unique",
+  "clause": null,
+  "control": "No two rows share the same experiment and subject_pid.",
   "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_experiment_summary GROUP BY experiment, subject_pid HAVING count(*) > 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -475,6 +569,8 @@
   "framework": "contract",
   "dataset": "gold/experiment_summary",
   "check_kind": "no_direct_identifier",
+  "clause": null,
+  "control": "No column here is named subject_src.",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_experiment_summary' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"
@@ -485,6 +581,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for experiment.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE experiment IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -495,6 +593,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for subject_pid.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE subject_pid IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -505,6 +605,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for run.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE run IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -515,6 +617,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for channel_idx.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE channel_idx IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -525,6 +629,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for window_start_ms.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE window_start_ms IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -535,6 +641,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for mean_uv.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE mean_uv IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -545,6 +653,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for std_uv.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE std_uv IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -555,6 +665,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for p2p_uv.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE p2p_uv IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -565,6 +677,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for lid.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE lid IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -575,6 +689,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for sample_lo.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE sample_lo IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -585,6 +701,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "not_null",
+  "clause": null,
+  "control": "Every row has a value for sample_hi.",
   "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_feature_window WHERE sample_hi IS NULL\n",
   "expected": "0",
   "compare": "eq"
@@ -595,6 +713,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "unique",
+  "clause": null,
+  "control": "No two rows share the same lid and window_start_ms.",
   "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_feature_window GROUP BY lid, window_start_ms HAVING count(*) > 1)\n",
   "expected": "0",
   "compare": "eq"
@@ -605,6 +725,8 @@
   "framework": "contract",
   "dataset": "gold/feature_window",
   "check_kind": "no_direct_identifier",
+  "clause": null,
+  "control": "No column here is named subject_src.",
   "sql": "-- no_direct_identifier: forbidden columns present in the dataset. Expected 0.\nSELECT count(*) AS observed\nFROM information_schema.columns\nWHERE table_name = 'gold_feature_window' AND column_name IN ('subject_src')\n",
   "expected": "0",
   "compare": "eq"

@@ -85,6 +85,11 @@ def columns(dataset: str) -> str | None:
     return ", ".join(f"{p['name']} {p['physicalType']}" for p in props)
 
 
+# Append-only datasets whose schema has grown: a file written before a column existed is read
+# with NULL in it, rather than breaking the view or being rewritten.
+UNION_BY_NAME = {"gold/evidence"}
+
+
 def views(con):
     """One view per dataset on disk; a typed empty view for a dataset with a known schema."""
     for dataset in DATASETS:
@@ -96,7 +101,8 @@ def views(con):
             con.execute(
                 f"CREATE OR REPLACE VIEW {view_name(dataset)} AS SELECT * FROM read_parquet("
                 f"'{root.as_posix()}/**/*.parquet', hive_partitioning = true, "
-                "hive_types_autocast = false)"
+                "hive_types_autocast = false"
+                + (", union_by_name = true)" if dataset in UNION_BY_NAME else ")")
             )
         elif (schema := columns(dataset)) is not None:
             cols = ", ".join(f"NULL::{t} AS {c}" for c, t in (p.split() for p in schema.split(", ")))
