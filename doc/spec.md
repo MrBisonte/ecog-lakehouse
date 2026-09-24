@@ -363,6 +363,13 @@ Every SQL file is plain DuckDB SQL with `{{var}}` placeholders resolved by a 20-
 2. Attaches the Gold Parquet files over HTTP range requests.
 3. Runs the same check SQL the pipeline ran, from `docs/data/checks.json`.
 4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables.
+5. Reads every Gold file once more in full and compares its sha256 with `manifest.json`.
+
+The checks table reads in the order a reader needs: whatever did not pass, then privacy and the canary, then lineage, then the plausibility flags, then the contract rules, which collapse into one `details` element per dataset because they all pass or they would not be there. A row leads with one plain sentence and the clause behind it, never with a check id. Above the table the summary links the governance rows the checks are generated from and the published SQL of every check.
+
+The page can only read Gold, so the checks that ran on Bronze, Silver and the published copy are reported above the table from the latest `gold/evidence` run, grouped by framework.
+
+A `lid` is shown in its 26 character text form, `lid_text`, so the page, this document and the deck read the same identifier. The UUID stays in the data.
 
 Rules: every number on the page is a query result; system font stack; no request to any host other than the page's origin and the pinned CDN.
 
