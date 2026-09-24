@@ -104,6 +104,8 @@ async function query(conn, sql) {
   return { columns, rows };
 }
 
+// The governance rows every check is generated from, one line per requirement.
+const REQUIREMENTS = "https://github.com/MrBisonte/ecog-lakehouse/blob/master/governance/requirements.csv";
 const compare = { eq: (o, e) => o === e, ge: (o, e) => o >= e, le: (o, e) => o <= e };
 // A flag check reports the records it found, so it is compared as text. pipeline/checks.py
 // `passes` does the same, and the two have to agree or the page contradicts the evidence.
@@ -169,10 +171,10 @@ try {
     `${results.length} checks rerun here: ${counts.pass || 0} pass, ${counts.fail || 0} fail, ` +
     `${counts.flag || 0} flagged, ${counts.error || 0} error. A flag is a plausibility range the ` +
     `recordings fall outside; it is recorded and does not stop the build. `;
-  const sqlLink = document.createElement("a");
-  sqlLink.href = "data/checks.json";
-  sqlLink.textContent = "Read the SQL of every check.";
-  checksSummary.append(sqlLink);
+  const link = (href, text) => Object.assign(document.createElement("a"), { href, textContent: text });
+  checksSummary.append(
+    "Read ", link(REQUIREMENTS, "the checks definition"),
+    " and their ", link("data/checks.json", "respective SQL statements"), ".");
   checksTable("checks", results);
 
   const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
