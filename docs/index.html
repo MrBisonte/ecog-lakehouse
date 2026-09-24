@@ -6,10 +6,12 @@
 <title>ecog-lakehouse evidence</title>
 <style>
   :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 16px; max-width: 1200px; line-height: 1.4; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 16px; line-height: 1.4; }
   h1 { font-size: 1.4rem; margin: 0 0 4px; }
   h2 { font-size: 1.1rem; margin: 24px 0 8px; }
   p, td, th { font-size: 0.9rem; }
+  /* Prose reads at a comfortable measure; a table takes the window it needs. */
+  p { max-width: 90ch; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; }
   table { border-collapse: collapse; width: 100%; overflow-x: auto; display: block; }
   th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid #8884; white-space: nowrap; }
@@ -18,7 +20,7 @@
   .flag { color: #9a6700; font-weight: 600; }
   details summary { cursor: pointer; }
   details table { margin-top: 4px; }
-  td.wrap { white-space: normal; min-width: 24rem; }
+  td.wrap { white-space: normal; min-width: 16rem; overflow-wrap: anywhere; }
   #status { font-weight: 600; }
 </style>
 </head>
