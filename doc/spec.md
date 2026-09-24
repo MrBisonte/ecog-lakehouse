@@ -289,7 +289,7 @@ One row per check per run. Append-only.
 - `result` is one of `pass`, `fail`, `error`. Not NULL.
 - `observed` and `expected` are the measured and required values as text, for example `0` and `0` for a `not_null` check. NULL for `error`.
 - `severity` is `block` or `flag`, declared by the requirement row. A `block` failure stops the build; a `flag` failure is recorded and the build continues. Contract rules, GDPR and the canary are always `block`. Not NULL from the run that introduced it.
-- A `flag` check reports the records it found rather than how many, so its `observed` reads `3 of 2241: 01J..., 01J...` and its `expected` is the empty string. `observed` and `expected` are compared as text when either side is not a number.
+- A `flag` check reports the records it found rather than how many, so its `observed` reads `3 of 2241: 01J..., 01J...` against an `expected` of `no records`, and a clean run reads `no records` on both sides. `observed` and `expected` are compared as text when either side is not a number.
 - `clause` is the regulation text the requirement row quotes, copied as its author wrote it. NULL for a check generated from a data contract, which has no regulation behind it.
 - `control` is one plain sentence saying what the check asserts, for a reader who does not read SQL. A requirement row supplies its own; a contract rule has its sentence built from the rule, never typed per check. Not NULL.
 - `clause`, `control` and `severity` were added after the first runs were written. Evidence is never rewritten, so a run older than the columns reads NULL in them and `gold/evidence` is read with `union_by_name`.
