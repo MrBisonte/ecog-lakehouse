@@ -128,7 +128,8 @@ One row per source file converted. Not partitioned.
 | Column name | Column type |
 |---|---|
 | ingest_id | VARCHAR |
-| source_path | VARCHAR |
+| data_root | VARCHAR |
+| source_path_rel | VARCHAR |
 | source_url | VARCHAR |
 | sha256 | VARCHAR |
 | bytes | BIGINT |
@@ -137,9 +138,12 @@ One row per source file converted. Not partitioned.
 | tool | VARCHAR |
 | tool_version | VARCHAR |
 | duckdb_version | VARCHAR |
+| ingest_host | VARCHAR |
 | ingested_at | TIMESTAMP |
 
 - `sha256` is the hex digest of the source file. Not NULL. This is the "original" of ALCOA+.
+- `data_root` is `DATA_DIR` as it stood when the file was read, and `source_path_rel` is the file below it. Neither is NULL, and the absolute path is never stored: a reader joins them, which is what `lineage_dim.source_path` and therefore `lid_trace` return. `hash_match` uses only `source_path_rel`, against the current root, so moving or renaming the lakehouse does not read as tampering, while `data_root` keeps the fact that it was somewhere else. A file read from outside `DATA_DIR` has no path below it, so `source_path_rel` is absolute and begins with a slash; `hash_match` will not find it, which is the honest answer for a file that is not in the lakehouse.
+- `ingest_host` is the pseudonym of the machine that performed the conversion, ALCOA+ Attributable. Not NULL. It is HMAC-SHA256 of the hostname and the installation id under the same keyring secret that pseudonymises a subject; a hostname and a machine id are device identifiers under GDPR recital 30, and Bronze is append-only, so the raw values stay in `keyring.duckdb` in `host_map` and never enter a dataset. A MAC address is not recorded: it is link-local, so the source server's is never observable, and the ingesting machine's changes with the adapter.
 - `tool` and `tool_version` identify the converter, for example `convert_mat.py` and the git commit hash. Not NULL.
 - `ingested_at` is UTC. Not NULL.
 
@@ -271,6 +275,7 @@ One row per check per run. Append-only.
 | dataset | VARCHAR |
 | dataset_version | VARCHAR |
 | check_kind | VARCHAR |
+| severity | VARCHAR |
 | clause | VARCHAR |
 | control | VARCHAR |
 | result | VARCHAR |
@@ -283,9 +288,11 @@ One row per check per run. Append-only.
 - `dataset_version` is the sha256 of the sorted list of Parquet file digests in the dataset at run time. Not NULL. Two runs over identical files produce identical versions.
 - `result` is one of `pass`, `fail`, `error`. Not NULL.
 - `observed` and `expected` are the measured and required values as text, for example `0` and `0` for a `not_null` check. NULL for `error`.
+- `severity` is `block` or `flag`, declared by the requirement row. A `block` failure stops the build; a `flag` failure is recorded and the build continues. Contract rules, GDPR and the canary are always `block`. Not NULL from the run that introduced it.
+- A `flag` check reports the records it found rather than how many, so its `observed` reads `3 of 2241: 01J..., 01J...` against an `expected` of `no records`, and a clean run reads `no records` on both sides. `observed` and `expected` are compared as text when either side is not a number.
 - `clause` is the regulation text the requirement row quotes, copied as its author wrote it. NULL for a check generated from a data contract, which has no regulation behind it.
 - `control` is one plain sentence saying what the check asserts, for a reader who does not read SQL. A requirement row supplies its own; a contract rule has its sentence built from the rule, never typed per check. Not NULL.
-- Both columns were added after the first runs were written. Evidence is never rewritten, so a run older than the columns reads NULL in them and `gold/evidence` is read with `union_by_name`.
+- `clause`, `control` and `severity` were added after the first runs were written. Evidence is never rewritten, so a run older than the columns reads NULL in them and `gold/evidence` is read with `union_by_name`.
 
 ## 6. Planted faults
 
@@ -356,6 +363,13 @@ Every SQL file is plain DuckDB SQL with `{{var}}` placeholders resolved by a 20-
 2. Attaches the Gold Parquet files over HTTP range requests.
 3. Runs the same check SQL the pipeline ran, from `docs/data/checks.json`.
 4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables.
+5. Reads every Gold file once more in full and compares its sha256 with `manifest.json`.
+
+The checks table reads in the order a reader needs: whatever did not pass, then privacy and the canary, then lineage, then the plausibility flags, then the contract rules, which collapse into one `details` element per dataset because they all pass or they would not be there. A row leads with one plain sentence and the clause behind it, never with a check id. Above the table the summary links the governance rows the checks are generated from and the published SQL of every check.
+
+The page can only read Gold, so the checks that ran on Bronze, Silver and the published copy are reported above the table from the latest `gold/evidence` run, grouped by framework.
+
+A `lid` is shown in its 26 character text form, `lid_text`, so the page, this document and the deck read the same identifier. The UUID stays in the data.
 
 Rules: every number on the page is a query result; system font stack; no request to any host other than the page's origin and the pinned CDN.
 

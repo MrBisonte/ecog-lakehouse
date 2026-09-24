@@ -65,6 +65,7 @@ class Check:
     framework: str
     dataset: str
     check_kind: str
+    severity: str
     clause: str | None
     control: str
     sql: str
@@ -77,7 +78,12 @@ def oldest_age_days(dataset: str) -> float:
     return (time.time() - min(p.stat().st_mtime for p in files)) / 86400 if files else 0.0
 
 
-def template_values(kind: str, dataset: str, params: dict):
+def template_name(kind: str, severity: str) -> str:
+    """A flag check reports the records it found, so `sql` at severity flag has its own template."""
+    return "sql_flag" if kind == "sql" and severity == "flag" else kind
+
+
+def template_values(kind: str, dataset: str, params: dict, severity: str = "block"):
     """Placeholder values for the kind's template, and the expected value."""
     values = {
         "view": db.view_name(dataset),
@@ -103,7 +109,11 @@ def template_values(kind: str, dataset: str, params: dict):
             values["oldest_age_days"] = round(oldest_age_days(dataset), 3)
             expected = params["max_age_days"]
         case "sql":
-            values["query"] = params["sql"]
+            # Thresholds live in the requirement row beside the query, never in this file.
+            values["query"] = db.render(params["sql"], **{k: v for k, v in params.items()
+                                                          if k != "sql"})
+            if severity == "flag":
+                expected = "no records"
         case _:
             raise ValueError(f"unknown check_kind '{kind}', the kinds are in doc/spec.md section 5.2")
     return values, expected
@@ -130,24 +140,29 @@ def validate(sql: str) -> str:
 
 
 def generate(framework, requirement_id, check_kind, dataset, params, clause=None,
-             control=None) -> list[Check]:
+             control=None, severity="block") -> list[Check]:
     """One check per dataset matching the pattern; `gold/*` expands to every Gold dataset.
 
     `clause` and `control` are the regulation text and the plain sentence of a requirement row.
-    A contract rule has no clause, and its sentence comes from CONTROL.
+    A contract rule has no clause, and its sentence comes from CONTROL. A threshold is written
+    once, in `params`, and both the query and the sentence read it from there.
+    `severity` is `block` or `flag`; a flag check reports its offending records instead of a count.
     """
+    if severity not in ("block", "flag"):
+        raise ValueError(f"severity is 'block' or 'flag', not '{severity}', see doc/spec.md 5.3")
     names = [d for d in db.DATASETS if fnmatch(d, dataset)] or [dataset]
     checks = []
     for name in names:
-        values, expected = template_values(check_kind, name, params)
-        template = (db.SQL / "checks" / f"{check_kind}.sql").read_text(encoding="utf-8")
+        values, expected = template_values(check_kind, name, params, severity)
+        template = (db.SQL / "checks" / f"{template_name(check_kind, severity)}.sql").read_text(
+            encoding="utf-8")
         sql = validate(db.render(template, **values))
         detail = [str(v) for v in params.values()]
         check_id = "/".join([requirement_id, check_kind, name, *detail])
         checks.append(
-            Check(check_id, requirement_id, framework, name, check_kind, clause or None,
-                  control or CONTROL[check_kind](params), sql, str(expected),
-                  COMPARE[check_kind])
+            Check(check_id, requirement_id, framework, name, check_kind, severity, clause or None,
+                  db.render(control, **params) if control else CONTROL[check_kind](params),
+                  sql, str(expected), COMPARE[check_kind])
         )
     return checks
 
@@ -160,7 +175,7 @@ def from_requirements(path=REQUIREMENTS) -> list[Check]:
         for row in rows
         for c in generate(
             row["framework"], row["requirement_id"], row["check_kind"], row["dataset"],
-            json.loads(row["params"]), row["clause"], row["control"],
+            json.loads(row["params"]), row["clause"], row["control"], row["severity"],
         )
     ]
 
@@ -186,7 +201,11 @@ def from_contracts(folder=CONTRACTS) -> list[Check]:
 
 
 def passes(compare: str, observed: str, expected: str) -> bool:
-    o, e = float(observed), float(expected)
+    """Numbers where both sides are numbers; a flag check reports records, so text otherwise."""
+    try:
+        o, e = float(observed), float(expected)
+    except ValueError:
+        return observed == expected
     return {"eq": o == e, "ge": o >= e, "le": o <= e}[compare]
 
 
@@ -214,6 +233,7 @@ def run(con, checks: list[Check]) -> list[dict]:
                 "dataset": c.dataset,
                 "dataset_version": version,
                 "check_kind": c.check_kind,
+                "severity": c.severity,
                 "clause": c.clause,
                 "control": c.control,
                 "result": result,
@@ -242,10 +262,12 @@ def main(argv=None) -> int:
     rows = run(con, from_requirements() + from_contracts())
     for r in rows:
         if r["result"] != "pass":
-            print(f"checks: {r['result']} {r['check_id']} observed {r['observed']} expected {r['expected']}")
+            print(f"checks: {r['result']} {r['severity']} {r['check_id']} "
+                  f"observed {r['observed']} expected {r['expected']}")
     counts = {k: sum(r["result"] == k for r in rows) for k in ("pass", "fail", "error")}
-    print(f"checks: run {rows[0]['run_id']}, {counts}")
-    return 0 if counts["fail"] == 0 and counts["error"] == 0 else 1
+    blocking = sum(r["result"] != "pass" and r["severity"] == "block" for r in rows)
+    print(f"checks: run {rows[0]['run_id']}, {counts}, {blocking} blocking")
+    return 0 if blocking == 0 else 1
 
 
 if __name__ == "__main__":
