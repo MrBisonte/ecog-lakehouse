@@ -2,8 +2,10 @@
 -- the rails for clipped_pct are the observed extremes of value_uv within the run.
 -- missing_samples is the record's source sample count minus the samples present in Silver.
 -- Canary records (radioactive bit, spec 12.5) never enter a Gold mart.
--- Both passes over silver/recording are keyed by lid alone, 16 fixed bytes: carrying the
--- partition strings through the join and the aggregate held 12 GB on 871 million rows.
+-- The rails come from the first pass, not from a second aggregate over every sample row.
+-- An aggregate computed in the same statement carries no row count: grouping all 871 million
+-- rows by experiment, subject_pid and run returns 45 rows, the planner estimates 907 million,
+-- and the join to the scan is planned against that. See docs/lessons-learned.md.
 COPY (
     WITH kept AS (
         SELECT lid, experiment, subject_pid, run, channel_idx, n_samples_src
