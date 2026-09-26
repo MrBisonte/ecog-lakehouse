@@ -1,6 +1,8 @@
 # Lessons learned, phase 1
 
-One incident, told end to end: the first full build on real data stalled, then ran out of memory twice, and the fix that shipped is not the fastest one measured. Every number below is a query or a timer from the runs of 2026-09-21 on 871,160,120 Silver rows, 12 CPU threads, 15 GB in the WSL VM, DuckDB 1.5.5 with its 12.1 GB default memory limit.
+One incident, told end to end: the first full build on real data stalled, then ran out of memory twice, and the fix that shipped is not the fastest one measured. Every number below is a query or a timer, from the runs of 2026-09-21 and from the isolation tests of 2026-09-25, on 871,160,120 Silver rows, 12 CPU threads, 15 GB in the WSL VM, DuckDB 1.5.5 with its 12.1 GB default memory limit.
+
+Sections 2, 4 and 6 were rewritten on 2026-09-25. The first account named the cardinality estimate on the final aggregate as the cause, and a second named the width of the group key. Both were inferred rather than tested, and section 5 shows the tests that rule them out.
 
 ## 1. Timeline
 
@@ -18,7 +20,7 @@ One incident, told end to end: the first full build on real data stalled, then r
  make all #2 ───── Gold 010: "Out of Memory: 12.1 GiB / 12.1 GiB used"
  fix 2: preserve_insertion_order = false
  make all #3 ───── Gold 010: same 12.1 GiB, 48 s to fail
- fix 3: lid keyed passes (below)
+ fix 3: rails derived from the first pass, both passes keyed by lid (below)
  make all #4 ───── Gold, checks, publish in 208 s, 103 checks pass
  verifier  ─────── clean clone, make all in 513 s, 68 tests
 ```
@@ -31,18 +33,18 @@ Two side effects of the failed runs, both fixed and tested: an aborted `COPY` le
 
 ### Before
 
-One pass over Silver carried five group keys, three of them strings, through a join whose probe side was every sample row. The optimizer estimated 164 million groups, so the hash aggregate was sized for that, and every in-flight row held two heap allocated strings plus a UUID.
+The rails were derived inside the same statement, by grouping all 871 million rows by `experiment`, `subject_pid` and `run`. That aggregate returns 45 rows. The optimizer estimates 907,391,205 and plans the join to the 871 million row scan against the estimate. The second pass then grouped five keys, two of them strings, over the joined rows.
 
 ```
-silver_recording (871M rows)                 rails (2.4k rows)
+silver_recording (871M rows)                 rails (45 rows)
  experiment  subject_pid  run  channel  lid  value   <-- VARCHAR, VARCHAR, ...
       |                                                     |
       +---------- HASH JOIN on (experiment, subject_pid, run) --+
-                            |
+                            |     build side: the rails aggregate,
+                            |     45 rows, estimated 907,391,205
                   871M rows x (2 strings + uuid + float)
                             |
         HASH GROUP BY (experiment, subject_pid, run, channel, lid)
-              estimated 164M groups, sized for that
                             |
                   count, rms, clipped_pct
                             |
@@ -54,16 +56,16 @@ silver_recording (871M rows)                 rails (2.4k rows)
 The heavy passes touch two fixed width columns, `lid` and `value_uv`, and group by `lid`. Everything descriptive is joined afterwards from `silver/record`, one row per record. Rails per run are derived from the per record extremes instead of a second scan with string keys.
 
 ```
-silver_record (2.4k rows)                   silver_recording (871M rows)
+silver_record (2,433 rows)                  silver_recording (871M rows)
  lid  experiment  subject_pid  run  channel        lid  value      <-- 16 B + 4 B per row
       |                                                 |
       | kept = non canary lids  ----- SEMI JOIN --------+
       |                                                 |
-      |                              pass 1: GROUP BY lid -> min, max   (2.4k rows)
+      |                              pass 1: GROUP BY lid -> min, max  (2,241 rows)
       |                                                 |
-      +---- rails per run = min/max over the run's records (2.4k rows)
+      +---- rails per run = min/max over the run's records   (42 rows)
       |                                                 |
-      +---- rails_by_lid (2.4k rows) -- HASH JOIN on lid (uuid) --+
+      +---- rails_by_lid (2,241 rows) -- HASH JOIN on lid (uuid) --+
                                                         |
                              pass 2: GROUP BY lid -> count, rms, clipped_pct
                                                         |
@@ -102,14 +104,27 @@ Decision pending: the spec defines rails per run, so A stayed. Switching to B is
 | Spill files under `DATA_DIR/tmp` | `pipeline/db.py` connect | spec 7 puts every DuckDB working file outside the repo; the Windows mount refused the spill |
 | `preserve_insertion_order = false` | `pipeline/db.py` connect | every ORDER BY in `sql/` is explicit; the setting alone did not fix the OOM but removes a buffer that serves nothing |
 | Zero byte Parquet removed at connect | `pipeline/db.py` views, tested | an aborted write must not break the next run |
-| `channel_quality` and `feature_window` keyed by `lid` | `sql/gold/010_*.sql`, `sql/gold/030_*.sql` | fixed width keys through the heavy passes, labels joined once per record |
+| `channel_quality` and `feature_window` derive their rails from the first pass | `sql/gold/010_*.sql`, `sql/gold/030_*.sql` | the planner has no row count for an aggregate computed in the same statement; deriving the rails from 2,241 already aggregated rows keeps the join's build side small |
 | Verifier under `$HOME` | `~/verify_phase1.sh` | `/tmp` is a 7.6 GB tmpfs |
 | Download with stall detection and resume | `pipeline/fetch.py` Range header; curl `--speed-limit` during the session | the Stanford host stalled once at 359 MB |
 
-## 5. Lessons
+## 5. What was tested
 
-1. **Fixed width keys through the heavy pass, strings afterwards.** A 16 byte UUID per row costs 14 GB over 871 million rows; two VARCHAR keys on top of it cost the memory limit. Join the labels once per record, never once per sample.
-2. **Look at the cardinality estimate before the memory.** "Estimated 164,482,128 groups" for 2,241 real ones was in the profile of the failing query. The estimate sized the hash table; the strings filled it.
+Each row is two runs on the rebuilt lakehouse, DuckDB 1.5.5, 12.1 GB limit, results materialised so no aggregate expression is pruned.
+
+| Test | Result |
+|---|---|
+| The rails aggregate on its own | 45 rows in 1.9 s |
+| The mart, rails as an inline CTE | out of memory, 27.9 s and 25.7 s |
+| The mart, rails as a `MATERIALIZED` CTE | out of memory, 22.5 s and 24.1 s |
+| The mart, rails handed over as a table of the same 45 rows | 2,241 rows in 7.9 s and 7.7 s |
+| The mart, group key narrowed to `lid`, rails still a CTE | out of memory, 17.6 s and 15.5 s |
+| The committed query | 2,241 rows in 6.2 s and 6.3 s |
+
+## 6. Lessons
+
+1. **An aggregate computed in the same statement has no row count.** The rails aggregate returns 45 rows and the planner estimates 907,391,205, so the join to the 871 million row scan is planned against the estimate. Handed the same 45 rows as a table, the identical query completes in about 8 seconds. `MATERIALIZED` does not help, because it does not supply a row count either.
+2. **Test the explanation, do not infer it.** Two explanations were written down before they were tested and both were wrong: that the estimate sized the final hash table, and that the width of the group key was the cause. Narrowing the group key from five columns to `lid` alone leaves the failure unchanged, in two runs. The evidence is in the table below.
 3. **A settings change is a guess until measured.** `preserve_insertion_order` was the documented first suggestion in the error text and changed nothing here. It stayed because it is right, not because it helped.
 4. **Fewest scans is not fastest.** The window variant scans once and loses to two streaming aggregates. Measure, do not count passes.
 5. **Compare on equal footing.** Cold then warm in sequence flatters the second query. Repeat, alternate, and report the spread.
@@ -117,7 +132,7 @@ Decision pending: the spec defines rails per run, so A stayed. Switching to B is
 7. **Know the machine.** `/tmp` as tmpfs, a clock that jumps when the host sleeps, a mount that reports ENOMEM on a temp file: none of these were in the plan and all three cost a run.
 8. **Write the definition down before optimising it.** B is faster because it computes something else. The spec's rails per run is the reason A is still in place, and the reason the choice is Alex's, not the optimizer's.
 
-## 6. Addendum, the same faults against GitHub Pages
+## 7. Addendum, the same faults against GitHub Pages
 
 The tables in section 3 were loopback. With Pages on and `BASE_URL` pointing at it, three things changed the picture.
 
