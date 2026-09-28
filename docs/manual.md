@@ -136,7 +136,7 @@ The `lid` bit layout lives in arch-standards, not here. The macros are generated
 
 ```mermaid
 flowchart LR
-  Y[arch-standards<br>ids/layouts/lid.yaml] -->|make gen| D[ids/generated/lid/duckdb.sql]
+  Y[arch-standards<br>data/ids/layouts/lid.yaml] -->|make gen| D[data/ids/generated/lid/duckdb.sql]
   D -->|make lineage, in ecog-lakehouse| L[sql/lineage/lid_generated.sql]
   L --> X[sql/lineage/lid_extras.sql<br>hand written: parent, children, trace]
 ```
