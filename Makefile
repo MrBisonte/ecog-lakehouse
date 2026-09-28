@@ -38,4 +38,4 @@ lineage:
 	cp $(ARCH_STANDARDS)/data/ids/generated/lid/duckdb.sql sql/lineage/lid_generated.sql
 
 lint:
-	ruff check . && $(PY) scripts/lint_doc.py README.md CLAUDE.md doc/*.md doc/agent/*.md doc/references/*/*.md adr/*.md docs/*.md
+	ruff check . && $(PY) scripts/lint_doc.py README.md CLAUDE.md doc/*.md doc/agent/*.md adr/*.md docs/*.md

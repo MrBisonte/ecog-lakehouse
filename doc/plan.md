@@ -1,6 +1,6 @@
 # plan.md
 
-Interview is in the week of 21 September 2026; exact day to be filled in. Phases are ordered so that a demo exists after phase 2 even if nothing else lands. D means interview day.
+Built in the week of 21 September 2026. Phases are ordered so that a demo exists after phase 2 even if nothing else lands. D means the publish day.
 
 | Phase | When | Where | Work | Done when |
 |---|---|---|---|---|
@@ -8,8 +8,8 @@ Interview is in the week of 21 September 2026; exact day to be filled in. Phases
 | 1 Real data | Sat 19 to Sun 20 | Claude Code on WSL2 | `make fetch` for two or three experiments, one adapter per experiment in `convert_mat.py`, sha256 in `governance/sources.csv`. Replace synthetic with real | `make all` passes on real data; row counts in `docs/bench.md` |
 | 2 Faults and bench | Sun 20 | Claude Code on WSL2 | Faults A, D, F, G with plant, fix and bench. DuckDB v2.0 alpha CLI installed, exact build recorded. Publish fault files under `docs/data/faults/` | `make bench` writes four before and after tables |
 | 3 Site | Mon 21 | Claude Code on WSL2 | `docs/index.html` with DuckDB-WASM, evidence and summary tables, manifest. Enable GitHub Pages from `docs/` on a private repo first | Page loads and runs checks from a stranger's browser |
-| 4 Rehearsal | D minus 1 | Chat plus a timer | Five-minute run through: brief on screen, page, fault A live, one of D, F or G, close. Fix what breaks | Two clean rehearsals under five minutes |
-| 5 Publish | D, one hour before | GitHub | Review `doc/references/` for anything naming unpublished personal repos and decide keep or drop; flip repository to public, confirm Pages URL, confirm the two README commands work from a clean shell | URL pasted in the interview notes |
+| 4 Rehearsal | D minus 1 | Chat plus a timer | Five-minute run through: README on screen, page, fault A live, one of D, F or G, close. Fix what breaks | Two clean rehearsals under five minutes |
+| 5 Publish | D, one hour before | GitHub | Flip the repository to public, confirm the Pages URL, confirm the two README commands work from a clean shell | URL in the README |
 
 ## Budget
 

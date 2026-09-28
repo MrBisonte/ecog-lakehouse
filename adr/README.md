@@ -1,6 +1,6 @@
 # Architecture decision records
 
-One decision per file, numbered, immutable once accepted. Template and rules: `doc/references/decisions/adr-standard__doc-skills.md`. Next number: ADR-0005.
+One decision per file, numbered, immutable once accepted. Next number: ADR-0005.
 
 | ADR | Decision | Status |
 |---|---|---|
