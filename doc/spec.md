@@ -418,7 +418,7 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
  bits  22..0    reserved       23   zero
 ```
 
-No field straddles the 64 bit boundary, so a hi and lo pair of 64 bit words is equivalent to the native 128 bit value on engines without one. The layout is the file `ids/layouts/lid.yaml` in the arch-standards repository. Every macro that touches these bits is generated from it by `idgen` and committed as `sql/lineage/lid_generated.sql`, never edited by hand; section 12.3 says which of the macros below are generated and which are this system's own.
+No field straddles the 64 bit boundary, so a hi and lo pair of 64 bit words is equivalent to the native 128 bit value on engines without one. The layout is the file `data/ids/layouts/lid.yaml` in the arch-standards repository. Every macro that touches these bits is generated from it by `idgen` and committed as `sql/lineage/lid_generated.sql`, never edited by hand; section 12.3 says which of the macros below are generated and which are this system's own.
 
 `ts_ms` is the timestamp of the first ingestion of that sha256, read from `ingest_audit`. A rerun of the same file reuses it, so identical inputs yield identical identifiers within one environment. A fresh environment assigns new timestamps; the sha256 in `lineage_dim` is what ties the two.
 
