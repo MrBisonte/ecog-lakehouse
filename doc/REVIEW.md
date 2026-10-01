@@ -520,3 +520,28 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 - The page in a browser against the new files. It is checked on Pages after the merge.
 - `docs/bench.md` was not regenerated; its row counts are unchanged, its build time is the earlier build's.
+
+## NaN as NULL and the walkthrough SQL, 2026-10-02
+
+- Status: done, branch `docs/nan-as-null-and-five-records`
+- Alex's decision: the documents change, NULL in Bronze is the truth
+
+### Found
+
+- Bronze holds NULL where the source holds NaN: DuckDB reads NaN from the numpy array as NULL. Synthetic Bronze, 2,000 NULL and 0 NaN in 30,720,000 rows; real Bronze, 500 NULL and 0 NaN in 871,160,120, the 500 being the canary's burst. The Stanford files hold no NaN.
+- `doc/spec.md` said `value_raw` is never NULL and `sql/bronze/recording.sql` said NaN is kept. `docs/five-records.md` already said NULL.
+- Four folded SQL blocks of `docs/five-records.md` predated the lid-keyed rewrite and the columns of #25.
+
+### Changed
+
+- Spec and the two SQL comments say NULL. The Silver filter names `IS NOT NULL`; it removes the same rows as before.
+- The eight single-file blocks and the channel quality block of `docs/five-records.md` are the files as they stand; a note dates the result tables and names the three columns they lack.
+- `tests/test_docs.py`: a block titled with one SQL file equals that file.
+
+### Checked
+
+- `make lint` green, `make test` 81 tests.
+
+### Not checked
+
+- The result tables were not regenerated. Silver was not rebuilt.
