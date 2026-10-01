@@ -545,3 +545,32 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 ### Not checked
 
 - The result tables were not regenerated. Silver was not rebuilt.
+
+## The two open timings, 2026-10-02
+
+- Status: done, branch `docs/explain-the-two-open-timings`
+
+### Asked
+
+- Why was variant A of the channel quality aggregate four times slower than B, `docs/lessons-learned.md` section 3.
+- Why is the partitioned layout of Fault A slower than the single row group against Pages.
+
+### Found
+
+- The A against B gap does not reproduce: three interleaved runs each, A 6.9 to 7.8 s, B 6.9 to 9.1 s, plans of the same shape. The 33 to 40 s of 2026-09-21 was the machine, not the query; section 5 of the same page had the committed query at 6.2 s since 2026-09-25.
+- Fault A is bytes, not round trips. For the aggregate DuckDB fetched 21.5 MiB in 11 requests from the single row group and 72.7 MiB in 38 from the partitioned files, the whole of them. The partitioned files are 47 percent larger because `ts_ms` and `sample_idx` lose their dictionary in row groups of 198,656 sorted rows.
+- One record by `lid`, the retrieval the layout is for: 0.649 s, 5 requests, 6.7 MiB partitioned; 1.708 s, 10 requests, 19.5 MiB single row group.
+
+### Changed
+
+- `faults/a/bench.sh` reports GET requests and bytes received for the aggregate, and times the retrieval of one record by `lid`. Run against Pages; the section is appended to `docs/bench.md`.
+- `docs/lessons-learned.md`: the remeasure in section 3, the measured cause in section 7, lesson 8 corrected.
+
+### Checked
+
+- `make lint` green, `make test` 81 tests.
+
+### Not checked
+
+- Why DuckDB fetches the small row groups whole. It is observed in the request count and the bytes received, not traced in the reader.
+- The bench on loopback with the new columns; only the run against Pages was made.
