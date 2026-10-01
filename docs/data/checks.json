@@ -234,6 +234,32 @@
   "compare": "eq"
  },
  {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/clipped_own_pct",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "severity": "block",
+  "clause": null,
+  "control": "Every row has a value for clipped_own_pct.",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE clipped_own_pct IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/not_null/gold/channel_quality/scale_basis",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "not_null",
+  "severity": "block",
+  "clause": null,
+  "control": "Every row has a value for scale_basis.",
+  "sql": "-- not_null: rows where the column is NULL. Expected 0.\nSELECT count(*) AS observed FROM gold_channel_quality WHERE scale_basis IS NULL\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
   "check_id": "gold-channel-quality/not_null/gold/channel_quality/lid",
   "requirement_id": "gold-channel-quality",
   "framework": "contract",
@@ -256,6 +282,19 @@
   "clause": null,
   "control": "No two rows share the same lid.",
   "sql": "-- unique: groups of the columns that occur more than once. Expected 0.\nSELECT count(*) AS observed\nFROM (SELECT 1 FROM gold_channel_quality GROUP BY lid HAVING count(*) > 1)\n",
+  "expected": "0",
+  "compare": "eq"
+ },
+ {
+  "check_id": "gold-channel-quality/sql/gold/channel_quality/SELECT 1 FROM gold_channel_quality WHERE scale_basis NOT IN ('documented', 'assumed')",
+  "requirement_id": "gold-channel-quality",
+  "framework": "contract",
+  "dataset": "gold/channel_quality",
+  "check_kind": "sql",
+  "severity": "block",
+  "clause": null,
+  "control": "A rule of this dataset, written as a query that must return nothing.",
+  "sql": "-- sql: rows returned by the requirement's own query. Expected 0.\nSELECT count(*) AS observed FROM (SELECT 1 FROM gold_channel_quality WHERE scale_basis NOT IN ('documented', 'assumed'))\n",
   "expected": "0",
   "compare": "eq"
  },
