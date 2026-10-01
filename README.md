@@ -1,5 +1,7 @@
 # ecog-lakehouse
 
+[![ci](https://github.com/MrBisonte/ecog-lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/MrBisonte/ecog-lakehouse/actions/workflows/ci.yml)
+
 Governed lakehouse over public ECoG recordings. Every number traces to bytes. Four planted faults, fixed live.
 
 ## 1. Flow

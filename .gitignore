@@ -11,6 +11,7 @@
 !REUSE.toml
 !LICENSES/*.txt
 !sbom.cdx.json
+!.github/workflows/*.yml
 !doc/**/*.md
 !adr/*.md
 !pipeline/**/*.py
