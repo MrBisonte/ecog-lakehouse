@@ -144,3 +144,12 @@ Malformed variant, one parenthesis short, as the parser reports it:
     LINE 1: ...) OR channel_idx = 509) OR channel_idx = 510) OR channel_idx = 511
                                                                               ^^^
 ```
+
+## Fault A: single row group, unpartitioned, unsorted
+
+DuckDB CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766`. Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one, over `https://mrbisonte.github.io/ecog-lakehouse/data`, every file of the layout in one read_parquet. Aggregate: `SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet([URLS]) GROUP BY 1`. One record: `SELECT avg(value_uv), count(*) FROM read_parquet([URLS]) WHERE lid = '01a0c53a-e0f9-2030-000c-105000000000'`, the middle record of 40. Seconds are the median of three CLI runs each; GET requests and bytes received are one run's HTTP statistics from EXPLAIN ANALYZE.
+
+| layout | files | row groups | bytes | sorted by lid, sample_idx | aggregate, read_ahead_depth = 0 | aggregate, default | aggregate GETs | aggregate received | one record | one record GETs | one record received |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| before, one row group | 1 | 1 | 51960395 | true | 1.323 | 1.504 | 11 | 21.5 MiB | 1.708 | 10 | 19.5 MiB |
+| after, partitioned and sorted | 2 | 38 | 76269314 | true | 3.459 | 3.760 | 38 | 72.7 MiB | 0.649 | 5 | 6.7 MiB |
