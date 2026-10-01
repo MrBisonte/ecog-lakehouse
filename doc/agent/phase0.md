@@ -32,8 +32,8 @@ anything else:
    check yet. It must pass from step 1 of the build onward.
 
 Then read, in this order and in full: CLAUDE.md, doc/intent.md, doc/spec.md,
-doc/plan.md, doc/REVIEW.md, every file under adr/, every file under
-doc/references/. doc/spec.md is the contract. If you find a contradiction
+doc/plan.md, doc/REVIEW.md, every file under adr/.
+doc/spec.md is the contract. If you find a contradiction
 between doc/spec.md and anything else, stop and tell me which line; do not
 resolve it yourself. doc/agent/phase0.md is an earlier copy of this prompt;
 this message supersedes it, update that file to match before your first

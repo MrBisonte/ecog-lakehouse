@@ -10,11 +10,11 @@ A working example of a governed data platform for implanted neural recordings, b
 
 ## Who it is for
 
-The technical team at a Barcelona neurotechnology company, including the interim data architect, during and after a technical interview. Secondary audience: anyone evaluating the author's data architecture work.
+Anyone evaluating the author's data architecture work: how a governed lakehouse is designed, verified and explained, with every number traceable to the bytes it came from.
 
 ## What it is not
 
-Not a product. Not a claim about how the company's real data is structured. Not a benchmark of DuckDB; the numbers are illustrations of design choices, produced on the author's machine and reproducible from the README.
+Not a product. Not a claim about how any organisation's real data is structured. Not a benchmark of DuckDB; the numbers are illustrations of design choices, produced on the author's machine and reproducible from the README.
 
 ## Constraints the design accepts
 

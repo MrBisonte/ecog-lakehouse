@@ -45,7 +45,7 @@ One entry per phase. What was checked, what failed, what changed.
 - `duration_s` is the sum over runs of the last present sample time plus one millisecond.
 - `experiment_summary` carries no `lid`; its grain spans records and section 12.2 does not list it.
 - `check_id` is `requirement_id/check_kind/dataset` followed by the parameter values, so two rows of the same requirement stay distinct.
-- Contract `required` and `unique` properties and every `quality` rule with `engine: ibrain` generate checks with framework `contract`, because spec section 4 says the generator reads the contracts. That is 81 of the 89 evidence rows.
+- Contract `required` and `unique` properties and every `quality` rule with `engine: ecog-lakehouse` generate checks with framework `contract`, because spec section 4 says the generator reads the contracts. That is 81 of the 89 evidence rows.
 - `retention` takes the oldest Parquet modification time from Python, because DuckDB 1.5 exposes no file time in SQL.
 - `make all` includes `publish`, so `pipeline/publish.py` exists in phase 0: Gold copied to `docs/data/gold/`, `manifest.json` with bytes and sha256 per file, limits of section 9 enforced. No site, no fault files.
 - `gold/evidence` is one file per run under `run_id=<ulid>/`, never rewritten.
@@ -59,12 +59,12 @@ One entry per phase. What was checked, what failed, what changed.
 Clean clone inside WSL, fresh venv, fresh `DATA_DIR`, run at commit `1ff7cd8`, the last code commit; the docs commit that adds this entry came after. `make lint` printed `result: pass` for every document and exited 0.
 
 ```
-$ git clone -q -b feat/phase0 /mnt/c/Prj/ibrain /tmp/ibrain_verify
+$ git clone -q -b feat/phase0 /mnt/c/Prj/ecog-lakehouse /tmp/ecog-lakehouse_verify
 $ git log --oneline | head -1
 1ff7cd8 fix(silver): rerun with no new subject adds no pseudonym
-$ python3 -m venv --without-pip /tmp/ibrain_verify_venv
-$ pip --python /tmp/ibrain_verify_venv/bin/python install -e .[dev]
-$ export DATA_DIR=/tmp/ibrain_verify_data
+$ python3 -m venv --without-pip /tmp/ecog-lakehouse_verify_venv
+$ pip --python /tmp/ecog-lakehouse_verify_venv/bin/python install -e .[dev]
+$ export DATA_DIR=/tmp/ecog-lakehouse_verify_data
 $ make all SYNTH=1
 python3 pipeline/run.py bronze --synth
 convert: 23040000 rows written
@@ -83,7 +83,7 @@ run: gold/030_feature_window.sql
 python3 pipeline/checks.py
 checks: run 01M2WZK8K54TZMGHBK5KFMQCYZ, {'pass': 89, 'fail': 0, 'error': 0}
 python3 pipeline/publish.py
-publish: 4 files, 301154 bytes, manifest at /tmp/ibrain_verify/docs/data/manifest.json
+publish: 4 files, 301154 bytes, manifest at /tmp/ecog-lakehouse_verify/docs/data/manifest.json
 make all exit 0
 $ make test
 python3 -m pytest -q
@@ -92,11 +92,11 @@ python3 -m pytest -q
 make test exit 0
 $ git status --short
 $ du -sh $DATA_DIR/*
-165M	/tmp/ibrain_verify_data/bronze
-300K	/tmp/ibrain_verify_data/gold
-780K	/tmp/ibrain_verify_data/keyring.duckdb
-89M	/tmp/ibrain_verify_data/raw
-264M	/tmp/ibrain_verify_data/silver
+165M	/tmp/ecog-lakehouse_verify_data/bronze
+300K	/tmp/ecog-lakehouse_verify_data/gold
+780K	/tmp/ecog-lakehouse_verify_data/keyring.duckdb
+89M	/tmp/ecog-lakehouse_verify_data/raw
+264M	/tmp/ecog-lakehouse_verify_data/silver
 $ python -c "import duckdb; print(duckdb.__version__)"
 1.5.5
 ```
@@ -139,14 +139,14 @@ $ python -c "import duckdb; print(duckdb.__version__)"
 ### Verifier output
 
 ```
-$ git clone -q -b feat/lid-layout /mnt/c/Prj/ibrain /tmp/ibrain_verify
+$ git clone -q -b feat/lid-layout /mnt/c/Prj/ecog-lakehouse /tmp/ecog-lakehouse_verify
 $ git log --oneline | head -1
 853fa52 refactor(lineage): take the UUID bridge from the generated macros
 $ cmp sql/lineage/lid_generated.sql /mnt/c/Prj/arch-standards/ids/generated/lid/duckdb.sql && echo identical
 identical
-$ python3 -m venv --without-pip /tmp/ibrain_verify_venv
-$ pip --python /tmp/ibrain_verify_venv/bin/python install -e .[dev]
-$ export DATA_DIR=/tmp/ibrain_verify_data
+$ python3 -m venv --without-pip /tmp/ecog-lakehouse_verify_venv
+$ pip --python /tmp/ecog-lakehouse_verify_venv/bin/python install -e .[dev]
+$ export DATA_DIR=/tmp/ecog-lakehouse_verify_data
 $ make lint | grep -c "result: pass"
 20
 $ make all SYNTH=1
@@ -168,7 +168,7 @@ run: gold/dataset_manifest, 12 datasets
 python3 pipeline/checks.py
 checks: run 01M2ZJ68ZR1KCD78GVFS23EVM4, {pass: 102, fail: 0, error: 0}
 python3 pipeline/publish.py
-publish: 5 files, 306033 bytes, manifest at /tmp/ibrain_verify/docs/data/manifest.json
+publish: 5 files, 306033 bytes, manifest at /tmp/ecog-lakehouse_verify/docs/data/manifest.json
 make all exit 0
 $ make test
 python3 -m pytest -q
@@ -177,11 +177,11 @@ python3 -m pytest -q
 make test exit 0
 $ git status --short
 $ du -sh $DATA_DIR/*
-218M	/tmp/ibrain_verify_data/bronze
-308K	/tmp/ibrain_verify_data/gold
-780K	/tmp/ibrain_verify_data/keyring.duckdb
-119M	/tmp/ibrain_verify_data/raw
-352M	/tmp/ibrain_verify_data/silver
+218M	/tmp/ecog-lakehouse_verify_data/bronze
+308K	/tmp/ecog-lakehouse_verify_data/gold
+780K	/tmp/ecog-lakehouse_verify_data/keyring.duckdb
+119M	/tmp/ecog-lakehouse_verify_data/raw
+352M	/tmp/ecog-lakehouse_verify_data/silver
 ```
 
 ## Phase 0 amendment, text, parse and relayer from the generator
@@ -212,17 +212,17 @@ $ du -sh $DATA_DIR/*
 
 - `lid_relayer` returning the native integer rather than `UUID` is the generator's contract, so this system wraps at five call sites. More verbose than the hand written macro it replaces, and it keeps one home for the bit work. Reversing that would mean the generator knowing a project's storage type, which it does not.
 - The range guard gap from the previous entry is still open. Ids SPEC rule 7 says every input field is range checked on encode; the Python target does it, the SQL targets do not, so `lid_encode` in DuckDB still wraps a value that is out of range instead of erroring. It belongs in `idgen`, not here.
-- The verifier reused `~/.venvs/ibrain`, whose editable install points at `/mnt/c/Prj/ibrain`. `pipeline/db.py` sets `REPO` from the `pipeline` module's own location, so `publish` wrote its manifest into the original checkout rather than the clone. The clone's data and checks were unaffected and the original repository stayed clean, but a verifier run is only truly isolated with a venv installed from the clone, as the previous entry did.
+- The verifier reused `~/.venvs/ecog-lakehouse`, whose editable install points at `/mnt/c/Prj/ecog-lakehouse`. `pipeline/db.py` sets `REPO` from the `pipeline` module's own location, so `publish` wrote its manifest into the original checkout rather than the clone. The clone's data and checks were unaffected and the original repository stayed clean, but a verifier run is only truly isolated with a venv installed from the clone, as the previous entry did.
 
 ### Verifier output
 
 ```
-$ git clone -q -b feat/lid-generated-macros /mnt/c/Prj/ibrain /tmp/ibrain_verify
+$ git clone -q -b feat/lid-generated-macros /mnt/c/Prj/ecog-lakehouse /tmp/ecog-lakehouse_verify
 $ git log --oneline | head -1
 d58cbcf refactor(lineage): take text, parse and relayer from the generated macros
 $ cmp sql/lineage/lid_generated.sql /mnt/c/Prj/arch-standards/ids/generated/lid/duckdb.sql && echo identical
 identical
-$ export DATA_DIR=/tmp/ibrain_verify_data
+$ export DATA_DIR=/tmp/ecog-lakehouse_verify_data
 $ ruff check .
 All checks passed!
 $ python scripts/lint_doc.py ... | grep -c "result: pass"
@@ -247,7 +247,7 @@ $ git status --short
 ### Pre-flight
 
 - `origin/master` at `747ea27`, `git status --short` empty, `make all SYNTH=1 && make test` rerun: exit 0, 55 passed.
-- `echo $DATA_DIR` prints nothing in a login shell; the Makefile exports `$(HOME)/data/ibrain` and every pipeline call went through `make` or an explicit export. Free under `$HOME`: 952 GB.
+- `echo $DATA_DIR` prints nothing in a login shell; the Makefile exports `$(HOME)/data/ecog-lakehouse` and every pipeline call went through `make` or an explicit export. Free under `$HOME`: 952 GB.
 - Sections 2, 3.4, 7 and 12 of the spec and plan phase 1 read after patch 0003.
 
 ### Source facts, from the repository and the files, not assumed
@@ -308,15 +308,15 @@ run: silver/050_event.sql
 run: line noise on 2433 records
 run: gold/dataset_manifest, 12 datasets
 checks: run 01M32SPQ2CVDTH7CNN3MS8WJYX, {'pass': 103, 'fail': 0, 'error': 0}
-publish: 5 files, 10883387 bytes, manifest at /home/bisonte/ibrain_verify/docs/data/manifest.json
+publish: 5 files, 10883387 bytes, manifest at /home/bisonte/ecog-lakehouse_verify/docs/data/manifest.json
 $ make test
 ....................................................................             [100%]
 68 passed in 10.76s
 $ git status --short
 $ du -sh $DATA_DIR/bronze $DATA_DIR/silver $DATA_DIR/gold
-5.6G    /home/bisonte/ibrain_verify_data/bronze
-8.5G    /home/bisonte/ibrain_verify_data/silver
-11M     /home/bisonte/ibrain_verify_data/gold
+5.6G    /home/bisonte/ecog-lakehouse_verify_data/bronze
+8.5G    /home/bisonte/ecog-lakehouse_verify_data/silver
+11M     /home/bisonte/ecog-lakehouse_verify_data/gold
 ```
 
 ## Phase 2, faults and bench

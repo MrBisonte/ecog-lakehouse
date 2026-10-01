@@ -60,10 +60,10 @@ Integrity is separate: sha256 per file, digest per dataset version. Click any nu
 
 Bench: same query, before and after, `read_ahead_depth = 0` versus default, remote URL.
 
-## 5. Demo, five minutes
+## 5. Walkthrough, five minutes
 
 ```
-brief on screen  →  page: evidence + tables  →  click a number: lineage  →  fault A live  →  one of D/F/G  →  close
+README on screen  →  page: evidence + tables  →  click a number: lineage  →  fault A live  →  one of D/F/G  →  close
 ```
 
 Browser for governance, DuckDB 2.0 CLI for the performance A/B, two README commands to reproduce.
