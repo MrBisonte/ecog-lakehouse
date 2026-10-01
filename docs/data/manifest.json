@@ -2,13 +2,13 @@
  "files": [
   {
    "path": "gold/channel_quality/data_0.parquet",
-   "bytes": 33085,
-   "sha256": "a48e17b817f547e82074de9663812cdb86256b4cc72415b269fc73fc79eb2f66"
+   "bytes": 34972,
+   "sha256": "bad96cfe9e4ffb70d609e85dade00566f690ecd7c445c8f2c328d0631559be4b"
   },
   {
    "path": "gold/dataset_manifest/data_0.parquet",
-   "bytes": 8076,
-   "sha256": "19d50c398bcc970b1cbdfc61e9d5d9a5692229600bd1b91f75fadd089be15970"
+   "bytes": 8154,
+   "sha256": "23a8a559c3a3896460321f9c42c6df5fdd2dbdea2f9b818c7fbf74c7c4f5d789"
   },
   {
    "path": "gold/evidence/run_id=01M3ASMJE3K0Z6SPQH2F7N6TJK/data_0.parquet",
@@ -19,6 +19,11 @@
    "path": "gold/evidence/run_id=01M3ATXEH51KEY8V5DR5M1J71T/data_0.parquet",
    "bytes": 10529,
    "sha256": "8968ac1ac545331540ad4f14c6f8352196246781b0be945eceeaa5b3d40ab03a"
+  },
+  {
+   "path": "gold/evidence/run_id=01M3WTDATJYQ57CY5YHT2D54NR/data_0.parquet",
+   "bytes": 10796,
+   "sha256": "df7d91508e75659b34e62c15bde9e33827b5a38e81586091c5bdbd8044c7876f"
   },
   {
    "path": "gold/experiment_summary/data_0.parquet",
@@ -46,5 +51,5 @@
    "sha256": "ca57b778302e8c5b48a23d6a6ddb47b2582c02323ae61642be8d25a3c39852c8"
   }
  ],
- "bytes": 139127362
+ "bytes": 139140123
 }
