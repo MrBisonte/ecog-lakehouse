@@ -1,7 +1,7 @@
 import duckdb
 import pytest
 
-from pipeline import db, keyring, synth
+from pipeline import convert_mat, db, keyring, synth
 from tests.conftest import CHANNELS, FILES, SECONDS
 
 SPEC_RECORDING = [
@@ -63,6 +63,15 @@ def test_files_are_sorted_by_lid_then_sample_idx_in_row_groups_under_the_limit(s
             f"FROM parquet_metadata('{f.as_posix()}')"
         ).fetchone()
         assert groups[0] >= 2 and groups[1] <= 200000, (f, groups)
+
+
+def test_scale_basis_says_whether_the_unit_scale_is_documented(silver):
+    assert set(convert_mat.SCALE_BASIS) == set(convert_mat.UV_PER_UNIT)
+    assert set(convert_mat.SCALE_BASIS.values()) <= {"documented", "assumed"}
+    assert convert_mat.SCALE_BASIS["faces_basic"] == "assumed"
+    assert silver.execute("SELECT DISTINCT scale_basis FROM silver_record").fetchall() == [
+        ("documented",)
+    ]
 
 
 def test_silver_lid_is_layer_2_child_of_a_bronze_record(silver):

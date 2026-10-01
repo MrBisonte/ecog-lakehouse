@@ -17,7 +17,7 @@ COPY (
     JOIN keyring.key_map k USING (subject_src)
     JOIN bronze_ingest_audit a USING (ingest_id)
     JOIN (SELECT lid, lid_parent(lid) AS bronze_lid FROM silver_record) s ON s.bronze_lid = r.lid
-    JOIN (VALUES {{unit_scale_values}}) u(experiment, uv_per_unit) ON u.experiment = r.experiment
+    JOIN (VALUES {{unit_scale_values}}) u(experiment, uv_per_unit, scale_basis) ON u.experiment = r.experiment
     WHERE r.experiment = '{{experiment}}' AND k.subject_pid = '{{subject_pid}}'
       AND NOT isnan(r.value_raw)
     ORDER BY s.lid, r.sample_idx

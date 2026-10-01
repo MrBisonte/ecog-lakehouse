@@ -9,7 +9,7 @@
 -- and the join to the scan is planned against that. See docs/lessons-learned.md.
 COPY (
     WITH kept AS (
-        SELECT lid, experiment, subject_pid, run, channel_idx, n_samples_src
+        SELECT lid, experiment, subject_pid, run, channel_idx, n_samples_src, scale_basis
         FROM silver_record
         WHERE lid_radioactive(lid_from_uuid(lid)) = 0
     ),
@@ -55,6 +55,7 @@ COPY (
         q.clipped_pct,
         q.clipped_own_pct,
         n.line_noise_ratio::FLOAT AS line_noise_ratio,
+        k.scale_basis,
         lid_to_uuid(lid_relayer(lid_from_uuid(q.lid), 2)) AS lid
     FROM q
     JOIN kept k USING (lid)

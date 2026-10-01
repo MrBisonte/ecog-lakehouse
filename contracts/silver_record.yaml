@@ -38,7 +38,17 @@ schema:
         physicalType: BIGINT
         required: true
         description: Source samples of the record in Bronze, NaN included.
+      - name: scale_basis
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: documented when the experiment's README states microvolts per unit, assumed when the scale is taken from the other experiments.
     quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: sql
+          params: {"sql": "SELECT 1 FROM silver_record WHERE scale_basis NOT IN ('documented', 'assumed')"}
       - type: custom
         engine: ecog-lakehouse
         implementation:
