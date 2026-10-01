@@ -1,6 +1,6 @@
 # Architecture decision records
 
-One decision per file, numbered, immutable once accepted. Next number: ADR-0005.
+One decision per file, numbered, immutable once accepted. Next number: ADR-0007.
 
 | ADR | Decision | Status |
 |---|---|---|
@@ -8,3 +8,5 @@ One decision per file, numbered, immutable once accepted. Next number: ADR-0005.
 | 0002 | A PHI zone with pseudonymisation at the Silver boundary | proposed |
 | 0003 | Governance as code, with validation evidence as a build artefact | proposed |
 | 0004 | A decodable lineage identifier on every record | proposed |
+| 0005 | NWB input and export through an optional dependency | proposed |
+| 0006 | A hand-written check generator | accepted |
