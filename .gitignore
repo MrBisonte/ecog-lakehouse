@@ -7,6 +7,10 @@
 !CLAUDE.md
 !Makefile
 !pyproject.toml
+!CITATION.cff
+!REUSE.toml
+!LICENSES/*.txt
+!sbom.cdx.json
 !doc/**/*.md
 !adr/*.md
 !pipeline/**/*.py
