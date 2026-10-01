@@ -500,3 +500,34 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 - A check of line endings reported every file as CRLF; all five were LF. The first run of the edit script wrote CRLF into four of them, caught by `file` and the diff stat, restored from HEAD and rerun with LF.
 - The first `sbom.cdx.json` listed the REUSE linter and its dependencies, present in the working environment for the check. Regenerated from a clean environment.
+
+## Own rails and scale basis, 2026-10-02
+
+- Status: done, branch `feat/gold-own-rails-and-scale-basis`, off master after the merge of #23
+- Alex's decisions: two columns for the rails; for the `faces_basic` unit scale, look it up first, then flag per subject
+
+### Found
+
+- The `faces_basic` notes state no microvolts per unit. The 2016 paper, read on the publisher's page, names Synamps2 amplifiers, a 0.15 to 200 Hz filter and 1000 Hz, the same as the other experiments, and states no scale either. The 2019 library paper is behind a login and was not read.
+- Nothing documented to cite, so the 0.0298 of the other two experiments stays, and the rows now say that it is assumed.
+
+### Changed
+
+- `gold/channel_quality.clipped_own_pct`: the share of samples at the record's own extremes, beside `clipped_pct` against the run's rails. The commit parked since 2026-09-24, cherry-picked onto master; the two conflicts were a line ending change in `doc/spec.md` and the unit labels added to the page query.
+- `scale_basis` on `silver/record` and `gold/channel_quality`: `documented` or `assumed`, from `convert_mat.SCALE_BASIS`, joined in through the same VALUES list as the scale itself. One contract rule per dataset rejects any other value.
+- `docs/index.html`: both columns in the channel quality table.
+- `docs/data`: Gold rebuilt on the real data and republished.
+
+### Checked
+
+- The new test failed before the code and passes after: 80 tests. `make lint` green.
+- Real data: Silver 227 s, Gold 85 s, checks 143 s. 111 checks, 108 pass, 0 blocking; the 3 failing flags are the same three as before, 101 of 2,241 channels outside 1 to 1000 microvolts, 48 at or above 0.5 line noise, 1 subject of 42 outside the event rate band.
+- Published `gold/channel_quality`: 714 records `assumed`, all `faces_basic`; 1,527 `documented`, 484 `fingerflex` and 1,043 `motor_basic`.
+- Of the 101 records outside 1 to 1000 microvolts, 94 are `assumed` and 7 are `documented`. The flag that looked like noise is mostly the undocumented scale.
+- `clipped_pct` is 0 for 2,019 of 2,241 records, 633 + 467 + 919; `clipped_own_pct` is never 0 and reaches 1 percent or more in 69 records, 56 of them `faces_basic`.
+- `make publish`: 10 files, 139,140,123 bytes.
+
+### Not checked
+
+- The page in a browser against the new files. It is checked on Pages after the merge.
+- `docs/bench.md` was not regenerated; its row counts are unchanged, its build time is the earlier build's.
