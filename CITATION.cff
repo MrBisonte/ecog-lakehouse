@@ -1,0 +1,140 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, cite it as below. If you use the published data under
+  docs/data, cite the dataset and the papers listed under references, and carry the
+  ethics statement reproduced in docs/data/LICENSE.md without modification.
+type: software
+title: "ecog-lakehouse: a governed lakehouse over public ECoG recordings"
+abstract: >-
+  Recordings from the Stanford ECoG library stored in three layers on Parquet, with data
+  contracts, checks generated from a regulatory requirements table, a decodable lineage
+  identifier on every record, four planted performance faults with their fixes and
+  benchmarks, and a static page that reruns the checks in the browser with DuckDB-WASM.
+authors:
+  - family-names: Monteiro
+    given-names: Alexandre
+repository-code: "https://github.com/MrBisonte/ecog-lakehouse"
+url: "https://mrbisonte.github.io/ecog-lakehouse/"
+license: MIT
+version: 0.0.1
+keywords:
+  - lakehouse
+  - data governance
+  - data contracts
+  - data lineage
+  - DuckDB
+  - Parquet
+  - electrocorticography
+references:
+  - type: data
+    title: "A library of human electrocorticographic data and analyses"
+    authors:
+      - family-names: Miller
+        given-names: Kai Joshua
+    year: 2016
+    publisher:
+      name: Stanford Digital Repository
+    url: "https://purl.stanford.edu/zk881ps0522"
+    license: CC-BY-SA-4.0
+    notes: "Source of every recording. Experiments used: fingerflex, motor_basic, faces_basic."
+  - type: article
+    title: "A library of human electrocorticographic data and analyses"
+    authors:
+      - family-names: Miller
+        given-names: Kai J.
+    journal: Nature Human Behaviour
+    year: 2019
+    volume: 3
+    start: 1225
+    end: 1235
+    doi: 10.1038/s41562-019-0678-3
+  - type: article
+    title: "Human motor cortical activity is selectively phase-entrained on underlying rhythms"
+    authors:
+      - family-names: Miller
+        given-names: Kai J.
+      - family-names: Hermes
+        given-names: Dora
+      - family-names: Honey
+        given-names: Christopher J.
+      - family-names: Hebb
+        given-names: Adam O.
+      - family-names: Ramsey
+        given-names: Nick F.
+      - family-names: Knight
+        given-names: Robert T.
+      - family-names: Ojemann
+        given-names: Jeffrey G.
+      - family-names: Fetz
+        given-names: Eberhard E.
+    journal: PLoS Computational Biology
+    year: 2012
+    volume: 8
+    issue: 9
+    doi: 10.1371/journal.pcbi.1002655
+    notes: "Experiment fingerflex."
+  - type: article
+    title: "Spectral changes in cortical surface potentials during motor movement"
+    authors:
+      - family-names: Miller
+        given-names: Kai J.
+      - family-names: Leuthardt
+        given-names: Eric C.
+      - family-names: Schalk
+        given-names: Gerwin
+      - family-names: Rao
+        given-names: Rajesh P. N.
+      - family-names: Anderson
+        given-names: Nicholas R.
+      - family-names: Moran
+        given-names: Daniel W.
+      - family-names: Miller
+        given-names: John W.
+      - family-names: Ojemann
+        given-names: Jeffrey G.
+    journal: Journal of Neuroscience
+    year: 2007
+    volume: 27
+    issue: 9
+    start: 2424
+    end: 2432
+    doi: 10.1523/JNEUROSCI.3886-06.2007
+    notes: "Experiment motor_basic."
+  - type: article
+    title: "Spontaneous decoding of the timing and content of human object perception from cortical surface recordings reveals complementary information in the event-related potential and broadband spectral change"
+    authors:
+      - family-names: Miller
+        given-names: Kai J.
+      - family-names: Schalk
+        given-names: Gerwin
+      - family-names: Hermes
+        given-names: Dora
+      - family-names: Ojemann
+        given-names: Jeffrey G.
+      - family-names: Rao
+        given-names: Rajesh P. N.
+    journal: PLoS Computational Biology
+    year: 2016
+    volume: 12
+    issue: 1
+    doi: 10.1371/journal.pcbi.1004660
+    notes: "Experiment faces_basic."
+  - type: article
+    title: "Automatic parcellation of human cortical gyri and sulci using standard anatomical nomenclature"
+    authors:
+      - family-names: Destrieux
+        given-names: Christophe
+      - family-names: Fischl
+        given-names: Bruce
+      - family-names: Dale
+        given-names: Anders
+      - family-names: Halgren
+        given-names: Eric
+    journal: NeuroImage
+    year: 2010
+    volume: 53
+    issue: 1
+    start: 1
+    end: 15
+    doi: 10.1016/j.neuroimage.2010.06.010
+    notes: "Anatomical labels of the faces_basic electrodes."

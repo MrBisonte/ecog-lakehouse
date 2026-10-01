@@ -1,4 +1,4 @@
-.PHONY: all fetch synth bronze silver gold checks publish bench test lint lineage
+.PHONY: all fetch synth bronze silver gold checks publish bench test lint lineage sbom
 PY ?= python3
 SYNTH ?= 0
 ARCH_STANDARDS ?= ../arch-standards
@@ -39,3 +39,7 @@ lineage:
 
 lint:
 	ruff check . && $(PY) scripts/lint_doc.py README.md CLAUDE.md doc/*.md doc/agent/*.md adr/*.md docs/*.md
+
+# CycloneDX 1.6 bill of materials of the installed environment, the project as root component.
+sbom:
+	cyclonedx-py environment --pyproject pyproject.toml --mc-type application --sv 1.6 --of JSON --output-reproducible -o sbom.cdx.json

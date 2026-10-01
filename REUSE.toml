@@ -1,0 +1,20 @@
+version = 1
+SPDX-PackageName = "ecog-lakehouse"
+SPDX-PackageSupplier = "Alexandre Monteiro"
+SPDX-PackageDownloadLocation = "https://github.com/MrBisonte/ecog-lakehouse"
+
+# Everything in the repository is the author's own work under MIT, except the published
+# data. When two annotations match a file, the later one applies.
+[[annotations]]
+path = "**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Alexandre Monteiro"
+SPDX-License-Identifier = "MIT"
+
+# docs/data is derived from the Stanford ECoG library, CC BY-SA 4.0, share alike.
+# Attribution, citations and the ethics statement are in docs/data/LICENSE.md.
+[[annotations]]
+path = "docs/data/**"
+precedence = "override"
+SPDX-FileCopyrightText = ["2016 Kai Joshua Miller, source recordings", "2026 Alexandre Monteiro, derived tables"]
+SPDX-License-Identifier = "CC-BY-SA-4.0"
