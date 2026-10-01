@@ -1,4 +1,5 @@
--- silver/recording, spec 3.2 and 12.2. Microvolts, milliseconds, pseudonyms, NaN dropped.
+-- silver/recording, spec 3.2 and 12.2. Microvolts, milliseconds, pseudonyms. A sample
+-- that is NULL in Bronze, a NaN in the source, is dropped.
 -- Executed once per (experiment, subject_pid) partition by pipeline/run.py: DuckDB 1.5's
 -- partitioned COPY does not keep the ORDER BY across its buffer flushes, a plain COPY does.
 -- Sorted by lid, sample_idx inside the file. Row groups of at most 200,000 rows: DuckDB
@@ -19,7 +20,7 @@ COPY (
     JOIN (SELECT lid, lid_parent(lid) AS bronze_lid FROM silver_record) s ON s.bronze_lid = r.lid
     JOIN (VALUES {{unit_scale_values}}) u(experiment, uv_per_unit, scale_basis) ON u.experiment = r.experiment
     WHERE r.experiment = '{{experiment}}' AND k.subject_pid = '{{subject_pid}}'
-      AND NOT isnan(r.value_raw)
+      AND r.value_raw IS NOT NULL AND NOT isnan(r.value_raw)
     ORDER BY s.lid, r.sample_idx
 ) TO '{{data_dir}}/silver/recording/experiment={{experiment}}/subject_pid={{subject_pid}}/data_0.parquet'
 (FORMAT parquet, ROW_GROUP_SIZE 198656);

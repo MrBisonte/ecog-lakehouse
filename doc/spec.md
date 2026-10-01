@@ -80,7 +80,7 @@ Partition: `experiment=<experiment>/subject_src=<code>/ingest_id=<id>/`.
 - `run` is the recording run within the experiment for that subject, starting at 1. Not NULL.
 - `channel_idx` is the zero-based electrode index in the source array. Not NULL.
 - `sample_idx` is the zero-based sample position at the source sampling rate. Not NULL. Timestamp in milliseconds is `sample_idx * 1000 / sample_rate_hz` and is derived in Silver, not stored here.
-- `value_raw` is the amplifier value as stored in the file, in the file's units. Not NULL.
+- `value_raw` is the amplifier value as stored in the file, in the file's units. NULL where the file holds NaN: DuckDB reads NaN from the source array as NULL. The row is kept.
 - `ingest_id` is a ULID assigned per conversion run. Not NULL. References `bronze/ingest_audit.ingest_id`.
 - `lid` is the Bronze-layer lineage identifier of the record (layer 1, see section 12), computed at conversion time from the file's `ingest_ord`, `run` and `channel_idx`. Not NULL. Bronze is the first layer that carries it, so the chain is unbroken from the ingested file downward: `lid_trace` on a Bronze row returns the source path, the source URL at the Stanford repository and the sha256 recorded in `bronze/ingest_audit`.
 
@@ -185,7 +185,7 @@ Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file
 | sample_idx | INTEGER |
 
 - `ts_ms` is milliseconds from the start of the run. Not NULL.
-- `value_uv` is the value in microvolts after the adapter's unit conversion. NULL is not allowed; a source NaN is dropped and counted in `gold/channel_quality.missing_samples`.
+- `value_uv` is the value in microvolts after the adapter's unit conversion. NULL is not allowed; a source NaN, NULL in Bronze, is dropped and counted in `gold/channel_quality.missing_samples`.
 - `lid` is the layer 2 identifier of the sample's record (section 12.2). Not NULL. References `silver/record.lid`.
 - `sample_idx` is the source sample position, kept so a Gold row can name its sample range. Not NULL.
 
