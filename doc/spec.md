@@ -201,9 +201,11 @@ One row per record, that is one channel of one run of one ingested file. Not par
 | run | SMALLINT |
 | channel_idx | SMALLINT |
 | n_samples_src | BIGINT |
+| scale_basis | VARCHAR |
 
 - `lid` is the Bronze record's identifier with the layer set to 2. Not NULL, unique.
 - `n_samples_src` is the number of source samples of the record in Bronze, NaN included, so that `gold/channel_quality.missing_samples` is derived from Silver alone. Not NULL.
+- `scale_basis` is `documented` when the experiment's README states microvolts per unit, `assumed` when the adapter takes the scale of the other experiments, as for `faces_basic`. Not NULL.
 
 `silver/electrode` and `silver/event` mirror their Bronze tables with `subject_src` replaced by `subject_pid`, `sample_idx` replaced by `ts_ms`, and `ingest_id` removed.
 
@@ -213,13 +215,14 @@ Gold is the enterprise model for consumers. Everything here is a query result.
 
 | Dataset | Grain | Columns |
 |---|---|---|
-| `gold/channel_quality` | experiment, subject_pid, run, channel_idx | `n_samples BIGINT, missing_samples BIGINT, rms_uv FLOAT, clipped_pct FLOAT, clipped_own_pct FLOAT, line_noise_ratio FLOAT` |
+| `gold/channel_quality` | experiment, subject_pid, run, channel_idx | `n_samples BIGINT, missing_samples BIGINT, rms_uv FLOAT, clipped_pct FLOAT, clipped_own_pct FLOAT, line_noise_ratio FLOAT, scale_basis VARCHAR` |
 | `gold/experiment_summary` | experiment, subject_pid | `n_runs SMALLINT, n_channels SMALLINT, duration_s FLOAT, n_events INTEGER` |
 | `gold/feature_window` | experiment, subject_pid, run, channel_idx, window_start_ms | `mean_uv FLOAT, std_uv FLOAT, p2p_uv FLOAT` over 1,000 ms windows |
 | `gold/evidence` | run_id, check_id | see section 5 |
 | `gold/dataset_manifest` | dataset_version | `dataset VARCHAR, layer TINYINT, lid_lo UUID, lid_hi UUID, n_records BIGINT, file_digests VARCHAR[], produced_at TIMESTAMP, git_commit VARCHAR` |
 
 - `clipped_pct` is the share of samples at the amplifier's minimum or maximum, in percent. The files carry no amplifier range, so the rails are the observed extremes of the run: the hardware reading, one rail for every channel of the run.
+- `scale_basis` is copied from `silver/record`: `rms_uv` of a record marked `assumed` rests on a scale its source does not state.
 - `clipped_own_pct` is the same share against the record's own extremes: the signal reading, how flat one channel is at its own top. Every record has at least one sample at each extreme, so it is never zero. Both columns come from the same pass over Silver.
 - `gold/dataset_manifest` has one row per dataset per build. `dataset_version` is the same digest `gold/evidence` uses; `lid_lo` and `lid_hi` bound the records included; `file_digests` lists the source sha256 values. This is the handle a model registry or a submission package holds to say exactly which data it was built on: one row, and every record and file it covers can be enumerated with `lid_children` and `lineage_dim`.
 - `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per channel in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.

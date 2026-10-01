@@ -52,12 +52,22 @@ schema:
         physicalType: FLOAT
         required: false
         description: NULL when the record has under 10 s of samples.
+      - name: scale_basis
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: documented when the experiment's README states microvolts per unit, assumed when the scale is taken from the other experiments.
       - name: lid
         logicalType: string
         physicalType: UUID
         required: true
         unique: true
     quality:
+      - type: custom
+        engine: ecog-lakehouse
+        implementation:
+          check_kind: sql
+          params: {"sql": "SELECT 1 FROM gold_channel_quality WHERE scale_basis NOT IN ('documented', 'assumed')"}
       - type: custom
         engine: ecog-lakehouse
         implementation:

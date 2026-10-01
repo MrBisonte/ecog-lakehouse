@@ -24,6 +24,9 @@ TOOL = "convert_mat.py"
 # Microvolts per raw amplifier unit, per experiment. Silver applies it; Bronze stays raw.
 # Stanford values come from each experiment's README_<experiment>_dataset_notes.
 UV_PER_UNIT = {"fingerflex": 0.0298, "motor_basic": 0.0298, "faces_basic": 0.0298}
+# Where each scale comes from: `documented` in the experiment's own README, `assumed` from
+# the other experiments. Carried on silver/record and gold/channel_quality as scale_basis.
+SCALE_BASIS = {"fingerflex": "documented", "motor_basic": "documented", "faces_basic": "assumed"}
 
 STANFORD_URL = "https://stacks.stanford.edu/file/druid:zk881ps0522/{experiment}.zip"
 STANFORD_SAMPLE_RATE_HZ = 1000  # manuscript, Methods: "sampled at 1000 Hz", every experiment
