@@ -97,6 +97,22 @@ What the numbers say:
 
 Decision pending: the spec defines rails per run, so A stayed. Switching to B is one SQL change plus one spec line, and a verifier rerun.
 
+### Remeasured, 2026-10-02
+
+The gap does not reproduce. Same SQL for A as on 2026-09-21, same engine, DuckDB 1.5.5, 12 threads, results into temp tables on one connection, the two variants interleaved:
+
+| Variant | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|
+| A, rails per run | 7.1 s | 6.9 s | 7.8 s |
+| B, own extremes | 7.1 s | 9.1 s | 6.9 s |
+
+- Agreement is as before: 2,241 records, `n` and `rms` identical, `clipped_pct` differing on 2,107.
+- `EXPLAIN ANALYZE` shows the same shape for both: the 859,640,120 row scan is the probe side, the build side has 2,241 rows, and A's two extra joins handle 2,241 and 42 rows in 0.00 s. There is nothing in A's plan to cost 30 s.
+- So the 33 to 40 s of A was the state of the machine, not the query. The likeliest cause is the one the third bullet above already names: 8.5 GB of Silver in a 15 GB VM, measured in the hours after the out of memory runs, with A timed first. That cannot be proven after the fact, and it is not claimed. Section 5 already had the committed query at 6.2 s and 6.3 s on 2026-09-25, and nobody set that beside the 33 s above.
+- The decision is no longer pending: both readings are in the mart since #25, `clipped_pct` from A and `clipped_own_pct` from B, in one pass.
+
+Lesson: a timing that surprises gets rerun in a fresh process, interleaved with its rival, before it is written down as a finding. A four times gap between two plans of the same shape was a measurement to doubt, and it stood in this page for eleven days.
+
 ## 4. What is in place now
 
 | Piece | Where | Why |
@@ -130,12 +146,12 @@ Each row is two runs on the rebuilt lakehouse, DuckDB 1.5.5, 12.1 GB limit, resu
 5. **Compare on equal footing.** Cold then warm in sequence flatters the second query. Repeat, alternate, and report the spread.
 6. **A failed write is a state, handle it.** Zero byte files and stale spill directories broke the next run twice. The pipeline now cleans what it can and puts the rest where the spec says.
 7. **Know the machine.** `/tmp` as tmpfs, a clock that jumps when the host sleeps, a mount that reports ENOMEM on a temp file: none of these were in the plan and all three cost a run.
-8. **Write the definition down before optimising it.** B is faster because it computes something else. The spec's rails per run is the reason A is still in place, and the reason the choice is Alex's, not the optimizer's.
+8. **Write the definition down before optimising it.** B computes something else, and its speed was a measurement artefact, section 3. The spec's rails per run is the reason A stayed, and the reason the choice was Alex's, not the optimizer's. Both readings are in the mart now.
 
 ## 7. Addendum, the same faults against GitHub Pages
 
 The tables in section 3 were loopback. With Pages on and `BASE_URL` pointing at it, three things changed the picture.
 
 - **The CDN lies about identity.** Pages returned `6ab394b5-385b0b5` for a file from one Fastly edge and `6ab394b4-385b0b5` from another. DuckDB pins the first ETag with If-Match, the next range request lands on the other edge, 412. The read that worked on loopback failed on the real host. `unsafe_disable_etag_checks` is the documented way through, and the sha256 in the manifest is the integrity check that remains. Lesson: a correctness check inside the client can fail on infrastructure the client does not control; know which check you are relying on.
-- **Fault A inverted.** Loopback showed no gap; Pages showed the partitioned layout slower, 2.7 s against 1.0 s, because 38 row groups are 38 round trips. The layout is still right for the range retrieval that `lid_children` does, and still what the partition_layout check demands, but the "faster aggregate" claim needs a file big enough for parallel streams to beat request latency. Lesson: measure the claim on the network it will be made on, and write down the one that did not hold.
+- **Fault A inverted.** Loopback showed no gap; Pages showed the partitioned layout slower, 2.7 s against 1.0 s. The first explanation written here, 38 row groups are 38 round trips, was a guess. Measured on 2026-10-02, it is bytes: the aggregate needs two columns, about 17 MB in either layout; from the single row group DuckDB fetched 21.5 MiB in 11 requests, from the 38 row groups it fetched 72.7 MiB in 38, every row group whole, the file's full size. The partitioned files are also 47 percent larger, 76.3 MB against 52.0 MB: `ts_ms` and `sample_idx` take 28.9 MB each where the single row group stores each in 17.0 MB, because one dictionary over 7.2 million rows compresses what a dictionary per 198,656 sorted rows cannot. The same day, the retrieval the layout exists for, one record by `lid`: 0.65 s, 5 requests and 6.7 MiB partitioned, against 1.71 s, 10 requests and 19.5 MiB from the single row group. Partitioning pays when a predicate prunes row groups, and costs when the query reads every row. The layout is still right for the range retrieval that `lid_children` does, and still what the partition_layout check demands, but the "faster aggregate" claim needs a file big enough for parallel streams to beat request latency. Lesson: measure the claim on the network it will be made on, and write down the one that did not hold.
 - **Fault D and F held.** 5.1 s against 0.3 s for the download loop; 0 of 10 against 10 of 10 without and with retries. The stories that are about request count and failure handling survive real latency; the one about parallel streams did not at this size.
