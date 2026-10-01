@@ -169,6 +169,8 @@ Check kinds and their params:
 
 `dataset` may be a glob such as `gold/*`. The generator refuses SQL that does not parse and predicates nested deeper than 32 levels.
 
+One rule followed from its row to its evidence: [ADR-0006](../adr/ADR-0006.md).
+
 ## 8. Show it in five minutes
 
 | Minute | Say | Run |
