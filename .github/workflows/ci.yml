@@ -12,9 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      # Data stays outside the checkout, as on a workstation.
-      DATA_DIR: ${{ runner.temp }}/ecog-lakehouse
+    # DATA_DIR is the Makefile default, $HOME/data/ecog-lakehouse, outside the checkout.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
