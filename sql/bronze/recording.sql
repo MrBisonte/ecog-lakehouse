@@ -1,4 +1,5 @@
--- bronze/recording, spec 3.1. One row per sample, raw units, NaN kept.
+-- bronze/recording, spec 3.1. One row per sample, raw units. A source NaN
+-- arrives as NULL: DuckDB reads NaN from the numpy array as NULL. The row is kept.
 -- The lid is computed once per record (channel) and joined, not once per sample.
 COPY (
     SELECT

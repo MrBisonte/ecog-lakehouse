@@ -2,6 +2,8 @@
 
 Five records enter as samples in a `.mat` file and travel to Gold, evidence and the published copy. This page shows their complete tuples at every stage, so the lineage identifier can be watched changing while everything else stays put. Every value is a query result from one build of the synthetic data; digests, paths and commits are cut to their first characters for width, the full values sit in the tables they came from.
 
+The result tables are that build, of 2026-09-20. The folded SQL is the source as it stands today, and a test keeps it so. Three columns were added after the build and are in the SQL but not in the tables: `scale_basis` on `silver/record`, `clipped_own_pct` and `scale_basis` on `gold/channel_quality`. The unit scale of the synthetic files was 0.1 in that build.
+
 Each transformation has its source SQL folded under the paragraph that introduces its result, click the line to open it. Closed, the page is data and flow only.
 
 ## 0. Who travels
@@ -139,7 +141,8 @@ Samples, one row each, in the file's own units, with the source subject code and
 <summary>sql/bronze/recording.sql</summary>
 
 ```sql
--- bronze/recording, spec 3.1. One row per sample, raw units, NaN kept.
+-- bronze/recording, spec 3.1. One row per sample, raw units. A source NaN
+-- arrives as NULL: DuckDB reads NaN from the numpy array as NULL. The row is kept.
 -- The lid is computed once per record (channel) and joined, not once per sample.
 COPY (
     SELECT
@@ -296,7 +299,8 @@ One `silver/record` row per record, the lineage dimension. The loader validates 
 -- silver/record, spec 12.2. One row per record (file, run, channel), the lineage dimension
 -- of Silver. The lid is the Bronze lid with the layer set to 2, validated on the way.
 -- n_samples_src counts source samples including NaN, so Gold derives missing_samples from
--- Silver alone.
+-- Silver alone. scale_basis says whether the experiment's microvolt scale is documented in
+-- its own README or assumed from the other experiments.
 COPY (
     SELECT
         lid_to_uuid(lid_relayer(lid_from_uuid(r.lid), 1)) AS lid,
@@ -304,9 +308,12 @@ COPY (
         k.subject_pid,
         r.run,
         r.channel_idx,
-        count(*)::BIGINT AS n_samples_src
+        count(*)::BIGINT AS n_samples_src,
+        u.scale_basis
     FROM bronze_recording r
     JOIN keyring.key_map k USING (subject_src)
+    JOIN (VALUES {{unit_scale_values}}) u(experiment, uv_per_unit, scale_basis)
+        ON u.experiment = r.experiment
     GROUP BY ALL
     ORDER BY 1
 ) TO '{{data_dir}}/silver/record/data_0.parquet' (FORMAT parquet);
@@ -350,7 +357,8 @@ The same two samples in `silver/recording`: microvolts (raw times 0.1), millisec
 <summary>sql/silver/030_recording.sql</summary>
 
 ```sql
--- silver/recording, spec 3.2 and 12.2. Microvolts, milliseconds, pseudonyms, NaN dropped.
+-- silver/recording, spec 3.2 and 12.2. Microvolts, milliseconds, pseudonyms. A sample
+-- that is NULL in Bronze, a NaN in the source, is dropped.
 -- Executed once per (experiment, subject_pid) partition by pipeline/run.py: DuckDB 1.5's
 -- partitioned COPY does not keep the ORDER BY across its buffer flushes, a plain COPY does.
 -- Sorted by lid, sample_idx inside the file. Row groups of at most 200,000 rows: DuckDB
@@ -369,9 +377,9 @@ COPY (
     JOIN keyring.key_map k USING (subject_src)
     JOIN bronze_ingest_audit a USING (ingest_id)
     JOIN (SELECT lid, lid_parent(lid) AS bronze_lid FROM silver_record) s ON s.bronze_lid = r.lid
-    JOIN (VALUES {{unit_scale_values}}) u(experiment, uv_per_unit) ON u.experiment = r.experiment
+    JOIN (VALUES {{unit_scale_values}}) u(experiment, uv_per_unit, scale_basis) ON u.experiment = r.experiment
     WHERE r.experiment = '{{experiment}}' AND k.subject_pid = '{{subject_pid}}'
-      AND NOT isnan(r.value_raw)
+      AND r.value_raw IS NOT NULL AND NOT isnan(r.value_raw)
     ORDER BY s.lid, r.sample_idx
 ) TO '{{data_dir}}/silver/recording/experiment={{experiment}}/subject_pid={{subject_pid}}/data_0.parquet'
 (FORMAT parquet, ROW_GROUP_SIZE 198656);
@@ -463,44 +471,66 @@ The marts read Silver and refuse any record whose identifier carries the canary 
 
 ```sql
 -- gold/channel_quality, spec 3.3. One row per record. Silver carries no amplifier range, so
--- the rails for clipped_pct are the observed extremes of value_uv within the run.
+-- the rails for clipped_pct are the observed extremes of value_uv within the run, the hardware
+-- reading; clipped_own_pct measures each record against its own extremes, the signal reading.
 -- missing_samples is the record's source sample count minus the samples present in Silver.
 -- Canary records (radioactive bit, spec 12.5) never enter a Gold mart.
+-- The rails come from the first pass, not from a second aggregate over every sample row.
+-- An aggregate computed in the same statement carries no row count: grouping all 871 million
+-- rows by experiment, subject_pid and run returns 45 rows, the planner estimates 907 million,
+-- and the join to the scan is planned against that. See docs/lessons-learned.md.
 COPY (
-    WITH rails AS (
-        SELECT experiment, subject_pid, run, min(value_uv) AS lo, max(value_uv) AS hi
+    WITH kept AS (
+        SELECT lid, experiment, subject_pid, run, channel_idx, n_samples_src, scale_basis
+        FROM silver_record
+        WHERE lid_radioactive(lid_from_uuid(lid)) = 0
+    ),
+    extremes AS (
+        SELECT lid, min(value_uv) AS lo, max(value_uv) AS hi
         FROM silver_recording
+        WHERE lid IN (SELECT lid FROM kept)
+        GROUP BY lid
+    ),
+    rails AS (
+        SELECT k.experiment, k.subject_pid, k.run, min(e.lo) AS lo, max(e.hi) AS hi
+        FROM extremes e
+        JOIN kept k USING (lid)
         GROUP BY ALL
+    ),
+    rails_by_lid AS (
+        SELECT k.lid, r.lo, r.hi
+        FROM kept k
+        JOIN rails r USING (experiment, subject_pid, run)
     ),
     q AS (
         SELECT
-            r.experiment,
-            r.subject_pid,
-            r.run,
-            r.channel_idx,
             r.lid,
             count(*)::BIGINT AS n_samples,
             sqrt(avg(r.value_uv * r.value_uv))::FLOAT AS rms_uv,
-            (100.0 * count(*) FILTER (WHERE r.value_uv = rails.lo OR r.value_uv = rails.hi)
-                / count(*))::FLOAT AS clipped_pct
+            (100.0 * count(*) FILTER (WHERE r.value_uv = b.lo OR r.value_uv = b.hi)
+                / count(*))::FLOAT AS clipped_pct,
+            (100.0 * count(*) FILTER (WHERE r.value_uv = e.lo OR r.value_uv = e.hi)
+                / count(*))::FLOAT AS clipped_own_pct
         FROM silver_recording r
-        JOIN rails USING (experiment, subject_pid, run)
-        WHERE r.lid IN (SELECT lid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 0)
-        GROUP BY ALL
+        JOIN rails_by_lid b USING (lid)
+        JOIN extremes e USING (lid)
+        GROUP BY r.lid
     )
     SELECT
-        q.experiment,
-        q.subject_pid,
-        q.run,
-        q.channel_idx,
+        k.experiment,
+        k.subject_pid,
+        k.run,
+        k.channel_idx,
         q.n_samples,
-        (s.n_samples_src - q.n_samples)::BIGINT AS missing_samples,
+        (k.n_samples_src - q.n_samples)::BIGINT AS missing_samples,
         q.rms_uv,
         q.clipped_pct,
+        q.clipped_own_pct,
         n.line_noise_ratio::FLOAT AS line_noise_ratio,
+        k.scale_basis,
         lid_to_uuid(lid_relayer(lid_from_uuid(q.lid), 2)) AS lid
     FROM q
-    JOIN silver_record s USING (lid)
+    JOIN kept k USING (lid)
     LEFT JOIN line_noise n USING (lid)
     ORDER BY 1, 2, 3, 4
 ) TO '{{data_dir}}/gold/channel_quality/data_0.parquet' (FORMAT parquet);
@@ -538,23 +568,42 @@ GROUP BY 1, 2
 ```sql
 -- gold/feature_window, spec 3.3 and 12.2. One row per record and 1,000 ms window, with the
 -- window's source sample range inside the record. Canary records (spec 12.5) are left out.
+-- The pass over silver/recording groups by lid and window only; the partition strings come
+-- from silver/record afterwards, one row per record (see 010_channel_quality.sql).
 COPY (
+    WITH kept AS (
+        SELECT lid, experiment, subject_pid, run, channel_idx
+        FROM silver_record
+        WHERE lid_radioactive(lid_from_uuid(lid)) = 0
+    ),
+    windows AS (
+        SELECT
+            lid,
+            (ts_ms // 1000 * 1000)::INTEGER AS window_start_ms,
+            avg(value_uv)::FLOAT AS mean_uv,
+            stddev_pop(value_uv)::FLOAT AS std_uv,
+            (max(value_uv) - min(value_uv))::FLOAT AS p2p_uv,
+            min(sample_idx)::INTEGER AS sample_lo,
+            max(sample_idx)::INTEGER AS sample_hi
+        FROM silver_recording
+        WHERE lid IN (SELECT lid FROM kept)
+        GROUP BY lid, window_start_ms
+    )
     SELECT
-        experiment,
-        subject_pid,
-        run,
-        channel_idx,
-        (ts_ms // 1000 * 1000)::INTEGER AS window_start_ms,
-        avg(value_uv)::FLOAT AS mean_uv,
-        stddev_pop(value_uv)::FLOAT AS std_uv,
-        (max(value_uv) - min(value_uv))::FLOAT AS p2p_uv,
-        lid_to_uuid(lid_relayer(lid_from_uuid(lid), 2)) AS lid,
-        min(sample_idx)::INTEGER AS sample_lo,
-        max(sample_idx)::INTEGER AS sample_hi
-    FROM silver_recording
-    WHERE lid IN (SELECT lid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 0)
-    GROUP BY experiment, subject_pid, run, channel_idx, window_start_ms, lid
-    ORDER BY lid, window_start_ms
+        k.experiment,
+        k.subject_pid,
+        k.run,
+        k.channel_idx,
+        w.window_start_ms,
+        w.mean_uv,
+        w.std_uv,
+        w.p2p_uv,
+        lid_to_uuid(lid_relayer(lid_from_uuid(w.lid), 2)) AS lid,
+        w.sample_lo,
+        w.sample_hi
+    FROM windows w
+    JOIN kept k USING (lid)
+    ORDER BY lid, w.window_start_ms
 ) TO '{{data_dir}}/gold/feature_window/data_0.parquet' (FORMAT parquet);
 ```
 
