@@ -32,6 +32,8 @@ requirements.csv  ──►  check generator  ──►  SQL checks  ──►  
 
 Adding a framework is adding rows. Evidence is reproducible: same files, same `dataset_version`.
 
+The generator is hand-written; [one check, end to end, and why not datacontract-cli](adr/ADR-0006.md).
+
 ## 3. Lineage identifier
 
 One 128-bit id per record, ULID shape, hierarchy in the 80 non-timestamp bits.
