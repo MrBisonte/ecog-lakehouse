@@ -2,9 +2,42 @@
 
 [![ci](https://github.com/MrBisonte/ecog-lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/MrBisonte/ecog-lakehouse/actions/workflows/ci.yml)
 
-Governed lakehouse over public ECoG recordings. Every number traces to bytes. Four planted faults, fixed live.
+A lakehouse over public brain recordings: 42 files from the Stanford ECoG library, 2,241 channels, 860 million samples, stored as Parquet and built with DuckDB.
 
-## 1. Flow
+It exists to try three ideas on real data.
+
+| Idea | In one line |
+|---|---|
+| Checks written from regulation text | A CSV row names a clause. The build turns it into SQL and keeps the result as evidence. |
+| An identifier you can decode | Every row carries 128 bits that say which file, run and channel it came from. |
+| Faults planted on purpose | Four known performance mistakes, each with its fix and a measurement. |
+
+**See it running:** https://mrbisonte.github.io/ecog-lakehouse/
+
+The page is static. DuckDB-WASM loads the published files, reruns 67 checks in your browser and verifies the file digests there.
+
+## Try it
+
+```bash
+git clone https://github.com/MrBisonte/ecog-lakehouse && cd ecog-lakehouse
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+make all SYNTH=1
+make test
+```
+
+- Needs Python 3.12 or later and `make`, on Linux, macOS or WSL.
+- `SYNTH=1` builds on generated data, in about a minute. No download.
+- Data goes to `$HOME/data/ecog-lakehouse`, never into the checkout. Set `DATA_DIR` to change it.
+- `make all` ends with `make publish`, which overwrites `docs/data/gold` with your build. `git checkout docs/data && git clean -fd docs/data` restores the published copy.
+
+For the real recordings, 2 GB:
+
+```bash
+make fetch && make all
+```
+
+## How it works
 
 ```mermaid
 flowchart LR
@@ -18,65 +51,83 @@ flowchart LR
   KEY[(keyring.duckdb: never published)] -.-> SLV
 ```
 
-| Layer | What it is | Rule |
+| Layer | What it holds | Rule |
 |---|---|---|
-| Bronze | Raw arrays, one row per sample, per file hash | Never rewritten |
-| Silver | Microvolts, milliseconds, pseudonyms | First readable layer, no source ids |
-| Gold | Channel quality, experiment summary, 1 s feature windows, evidence | Every value is a query result |
+| Bronze | Raw samples, one row each, with the hash of their file | Never rewritten |
+| Silver | Microvolts, milliseconds, pseudonyms | No source subject code past this point |
+| Gold | Channel quality, experiment summary, one second windows, evidence | Every value is a query result |
 
-## 2. Governance that executes
+## Checks
 
 ```
-requirements.csv  ──►  check generator  ──►  SQL checks  ──►  evidence rows
-(Part 11, GDPR-9,       (one per row)        (8 kinds)        (pass / fail / error,
- ALCOA+, ISO 13485)                                            dataset_version, engine, commit)
+requirements.csv  ──►  generator  ──►  SQL checks  ──►  evidence rows
+(Part 11, GDPR Art. 9,  (one per row)   (8 kinds)        (pass, fail or error, with
+ ALCOA+, ISO 13485)                                       dataset version, engine, commit)
 ```
 
-Adding a framework is adding rows. Evidence is reproducible: same files, same `dataset_version`.
+- A new regulation is new rows in the CSV. No code changes.
+- The data contracts feed the same generator.
+- The last build ran 111 checks.
+- The same files always give the same `dataset_version`, so evidence can be reproduced.
 
-The generator is hand-written; [one check, end to end, and why not datacontract-cli](adr/ADR-0006.md).
+[One check followed end to end, and why the generator is hand-written](adr/ADR-0006.md).
 
-## 3. Lineage identifier
-
-One 128-bit id per record, ULID shape, hierarchy in the 80 non-timestamp bits.
+## Lineage identifier
 
 ```
  ts_ms(48) | layer(4) | experiment(8) | file(16) | run(4) | channel(10) | segment(10) | reserved(28)
 ```
 
+One id per record, in the ULID layout. The 80 bits after the timestamp hold the hierarchy.
+
 ```
  file ──► Bronze lid ──► Silver lid ──► Gold lid + sample range
    ▲                                          │
    └────────────── lid_trace (bit shift) ─────┘
- lid_parent: same id, layer minus one.   lid_children: prefix range scan.
 ```
 
-Integrity is separate: sha256 per file, digest per dataset version. Click any number on the page, see its file and hash.
+| Question | How it is answered |
+|---|---|
+| Which file did this Gold number come from? | `lid_trace`: decode the bits, one lookup |
+| What is the parent record? | `lid_parent`: the same id, layer minus one |
+| Which records came from this file? | `lid_children`: a range scan on the prefix |
 
-## 4. Planted faults
+Integrity is separate: a sha256 per file and a digest per dataset version.
 
-| Fault | Symptom | Fix shown live | Payoff |
+## Planted faults
+
+Each fault is a mistake built on purpose, beside its fix. Times are measured against GitHub Pages.
+
+| Fault | The mistake | The fix | Measured |
 |---|---|---|---|
-| A | One giant row group, unpartitioned | `COPY ... PARTITION BY ... ORDER BY` | Async I/O now has parallel streams, 3x |
-| D | Python loop, one file at a time | One `read_parquet` over a remote glob | Engine read-ahead, less code |
-| F | Transient 503 kills the run | `http_retries`, backoff | Runs finish |
-| G | Generated SQL nests 512 `OR`s | `IN` list, generator test | Fast plan, clear parse error |
+| A | One giant row group | 38 sorted row groups | Fetching one record: 1.71 s to 0.65 s. Aggregating every row: 1.50 s to 3.76 s, slower |
+| D | A Python loop downloads one file at a time | One `read_parquet` over all the URLs | 9.46 s to 0.58 s for 8 files |
+| F | A 503 from the server kills the read | `http_retries` with backoff | 0 of 10 reads succeed, then 10 of 10 |
+| G | Generated SQL nests 512 `OR`s | An `IN` list | Planning: 0.093 s to 0.046 s. The generator now refuses the nested form |
 
-Bench: same query, before and after, `read_ahead_depth = 0` versus default, remote URL.
+Fault A did not go as planned. The fixed layout is faster for the lookup it was designed for and slower for a full aggregate. [Why](docs/lessons-learned.md), and [issue #28](https://github.com/MrBisonte/ecog-lakehouse/issues/28) for the part still open.
 
-## 5. Walkthrough, five minutes
+Run them with `make bench`. This needs a DuckDB CLI; see `faults/lib.sh`.
 
-```
-README on screen  →  page: evidence + tables  →  click a number: lineage  →  fault A live  →  one of D/F/G  →  close
-```
+## Docs
 
-Browser for governance, DuckDB 2.0 CLI for the performance A/B, two README commands to reproduce.
+| Read | For |
+|---|---|
+| [docs/manual.md](docs/manual.md) | Running, inspecting and resetting the build |
+| [docs/five-records.md](docs/five-records.md) | Five records followed from file to Gold, with the SQL of every step |
+| [docs/lessons-learned.md](docs/lessons-learned.md) | The out of memory incident: cause, proof, and what we got wrong |
+| [docs/bench.md](docs/bench.md) | Row counts and every fault measurement |
+| [doc/spec.md](doc/spec.md) | The contract: every dataset, column and rule |
+| [adr/](adr/README.md) | Six decisions, each with the options rejected |
 
-## 6. Boundaries
+## Limits
 
-Public data only, CC BY-SA 4.0. Files under 95 MB, total under 500 MB. No third-party request at view time.
+- Public data only.
+- No published file over 95 MB; `docs/data` stays under 500 MB.
+- The page loads DuckDB-WASM from a pinned CDN version. It makes no other third-party request.
+- The unit scale of `faces_basic` is not documented by its source. Those rows are marked `scale_basis = assumed`.
 
-## 7. Acknowledgements
+## Acknowledgements
 
 The recordings are the work of Kai J. Miller and the patients who took part. Citations, the paper of each experiment and the ethics statements are in [docs/data/LICENSE.md](docs/data/LICENSE.md) and, machine readable, in [CITATION.cff](CITATION.cff).
 
@@ -96,6 +147,6 @@ The code is a thin layer over other people's work:
 
 Standards followed: [Open Data Contract Standard](https://github.com/bitol-io/open-data-contract-standard) v3 for the contracts, the [ULID specification](https://github.com/ulid/spec) and Crockford base32 for the shape and text form of `lid`, [Citation File Format](https://citation-file-format.github.io/) 1.2.0, [REUSE](https://reuse.software/) for licensing, [CycloneDX](https://cyclonedx.org/) 1.6 for the bill of materials in [sbom.cdx.json](sbom.cdx.json), regenerated by `make sbom`.
 
-## 8. Licence
+## Licence
 
 Code: MIT, [LICENSE](LICENSE). Published data under `docs/data/`: CC BY-SA 4.0, [docs/data/LICENSE.md](docs/data/LICENSE.md). Both texts are in `LICENSES/`, and [REUSE.toml](REUSE.toml) states which applies to which path.
