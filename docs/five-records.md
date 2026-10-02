@@ -1,31 +1,31 @@
 # Five records, end to end
 
-Five records enter as samples in a `.mat` file and travel to Gold, evidence and the published copy. This page shows their complete tuples at every stage, so the lineage identifier can be watched changing while everything else stays put. Every value is a query result from one build of the synthetic data; digests, paths and commits are cut to their first characters for width, the full values sit in the tables they came from.
+Five records enter as samples in a `.mat` file and travel to Gold, evidence and the published copy. This page shows their key columns at every stage, so the lineage identifier can be watched changing while everything else stays put. Digests are cut to their first 12 characters for width; the full values sit in the tables they came from.
 
-The result tables are that build, of 2026-09-20. The folded SQL is the source as it stands today, and a test keeps it so. Three columns were added after the build and are in the SQL but not in the tables: `scale_basis` on `silver/record`, `clipped_own_pct` and `scale_basis` on `gold/channel_quality`. The unit scale of the synthetic files was 0.1 in that build.
+Every value is a query result from the real build in `DATA_DIR`, evidence run `01M3WTDATJYQ57CY5YHT2D54NR` of 2026-10-01. The folded SQL is the source as it stands today, and a test keeps it so.
 
 Each transformation has its source SQL folded under the paragraph that introduces its result, click the line to open it. Closed, the page is data and flow only.
 
 ## 0. Who travels
 
-| n | Experiment | Source subject | Channel | Why this one |
+| n | Experiment | subject_pid | Channel | Why this one |
 |---|---|---|---|---|
-| 1 | fingerflex | aa | 0 | has the NaN burst and the injected 50 Hz tone |
-| 2 | motor_basic | aa | 5 | clean channel, same subject as 1 |
-| 3 | fingerflex | bb | 1 | has the NaN burst, another subject |
-| 4 | motor_basic | cc | 3 | clean channel, third subject |
-| 5 | fingerflex | canary | 3 | the planted canary, must stop at Silver |
+| 1 | motor_basic | 536b14256e52d399 | 3 | the highest `line_noise_ratio` of the build |
+| 2 | faces_basic | 536b14256e52d399 | 3 | same subject as 1, an experiment whose unit scale is assumed |
+| 3 | fingerflex | 3b08103b5a44451c | 3 | the third experiment, another subject |
+| 4 | motor_basic | 72d88db77f3716bb | 3 | a third subject, whose `faces_basic` files are the Fault A partition |
+| 5 | fingerflex | 49c8f7217e7b2988 | 3 | the planted canary, with a NaN burst, must stop at Silver |
 
-The source subject code appears in this page only because the data is synthetic. In the real system it exists in Bronze and the keyring alone; a page like this one would be generated from Silver.
+Subjects are named by pseudonym. The source subject code exists in Bronze and the keyring alone, so this page does not show it.
 
 ## 1. The map
 
 ```mermaid
 flowchart LR
   F[.mat file<br>sha256] -->|convert| A[ingest_audit<br>ingest_ord, ts_ms]
-  A --> B[Bronze<br>lid layer 1<br>...CH<b>2</b>08...]
-  B -->|relayer, validate| S[Silver<br>lid layer 2<br>...CH<b>4</b>08...]
-  S -->|relayer, validate| G[Gold<br>lid layer 3<br>...CH<b>6</b>08...]
+  A --> B[Bronze<br>lid layer 1<br>...J8<b>2</b>0G...]
+  B -->|relayer, validate| S[Silver<br>lid layer 2<br>...J8<b>4</b>0G...]
+  S -->|relayer, validate| G[Gold<br>lid layer 3<br>...J8<b>6</b>0G...]
   G --> E[evidence<br>dataset_version]
   G --> M[dataset_manifest<br>lid_lo, lid_hi]
   G --> P[docs/data<br>sha256 per file]
@@ -89,13 +89,13 @@ LEFT JOIN (SELECT DISTINCT experiment, ingest_id FROM bronze_recording) r USING 
 
 | ingest_ord | ingest_id | sha256 | ts_ms | experiment |
 |---|---|---|---|---|
-| 1 | 01M30739CGE2JX4EXKR65BTC6E | 65c157a67f68 | 1789935068561 | fingerflex |
-| 2 | 01M3073A6E8SR2B7JF97DG0H07 | 51bdb94158ef | 1789935069391 | fingerflex |
-| 3 | 01M3073AZA3B2PSZTSGH07Y31Y | b8a002899aac | 1789935070188 | fingerflex |
-| 5 | 01M3073CEHVGSATDYM49B26G2H | d78878cdb442 | 1789935071698 | motor_basic |
-| 8 | 01M3073EJFREB8YATMZYFR5981 | c96c66f737e3 | 1789935073872 | motor_basic |
+| 5 | 01M3AS9Y5H012SDJPJH34P56DE | 7d7d347e2b29 | 1790289705138 | faces_basic |
+| 15 | 01M3ASAJ0RHND369W7RDPXVJ2W | b8222d13c15c | 1790289725466 | fingerflex |
+| 28 | 01M3ASBQJ6VY4SV1ESGDWGVHG3 | 0b1ba5cab220 | 1790289763912 | motor_basic |
+| 39 | 01M3ASCJ857F5K5AG0C36NRVJE | 2dd289af9f4e | 1790289791240 | motor_basic |
+| 44 | 01M3ASCWXE7R7HPMFXK8BS41BG | ea8e2ad5745c | 1790289802163 | fingerflex |
 
-Files 4, 6 and 7 exist; they hold subjects this page does not follow.
+The build holds 45 files. The other 40 hold subjects this page does not follow.
 
 ## 3. The identifier is minted
 
@@ -106,20 +106,20 @@ One identifier per record, that is per file, run and channel. 128 bits, most sig
  hi word                                          lo word
 ```
 
-Decoded, the five Bronze identifiers say exactly where each record sits. The canary's last field is 1.
+Decoded, the five Bronze identifiers say exactly where each record sits. All five are layer 1, run 1 and segment 0, so those fields are left out. The canary's radioactive field is 1.
 
-| n | lid | ts_ms | layer | experiment | file | run | channel | segment | radioactive |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | 01M30739CH2080008G00000000 | 1789935068561 | 1 | 1 | 1 | 1 | 0 | 0 | 0 |
-| 2 | 01M3073CEJ20G0018G2G000000 | 1789935071698 | 1 | 2 | 5 | 1 | 5 | 0 | 0 |
-| 3 | 01M3073A6F208000GG0G000000 | 1789935069391 | 1 | 1 | 2 | 1 | 1 | 0 | 0 |
-| 4 | 01M3073EJG20G0020G1G000000 | 1789935073872 | 1 | 2 | 8 | 1 | 3 | 0 | 0 |
-| 5 | 01M3073AZC208000RG1G080000 | 1789935070188 | 1 | 1 | 3 | 1 | 3 | 0 | 1 |
+| n | lid | experiment | file | channel | radioactive |
+|---|---|---|---|---|---|
+| 1 | 01M3ASBQJ820G0070G1G000000 | 2 | 28 | 3 | 0 |
+| 2 | 01M3AS9Y5J20R0018G1G000000 | 3 | 5 | 3 | 0 |
+| 3 | 01M3ASAJ0T208003RG1G000000 | 1 | 15 | 3 | 0 |
+| 4 | 01M3ASCJ8820G009RG1G000000 | 2 | 39 | 3 | 0 |
+| 5 | 01M3ASCWXK20800B0G1G080000 | 1 | 44 | 3 | 1 |
 
-Experiment codes: 1 fingerflex, 2 motor_basic. The file number is `ingest_ord` from the table above.
+Experiment codes: 1 fingerflex, 2 motor_basic, 3 faces_basic. The file number is `ingest_ord` from the table above.
 
 <details>
-<summary>sql/bronze/recording.sql, the mint, one lid per channel</summary>
+<summary>sql/bronze/recording.sql, the mint, one lid per record</summary>
 
 ```sql
     JOIN (
@@ -135,7 +135,7 @@ Experiment codes: 1 fingerflex, 2 motor_basic. The file number is `ingest_ord` f
 
 ## 4. Bronze, raw and complete
 
-Samples, one row each, in the file's own units, with the source subject code and the layer 1 identifier of their record. Two samples per record: the first, and one inside the burst that three of the files carry at second 30.
+Samples, one row each, in the file's own units, with the layer 1 identifier of their record. Bronze also holds the source subject code, left out here. Two samples per record: the first, and one at second 30, inside the burst of the canary file.
 
 <details>
 <summary>sql/bronze/recording.sql</summary>
@@ -168,22 +168,22 @@ COPY (
 
 </details>
 
-| n | experiment | subject_src | run | channel_idx | sample_idx | value_raw | ingest_id | lid |
-|---|---|---|---|---|---|---|---|---|
-| 1 | fingerflex | aa | 1 | 0 | 0 | 61.942 | 01M30739CGE2JX4EXKR65BTC6E | 01M30739CH2080008G00000000 |
-| 1 | fingerflex | aa | 1 | 0 | 30250 | NULL | 01M30739CGE2JX4EXKR65BTC6E | 01M30739CH2080008G00000000 |
-| 2 | motor_basic | aa | 1 | 5 | 0 | 191.232 | 01M3073CEHVGSATDYM49B26G2H | 01M3073CEJ20G0018G2G000000 |
-| 2 | motor_basic | aa | 1 | 5 | 30250 | 30.633 | 01M3073CEHVGSATDYM49B26G2H | 01M3073CEJ20G0018G2G000000 |
-| 3 | fingerflex | bb | 1 | 1 | 0 | 129.158 | 01M3073A6E8SR2B7JF97DG0H07 | 01M3073A6F208000GG0G000000 |
-| 3 | fingerflex | bb | 1 | 1 | 30250 | NULL | 01M3073A6E8SR2B7JF97DG0H07 | 01M3073A6F208000GG0G000000 |
-| 4 | motor_basic | cc | 1 | 3 | 0 | -91.151 | 01M3073EJFREB8YATMZYFR5981 | 01M3073EJG20G0020G1G000000 |
-| 4 | motor_basic | cc | 1 | 3 | 30250 | -32.514 | 01M3073EJFREB8YATMZYFR5981 | 01M3073EJG20G0020G1G000000 |
-| 5 | fingerflex | canary | 1 | 3 | 0 | 123.349 | 01M3073AZA3B2PSZTSGH07Y31Y | 01M3073AZC208000RG1G080000 |
-| 5 | fingerflex | canary | 1 | 3 | 30250 | NULL | 01M3073AZA3B2PSZTSGH07Y31Y | 01M3073AZC208000RG1G080000 |
+| n | sample_idx | value_raw | ingest_id | lid |
+|---|---|---|---|---|
+| 1 | 0 | -661.000 | 01M3ASBQJ6VY4SV1ESGDWGVHG3 | 01M3ASBQJ820G0070G1G000000 |
+| 1 | 30250 | -1232.000 | 01M3ASBQJ6VY4SV1ESGDWGVHG3 | 01M3ASBQJ820G0070G1G000000 |
+| 2 | 0 | -0.005 | 01M3AS9Y5H012SDJPJH34P56DE | 01M3AS9Y5J20R0018G1G000000 |
+| 2 | 30250 | -1031.000 | 01M3AS9Y5H012SDJPJH34P56DE | 01M3AS9Y5J20R0018G1G000000 |
+| 3 | 0 | -802.000 | 01M3ASAJ0RHND369W7RDPXVJ2W | 01M3ASAJ0T208003RG1G000000 |
+| 3 | 30250 | -1074.000 | 01M3ASAJ0RHND369W7RDPXVJ2W | 01M3ASAJ0T208003RG1G000000 |
+| 4 | 0 | -2853.000 | 01M3ASCJ857F5K5AG0C36NRVJE | 01M3ASCJ8820G009RG1G000000 |
+| 4 | 30250 | 1317.000 | 01M3ASCJ857F5K5AG0C36NRVJE | 01M3ASCJ8820G009RG1G000000 |
+| 5 | 0 | 123.349 | 01M3ASCWXE7R7HPMFXK8BS41BG | 01M3ASCWXK20800B0G1G080000 |
+| 5 | 30250 | NULL | 01M3ASCWXE7R7HPMFXK8BS41BG | 01M3ASCWXK20800B0G1G080000 |
 
 The burst arrives as NULL: the file holds NaN, and DuckDB reads NaN from the numpy array as NULL. Bronze keeps the row; the gap is counted later, not hidden.
 
-Electrodes, one row per channel, same identifier as the samples of that channel.
+Electrodes, one row per channel, same identifier as the samples of that record.
 
 <details>
 <summary>sql/bronze/electrode.sql</summary>
@@ -209,13 +209,13 @@ COPY (
 
 </details>
 
-| n | experiment | subject_src | channel_idx | x_mm | y_mm | z_mm | brain_area | ingest_id | lid |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | fingerflex | aa | 0 | 0.000 | 0.000 | 40.000 | precentral | 01M30739CGE2JX4EXKR65BTC6E | 01M30739CH2080008G00000000 |
-| 2 | motor_basic | aa | 5 | 50.000 | 0.000 | 40.000 | postcentral | 01M3073CEHVGSATDYM49B26G2H | 01M3073CEJ20G0018G2G000000 |
-| 3 | fingerflex | bb | 1 | 10.000 | 0.000 | 40.000 | postcentral | 01M3073A6E8SR2B7JF97DG0H07 | 01M3073A6F208000GG0G000000 |
-| 4 | motor_basic | cc | 3 | 30.000 | 0.000 | 40.000 | temporal | 01M3073EJFREB8YATMZYFR5981 | 01M3073EJG20G0020G1G000000 |
-| 5 | fingerflex | canary | 3 | 30.000 | 0.000 | 40.000 | temporal | 01M3073AZA3B2PSZTSGH07Y31Y | 01M3073AZC208000RG1G080000 |
+| n | channel_idx | x_mm | brain_area | lid |
+|---|---|---|---|---|
+| 1 | 3 | -41.170 | NULL | 01M3ASBQJ820G0070G1G000000 |
+| 2 | 3 | NULL | inferior temporal gyrus | 01M3AS9Y5J20R0018G1G000000 |
+| 3 | 3 | -38.276 | frontal | 01M3ASAJ0T208003RG1G000000 |
+| 4 | 3 | 64.918 | NULL | 01M3ASCJ8820G009RG1G000000 |
+| 5 | 3 | 30.000 | temporal | 01M3ASCWXK20800B0G1G080000 |
 
 Events belong to the run, not to a channel, so their identifier has channel 0. The first cue of each file:
 
@@ -244,15 +244,15 @@ COPY (
 
 </details>
 
-| n | experiment | subject_src | run | sample_idx | event_code | event_label | ingest_id | lid |
-|---|---|---|---|---|---|---|---|---|
-| 1 | fingerflex | aa | 1 | 0 | 1 | thumb | 01M30739CGE2JX4EXKR65BTC6E | 01M30739CH2080008G00000000 |
-| 2 | motor_basic | aa | 1 | 0 | 1 | hand | 01M3073CEHVGSATDYM49B26G2H | 01M3073CEJ20G0018G00000000 |
-| 3 | fingerflex | bb | 1 | 0 | 1 | thumb | 01M3073A6E8SR2B7JF97DG0H07 | 01M3073A6F208000GG00000000 |
-| 4 | motor_basic | cc | 1 | 0 | 1 | hand | 01M3073EJFREB8YATMZYFR5981 | 01M3073EJG20G0020G00000000 |
-| 5 | fingerflex | canary | 1 | 0 | 1 | thumb | 01M3073AZA3B2PSZTSGH07Y31Y | 01M3073AZC208000RG00080000 |
+| n | sample_idx | event_code | event_label | lid |
+|---|---|---|---|---|
+| 1 | 10120 | 11 | tongue | 01M3ASBQJ820G0070G00000000 |
+| 2 | 5480 | 11 | house | 01M3AS9Y5J20R0018G00000000 |
+| 3 | 7080 | 5 | little | 01M3ASAJ0T208003RG00000000 |
+| 4 | 10120 | 12 | hand | 01M3ASCJ8820G009RG00000000 |
+| 5 | 0 | 1 | thumb | 01M3ASCWXK20800B0G00080000 |
 
-Record 1 is channel 0, so its event identifier and its sample identifier coincide. For records 2 to 5 compare the two: the channel characters differ, the rest is the same.
+All five records are channel 3. Compare each event identifier with the sample identifier of its record: the channel characters differ, the rest is the same.
 
 ## 5. Silver, pseudonymised and typed
 
@@ -285,12 +285,12 @@ COPY (
 
 | subject_pid | first_seen_at |
 |---|---|
-| 330a1a33c4ea905e | 2026-09-20 20:11:14.744459 |
-| 4870aca0c2bc23d6 | 2026-09-20 20:11:14.744455 |
-| 8697935b255ab403 | 2026-09-20 20:11:14.744435 |
-| feff3135d21f3fc6 | 2026-09-20 20:11:14.744458 |
+| 3b08103b5a44451c | 2026-09-21 19:51:54.688695 |
+| 49c8f7217e7b2988 | 2026-09-21 19:51:54.688698 |
+| 536b14256e52d399 | 2026-09-21 19:51:54.688702 |
+| 72d88db77f3716bb | 2026-09-21 19:51:54.688725 |
 
-One `silver/record` row per record, the lineage dimension. The loader validates that the incoming identifier is layer 1, then sets layer 2. `n_samples_src` counts the source samples, burst included.
+One `silver/record` row per record, the lineage dimension. The loader validates that the incoming identifier is layer 1, then sets layer 2. `n_samples_src` counts the source samples, burst included. `scale_basis` reads `assumed` for record 2, the `faces_basic` file.
 
 <details>
 <summary>sql/silver/020_record.sql</summary>
@@ -321,13 +321,13 @@ COPY (
 
 </details>
 
-| n | lid | experiment | subject_pid | run | channel_idx | n_samples_src |
-|---|---|---|---|---|---|---|
-| 1 | 01M30739CH4080008G00000000 | fingerflex | 8697935b255ab403 | 1 | 0 | 60000 |
-| 2 | 01M3073CEJ40G0018G2G000000 | motor_basic | 8697935b255ab403 | 1 | 5 | 60000 |
-| 3 | 01M3073A6F408000GG0G000000 | fingerflex | 4870aca0c2bc23d6 | 1 | 1 | 60000 |
-| 4 | 01M3073EJG40G0020G1G000000 | motor_basic | 330a1a33c4ea905e | 1 | 3 | 60000 |
-| 5 | 01M3073AZC408000RG1G080000 | fingerflex | feff3135d21f3fc6 | 1 | 3 | 60000 |
+| n | lid | subject_pid | n_samples_src | scale_basis |
+|---|---|---|---|---|
+| 1 | 01M3ASBQJ840G0070G1G000000 | 536b14256e52d399 | 390680 | documented |
+| 2 | 01M3AS9Y5J40R0018G1G000000 | 536b14256e52d399 | 271400 | assumed |
+| 3 | 01M3ASAJ0T408003RG1G000000 | 3b08103b5a44451c | 610040 | documented |
+| 4 | 01M3ASCJ8840G009RG1G000000 | 72d88db77f3716bb | 390240 | documented |
+| 5 | 01M3ASCWXK40800B0G1G080000 | 49c8f7217e7b2988 | 60000 | documented |
 
 Decoded, only the layer moved. `lid_parent` returns the Bronze identifier with no lookup.
 
@@ -343,15 +343,15 @@ CREATE OR REPLACE MACRO lid_parent(lid) AS
 
 </details>
 
-| n | lid | layer | file | channel | radioactive | lid_parent |
-|---|---|---|---|---|---|---|
-| 1 | 01M30739CH4080008G00000000 | 2 | 1 | 0 | 0 | 01M30739CH2080008G00000000 |
-| 2 | 01M3073CEJ40G0018G2G000000 | 2 | 5 | 5 | 0 | 01M3073CEJ20G0018G2G000000 |
-| 3 | 01M3073A6F408000GG0G000000 | 2 | 2 | 1 | 0 | 01M3073A6F208000GG0G000000 |
-| 4 | 01M3073EJG40G0020G1G000000 | 2 | 8 | 3 | 0 | 01M3073EJG20G0020G1G000000 |
-| 5 | 01M3073AZC408000RG1G080000 | 2 | 3 | 3 | 1 | 01M3073AZC208000RG1G080000 |
+| n | lid | layer | radioactive | lid_parent |
+|---|---|---|---|---|
+| 1 | 01M3ASBQJ840G0070G1G000000 | 2 | 0 | 01M3ASBQJ820G0070G1G000000 |
+| 2 | 01M3AS9Y5J40R0018G1G000000 | 2 | 0 | 01M3AS9Y5J20R0018G1G000000 |
+| 3 | 01M3ASAJ0T408003RG1G000000 | 2 | 0 | 01M3ASAJ0T208003RG1G000000 |
+| 4 | 01M3ASCJ8840G009RG1G000000 | 2 | 0 | 01M3ASCJ8820G009RG1G000000 |
+| 5 | 01M3ASCWXK40800B0G1G080000 | 2 | 1 | 01M3ASCWXK20800B0G1G080000 |
 
-The same two samples in `silver/recording`: microvolts (raw times 0.1), milliseconds, pseudonym, the record's identifier and the source sample index. The three burst samples are absent, not NULL.
+The same two samples in `silver/recording`: microvolts, milliseconds, the record's identifier and the source sample index. The canary's burst sample is absent, not NULL. Silver dropped all 500 samples of the burst.
 
 <details>
 <summary>sql/silver/030_recording.sql</summary>
@@ -387,18 +387,18 @@ COPY (
 
 </details>
 
-| n | asked | experiment | subject_pid | run | channel_idx | ts_ms | value_uv | lid | sample_idx |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | 0 | fingerflex | 8697935b255ab403 | 1 | 0 | 0 | 6.194 | 01M30739CH4080008G00000000 | 0 |
-| 1 | 30250 | absent | | | | | | | |
-| 2 | 0 | motor_basic | 8697935b255ab403 | 1 | 5 | 0 | 19.123 | 01M3073CEJ40G0018G2G000000 | 0 |
-| 2 | 30250 | motor_basic | 8697935b255ab403 | 1 | 5 | 30250 | 3.063 | 01M3073CEJ40G0018G2G000000 | 30250 |
-| 3 | 0 | fingerflex | 4870aca0c2bc23d6 | 1 | 1 | 0 | 12.916 | 01M3073A6F408000GG0G000000 | 0 |
-| 3 | 30250 | absent | | | | | | | |
-| 4 | 0 | motor_basic | 330a1a33c4ea905e | 1 | 3 | 0 | -9.115 | 01M3073EJG40G0020G1G000000 | 0 |
-| 4 | 30250 | motor_basic | 330a1a33c4ea905e | 1 | 3 | 30250 | -3.251 | 01M3073EJG40G0020G1G000000 | 30250 |
-| 5 | 0 | fingerflex | feff3135d21f3fc6 | 1 | 3 | 0 | 12.335 | 01M3073AZC408000RG1G080000 | 0 |
-| 5 | 30250 | absent | | | | | | | |
+| n | asked | ts_ms | value_uv | sample_idx | lid |
+|---|---|---|---|---|---|
+| 1 | 0 | 0 | -19.698 | 0 | 01M3ASBQJ840G0070G1G000000 |
+| 1 | 30250 | 30250 | -36.714 | 30250 | 01M3ASBQJ840G0070G1G000000 |
+| 2 | 0 | 0 | -1.40e-04 | 0 | 01M3AS9Y5J40R0018G1G000000 |
+| 2 | 30250 | 30250 | -30.724 | 30250 | 01M3AS9Y5J40R0018G1G000000 |
+| 3 | 0 | 0 | -23.900 | 0 | 01M3ASAJ0T408003RG1G000000 |
+| 3 | 30250 | 30250 | -32.005 | 30250 | 01M3ASAJ0T408003RG1G000000 |
+| 4 | 0 | 0 | -85.019 | 0 | 01M3ASCJ8840G009RG1G000000 |
+| 4 | 30250 | 30250 | 39.247 | 30250 | 01M3ASCJ8840G009RG1G000000 |
+| 5 | 0 | 0 | 3.676 | 0 | 01M3ASCWXK40800B0G1G080000 |
+| 5 | 30250 | absent | | | |
 
 Electrodes and events mirror Bronze with the pseudonym, milliseconds instead of sample index, and no `ingest_id`; the file is inside the identifier now.
 
@@ -444,27 +444,27 @@ COPY (
 
 </details>
 
-| n | experiment | subject_pid | channel_idx | x_mm | y_mm | z_mm | brain_area | lid |
-|---|---|---|---|---|---|---|---|---|
-| 1 | fingerflex | 8697935b255ab403 | 0 | 0.000 | 0.000 | 40.000 | precentral | 01M30739CH4080008G00000000 |
-| 2 | motor_basic | 8697935b255ab403 | 5 | 50.000 | 0.000 | 40.000 | postcentral | 01M3073CEJ40G0018G2G000000 |
-| 3 | fingerflex | 4870aca0c2bc23d6 | 1 | 10.000 | 0.000 | 40.000 | postcentral | 01M3073A6F408000GG0G000000 |
-| 4 | motor_basic | 330a1a33c4ea905e | 3 | 30.000 | 0.000 | 40.000 | temporal | 01M3073EJG40G0020G1G000000 |
-| 5 | fingerflex | feff3135d21f3fc6 | 3 | 30.000 | 0.000 | 40.000 | temporal | 01M3073AZC408000RG1G080000 |
+| n | subject_pid | channel_idx | brain_area | lid |
+|---|---|---|---|---|
+| 1 | 536b14256e52d399 | 3 | NULL | 01M3ASBQJ840G0070G1G000000 |
+| 2 | 536b14256e52d399 | 3 | inferior temporal gyrus | 01M3AS9Y5J40R0018G1G000000 |
+| 3 | 3b08103b5a44451c | 3 | frontal | 01M3ASAJ0T408003RG1G000000 |
+| 4 | 72d88db77f3716bb | 3 | NULL | 01M3ASCJ8840G009RG1G000000 |
+| 5 | 49c8f7217e7b2988 | 3 | temporal | 01M3ASCWXK40800B0G1G080000 |
 
-| n | experiment | subject_pid | run | ts_ms | event_code | event_label | lid |
-|---|---|---|---|---|---|---|---|
-| 1 | fingerflex | 8697935b255ab403 | 1 | 0 | 1 | thumb | 01M30739CH4080008G00000000 |
-| 2 | motor_basic | 8697935b255ab403 | 1 | 0 | 1 | hand | 01M3073CEJ40G0018G00000000 |
-| 3 | fingerflex | 4870aca0c2bc23d6 | 1 | 0 | 1 | thumb | 01M3073A6F408000GG00000000 |
-| 4 | motor_basic | 330a1a33c4ea905e | 1 | 0 | 1 | hand | 01M3073EJG40G0020G00000000 |
-| 5 | fingerflex | feff3135d21f3fc6 | 1 | 0 | 1 | thumb | 01M3073AZC408000RG00080000 |
+| n | ts_ms | event_code | event_label | lid |
+|---|---|---|---|---|
+| 1 | 10120 | 11 | tongue | 01M3ASBQJ840G0070G00000000 |
+| 2 | 5480 | 11 | house | 01M3AS9Y5J40R0018G00000000 |
+| 3 | 7080 | 5 | little | 01M3ASAJ0T408003RG00000000 |
+| 4 | 10120 | 12 | hand | 01M3ASCJ8840G009RG00000000 |
+| 5 | 0 | 1 | thumb | 01M3ASCWXK40800B0G00080000 |
 
 ## 6. Gold, every value a query result
 
-The marts read Silver and refuse any record whose identifier carries the canary bit. Record 5 stops here. The others get layer 3.
+The marts read Silver and refuse any record whose identifier carries the radioactive bit. Record 5 stops here. The others get layer 3.
 
-`gold/channel_quality`, one row per record. `missing_samples` is `n_samples_src` minus what Silver holds: the 500 sample burst shows up as 500. `line_noise_ratio` is the share of power at 50 and 60 Hz in the first 10 s; record 1 carries the injected tone, so it stands out at 0.030 against 0.002.
+`gold/channel_quality`, one row per record. `missing_samples` is `n_samples_src` minus what Silver holds. It is 0 for every Gold record of this build: the one gap, the canary's burst, never reaches Gold. `line_noise_ratio` is the share of power at 50 and 60 Hz in the first 10 s. Record 1 reads 0.962, the highest of the build, against a median of 0.003.
 
 <details>
 <summary>sql/gold/010_channel_quality.sql, and the line noise excerpt from pipeline/line_noise.py</summary>
@@ -552,15 +552,15 @@ GROUP BY 1, 2
 
 </details>
 
-| n | experiment | subject_pid | run | channel_idx | n_samples | missing_samples | rms_uv | clipped_pct | line_noise_ratio | lid |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | fingerflex | 8697935b255ab403 | 1 | 0 | 59500 | 500 | 41.246 | 0.000 | 0.030 | 01M30739CH6080008G00000000 |
-| 2 | motor_basic | 8697935b255ab403 | 1 | 5 | 60000 | 0 | 40.518 | 0.000 | 0.002 | 01M3073CEJ60G0018G2G000000 |
-| 3 | fingerflex | 4870aca0c2bc23d6 | 1 | 1 | 59500 | 500 | 40.578 | 0.000 | 0.002 | 01M3073A6F608000GG0G000000 |
-| 4 | motor_basic | 330a1a33c4ea905e | 1 | 3 | 60000 | 0 | 40.567 | 0.000 | 0.002 | 01M3073EJG60G0020G1G000000 |
-| 5 | absent, canary | | | | | | | | | |
+| n | n_samples | missing_samples | rms_uv | line_noise_ratio | lid |
+|---|---|---|---|---|---|
+| 1 | 390680 | 0 | 33.930 | 0.962 | 01M3ASBQJ860G0070G1G000000 |
+| 2 | 271400 | 0 | 53.156 | 0.004 | 01M3AS9Y5J60R0018G1G000000 |
+| 3 | 610040 | 0 | 55.685 | 0.026 | 01M3ASAJ0T608003RG1G000000 |
+| 4 | 390240 | 0 | 87.401 | 0.043 | 01M3ASCJ8860G009RG1G000000 |
+| 5 | absent, canary | | | | |
 
-`gold/feature_window`, one row per record and second. The window that holds sample 30250: for the burst records the window starts at sample 30500, because samples 30000 to 30499 are gone, and `sample_lo` says so.
+`gold/feature_window`, one row per record and second. The window that holds sample 30250 starts at 30000 ms and covers samples 30000 to 30999. `sample_lo` and `sample_hi` name that range in the record, so a gap would show as a later `sample_lo`.
 
 <details>
 <summary>sql/gold/030_feature_window.sql</summary>
@@ -609,13 +609,13 @@ COPY (
 
 </details>
 
-| n | experiment | subject_pid | run | channel_idx | window_start_ms | mean_uv | std_uv | p2p_uv | lid | sample_lo | sample_hi |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | fingerflex | 8697935b255ab403 | 1 | 0 | 30000 | 0.522 | 41.131 | 203.212 | 01M30739CH6080008G00000000 | 30500 | 30999 |
-| 2 | motor_basic | 8697935b255ab403 | 1 | 5 | 30000 | -0.047 | 40.280 | 197.758 | 01M3073CEJ60G0018G2G000000 | 30000 | 30999 |
-| 3 | fingerflex | 4870aca0c2bc23d6 | 1 | 1 | 30000 | 0.383 | 41.294 | 193.428 | 01M3073A6F608000GG0G000000 | 30500 | 30999 |
-| 4 | motor_basic | 330a1a33c4ea905e | 1 | 3 | 30000 | -0.363 | 40.012 | 205.377 | 01M3073EJG60G0020G1G000000 | 30000 | 30999 |
-| 5 | absent, canary | | | | | | | | | | |
+| n | window_start_ms | mean_uv | sample_lo | sample_hi | lid |
+|---|---|---|---|---|---|
+| 1 | 30000 | -7.127 | 30000 | 30999 | 01M3ASBQJ860G0070G1G000000 |
+| 2 | 30000 | -2.828 | 30000 | 30999 | 01M3AS9Y5J60R0018G1G000000 |
+| 3 | 30000 | -0.510 | 30000 | 30999 | 01M3ASAJ0T608003RG1G000000 |
+| 4 | 30000 | 67.479 | 30000 | 30999 | 01M3ASCJ8860G009RG1G000000 |
+| 5 | absent, canary | | | | |
 
 `gold/experiment_summary`, one row per experiment and subject. It spans records, so it carries no identifier; the canary subject is left out by its pseudonym.
 
@@ -659,17 +659,17 @@ COPY (
 
 </details>
 
-| n | experiment | subject_pid | n_runs | n_channels | duration_s | n_events |
-|---|---|---|---|---|---|---|
-| 1 | fingerflex | 8697935b255ab403 | 1 | 64 | 60.000 | 30 |
-| 2 | motor_basic | 8697935b255ab403 | 1 | 64 | 60.000 | 30 |
-| 3 | fingerflex | 4870aca0c2bc23d6 | 1 | 64 | 60.000 | 30 |
-| 4 | motor_basic | 330a1a33c4ea905e | 1 | 64 | 60.000 | 30 |
-| 5 | absent, canary | | | | | |
+| n | experiment | subject_pid | n_channels | duration_s | n_events |
+|---|---|---|---|---|---|
+| 1 | motor_basic | 536b14256e52d399 | 62 | 390.680 | 60 |
+| 2 | faces_basic | 536b14256e52d399 | 52 | 271.400 | 300 |
+| 3 | fingerflex | 3b08103b5a44451c | 46 | 610.040 | 150 |
+| 4 | motor_basic | 72d88db77f3716bb | 49 | 390.240 | 60 |
+| 5 | absent, canary | | | | |
 
 ## 7. Back to the file, forward to the records
 
-`lid_trace` on the Gold identifier of record 1 decodes the bits and joins `lineage_dim` once. The number 41.246 above came from this file, this digest, this run and channel.
+`lid_trace` on the Gold identifier of record 1 decodes the bits and joins `lineage_dim` once. The `rms_uv` of 33.930 above came from this file, this digest, this run and channel. `lid_trace` also returns the file's path, left out here because the file name carries the source subject code.
 
 <details>
 <summary>sql/lineage/lid_extras.sql, lid_trace</summary>
@@ -685,11 +685,11 @@ CREATE OR REPLACE MACRO lid_trace(lid) AS TABLE
 
 </details>
 
-| source_path | source_url | sha256 | ts_ms | layer | experiment | run | channel | segment |
-|---|---|---|---|---|---|---|---|---|
-| fingerflex/aa.mat | synthetic://fingerflex/aa.mat | 65c157a67f68 | 1789935068561 | 3 | fingerflex | 1 | 0 | 0 |
+| source_url | sha256 | layer | experiment | run | channel |
+|---|---|---|---|---|---|
+| https://stacks.stanford.edu/file/druid:zk881ps0522/motor_basic.zip | 0b1ba5cab220 | 3 | motor_basic | 1 | 3 |
 
-`lid_children(1)` is a range scan between two identifiers; it returns every Silver record of file 1.
+`lid_children(28)` is a range scan between two identifiers. It returns every Silver record of file 28, the file of record 1.
 
 <details>
 <summary>sql/lineage/lid_extras.sql, lid_prefix_lo, lid_prefix_hi, lid_children</summary>
@@ -714,11 +714,11 @@ CREATE OR REPLACE MACRO lid_children(ing) AS TABLE
 
 | records | first | last |
 |---|---|---|
-| 64 | 01M30739CH4080008G00000000 | 01M30739CH4080008GZG000000 |
+| 62 | 01M3ASBQJ840G0070G00000000 | 01M3ASBQJ840G0070GYG000000 |
 
 ## 8. Evidence, manifest, publication
 
-Checks run over the datasets, not over single records, so their `lid` is NULL. Three rows of the last run: the identifier rule for Silver, the canary rule for Gold, the file layout rule.
+Checks run over the datasets, not over single records, so their `lid` is NULL. Three rows of run `01M3WTDATJYQ57CY5YHT2D54NR`: the identifier rule for Silver, the file layout rule, the canary rule for Gold.
 
 <details>
 <summary>sql/checks/no_direct_identifier.sql, sql.sql, partition_layout.sql, the three templates behind these rows</summary>
@@ -747,11 +747,11 @@ WHERE row_groups < {{min_row_groups}} OR max_rows > {{max_rows_per_row_group}}
 
 </details>
 
-| run_id | check_id | requirement_id | framework | dataset | dataset_version | check_kind | result | observed | expected | ran_at | engine_version | git_commit | lid |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 01M3075NM9ZSF1P822HXTA9W34 | GDPR-Art9/no_direct_identifier/silver/recording/['subject_src'] | GDPR-Art9 | GDPR-Art9 | silver/recording | 04eacd2c0a53 | no_direct_identifier | pass | 0 | 0 | 2026-09-20 20:12:26.633977 | 1.5.5 | 868ab53 | NULL |
-| 01M3075NM9ZSF1P822HXTA9W34 | GDPR-Art9/sql/gold/channel_quality/SELECT 1 FROM gold_channel_quality WHERE lid_radioactive(lid_from_uuid(lid)) = 1 | GDPR-Art9 | GDPR-Art9 | gold/channel_quality | 2612b79bcb85 | sql | pass | 0 | 0 | 2026-09-20 20:12:26.633977 | 1.5.5 | 868ab53 | NULL |
-| 01M3075NM9ZSF1P822HXTA9W34 | ISO13485-4.2.5/partition_layout/silver/recording/200000/2 | ISO13485-4.2.5 | ISO13485 | silver/recording | 04eacd2c0a53 | partition_layout | pass | 0 | 0 | 2026-09-20 20:12:26.633977 | 1.5.5 | 868ab53 | NULL |
+| requirement_id | dataset | dataset_version | result | observed | lid |
+|---|---|---|---|---|---|
+| GDPR-Art9 | silver/recording | 7c0dd6cd0c52 | pass | 0 | NULL |
+| ISO13485-4.2.5 | silver/recording | 7c0dd6cd0c52 | pass | 0 | NULL |
+| GDPR-Art9 | gold/channel_quality | 5f654194fba3 | pass | 0 | NULL |
 
 `gold/dataset_manifest` names the build: the same `dataset_version` the evidence carries, the identifier range of the records, the number of source files behind them.
 
@@ -774,12 +774,12 @@ ORDER BY 1;
 
 </details>
 
-| dataset_version | dataset | layer | lid_lo | lid_hi | n_records | files | produced_at | git_commit |
-|---|---|---|---|---|---|---|---|---|
-| 2612b79bcb85 | gold/channel_quality | 3 | 01M30739CH6080008G00000000 | 01M3073EJG60G0020GZG000000 | 384 | 6 | 2026-09-20 20:12:24.243828 | 868ab53 |
-| 04eacd2c0a53 | silver/recording | 2 | 01M30739CH4080008G00000000 | 01M3073EJG40G0020GZG000000 | 30718000 | 8 | 2026-09-20 20:12:24.243828 | 868ab53 |
+| dataset_version | dataset | lid_lo | lid_hi | n_records | files |
+|---|---|---|---|---|---|
+| 5f654194fba3 | gold/channel_quality | 01M3AS9Q5W60R0008G00000000 | 01M3ASCSFN60G00AGGQG000000 | 2241 | 42 |
+| 7c0dd6cd0c52 | silver/recording | 01M3AS9Q5W40R0008G00000000 | 01M3ASCXQV40G00B8GZG080000 | 871159620 | 45 |
 
-Silver has 8 files behind it, Gold 6: the two canary files never reach a mart. `docs/data/manifest.json` records the published copies with their own digests.
+Silver has 45 files behind it, Gold 42: the three canary files never reach a mart. `docs/data/manifest.json` records the published copies with their own digests.
 
 <details>
 <summary>pipeline/publish.py, the refusal query per published file</summary>
@@ -794,15 +794,15 @@ WHERE lid IS NOT NULL AND lid_radioactive(lid_from_uuid(lid)) = 1
 
 | path | bytes | sha256 |
 |---|---|---|
-| gold/channel_quality/data_0.parquet | 7360 | 9605d0fa03d0 |
-| gold/dataset_manifest/data_0.parquet | 4309 | 1b3c443a0443 |
+| gold/channel_quality/data_0.parquet | 34972 | bad96cfe9e4f |
+| gold/dataset_manifest/data_0.parquet | 8154 | 23a8a559c3a3 |
 
 ## 9. What the five showed
 
 | n | Lesson |
 |---|---|
-| 1 | A gap in the source is kept in Bronze, dropped in Silver, counted in Gold, and visible in the window range. The injected tone is measurable. |
-| 2 | Same subject as 1, other experiment: a different file, a different identifier, the same pseudonym. |
-| 3 | The burst lands on a different channel per subject; the identifier's channel field and `sample_lo` tell which. |
+| 1 | The strongest line noise of the build is one number in Gold, traced to its file and digest without a second lookup. |
+| 2 | Same subject as 1, other experiment: a different file, a different identifier, the same pseudonym. Its `scale_basis` says the unit scale is assumed. |
+| 3 | Another experiment changes the identifier's experiment field and nothing else in the method. |
 | 4 | A clean record moves through with nothing lost and every value a query result. |
-| 5 | The canary bit set at conversion survives Silver and stops every Gold mart, without any column to lose. |
+| 5 | A gap in the source is kept in Bronze as NULL and dropped in Silver. The radioactive bit set at conversion survives Silver and stops every Gold mart, without any column to lose. |

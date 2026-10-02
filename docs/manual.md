@@ -110,7 +110,7 @@ FROM silver_record"""))
 EOF
 ```
 
-Expected: a positive number in Silver, 0 in Gold. The canary is a fake subject planted to prove nothing leaks. Its flag is a bit inside the identifier, so a copied row keeps it.
+Expected: a positive number in Silver, 0 in Gold. The canary is a fake subject planted to prove nothing leaks. Its flag is the radioactive bit inside the identifier, so a copied row keeps it.
 
 ### 4.4 What this build is made of
 
@@ -163,7 +163,7 @@ A layout change is a decision and needs an ADR. Every `lid` in `DATA_DIR` was bu
 
 ## 7. Add a governance rule
 
-1. Add one row to `governance/requirements.csv`: framework, requirement id, clause, control, check kind, dataset, params as JSON, severity.
+1. Add one row to `governance/requirements.csv`, in the order of its header `framework,requirement_id,clause,control,check_kind,dataset,params,severity`. `params` is JSON.
 2. `make checks`.
 3. Read the evidence (section 4.2).
 

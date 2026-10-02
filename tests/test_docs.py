@@ -16,3 +16,14 @@ def test_five_records_shows_the_sql_files_as_they_are():
     assert len(blocks) == 8
     for name, block in blocks:
         assert block == lf(db.REPO / name).rstrip("\n"), name
+
+
+def test_adr_index_status_equals_each_record():
+    """The index row of every ADR names the status its own file states."""
+    index_md = lf(db.REPO / "adr" / "README.md")
+    index = dict(re.findall(r"^\| (\d{4}) \|.*\| (\w+) \|$", index_md, re.MULTILINE))
+    records = sorted((db.REPO / "adr").glob("ADR-*.md"))
+    assert records
+    for path in records:
+        status = re.search(r"^\| Status \| (\w+) \|$", lf(path), re.MULTILINE).group(1)
+        assert index.get(path.stem[4:]) == status, path.name

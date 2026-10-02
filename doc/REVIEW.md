@@ -1,6 +1,24 @@
-# REVIEW.md
+# Review log
 
 One entry per phase. What was checked, what failed, what changed.
+
+| Date | Entry | Branch | What changed |
+|---|---|---|---|
+| 2026-09-19 | [Phase 0, skeleton](#phase-0-skeleton) | `feat/phase0` | Bronze, Silver, Gold, checks and publish on synthetic data |
+| 2026-09-20 | [Phase 0 amendment, lid layout from arch-standards](#phase-0-amendment-lid-layout-from-arch-standards) | `feat/lid-layout` | lid macros generated from arch-standards, canary records, dataset manifest |
+| 2026-09-20 | [Phase 0 amendment, text, parse and relayer from the generator](#phase-0-amendment-text-parse-and-relayer-from-the-generator) | `feat/lid-generated-macros` | Text, parse and relayer macros generated, spec 12 corrected |
+| 2026-09-21 | [Phase 1, real data](#phase-1-real-data) | `feat/phase1` | Real Stanford data: fetch with resume, three adapters, memory fix |
+| 2026-09-21 | [Phase 2, faults and bench](#phase-2-faults-and-bench) | `feat/phase2` | Four faults planted, fixed and measured into docs/bench.md |
+| 2026-09-22 | [Phase 3, site](#phase-3-site) | `feat/phase3` | Static page reruns the Gold checks in DuckDB-WASM |
+| 2026-09-23 | [Phase 3 addendum, GitHub Pages](#phase-3-addendum-github-pages) | `docs/bench-pages` | Site on Pages, benches against real latency, ETag workaround |
+| 2026-09-23 | [Rename](#rename-2026-09-23) | `chore/rename-ecog-lakehouse` | Project renamed to ecog-lakehouse |
+| 2026-09-24 | [Digests verified by consumers](#digests-verified-by-consumers-2026-09-24) | `feat/verify-digests` | Page and Fault D verify every published sha256 |
+| 2026-09-25 | [Plausibility checks and the evidence page](#plausibility-checks-and-the-evidence-page-2026-09-25) | `feat/evidence-page` | Flag severity checks, checks table order, audit stores data root |
+| 2026-09-25 | [Memory incident root cause, corrected](#memory-incident-root-cause-corrected-2026-09-25) | `docs/memory-incident-root-cause` | Memory failure cause tested: inline aggregates carry no row count |
+| 2026-10-01 | [Credits and dependencies](#credits-and-dependencies-2026-10-01) | `chore/credits-and-dependencies` | Credits, citation file, licences, numpy declared, CycloneDX bill of materials |
+| 2026-10-02 | [Own rails and scale basis](#own-rails-and-scale-basis-2026-10-02) | `feat/gold-own-rails-and-scale-basis` | clipped_own_pct and scale_basis added, Gold republished |
+| 2026-10-02 | [NaN as NULL and the walkthrough SQL](#nan-as-null-and-the-walkthrough-sql-2026-10-02) | `docs/nan-as-null-and-five-records` | Docs say NULL for source NaN, walkthrough SQL equals files |
+| 2026-10-02 | [The two open timings](#the-two-open-timings-2026-10-02) | `docs/explain-the-two-open-timings` | Variant gap was the machine, Fault A is bytes |
 
 ## Phase 0, skeleton
 
