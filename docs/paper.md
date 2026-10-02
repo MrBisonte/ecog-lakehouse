@@ -28,11 +28,11 @@ Data: three experiments of the Stanford ECoG library [8], `fingerflex`, `motor_b
 
 **Checks.** `pipeline/checks.py` turns each row of `governance/requirements.csv` and each contract rule (Open Data Contract Standard v3 [6]) into plain SQL, one of eight kinds (`doc/spec.md` section 5.2). The rows quote 21 CFR Part 11 [1], ISO 13485 [2], ALCOA+ [3] and GDPR Article 9 [4]. The mapping of clauses to checks is illustrative and has not been reviewed by a compliance professional. Each run appends one evidence row per check with the dataset version (a digest of the file digests), the engine version and the git commit. A `block` failure stops the build. The browser reruns the same SQL with DuckDB-WASM.
 
-**Lineage identifier.** `lid` is 128 bits in the ULID layout [7]: 48 bits of first ingestion time, then layer, experiment, file, run, channel, segment and a canary bit (`doc/spec.md` section 12.1). Decoding is a bit shift; the source file and its sha256 are one join away. Against other schemes:
+**Lineage identifier.** `lid` is 128 bits in the ULID layout [7]: 48 bits of first ingestion time, then layer, experiment, file, run, channel, segment and the radioactive bit that marks a canary (`doc/spec.md` section 12.1). Decoding is a bit shift; the source file and its sha256 are one join away. Against other schemes:
 
 | Scheme | What it encodes | What a decode needs | Cost per record |
 |---|---|---|---|
-| `lid` | 48 bit time, layer, experiment, file, run, channel, segment, canary bit | Bit shift for the fields; one join for the file path and sha256 | 16 bytes |
+| `lid` | 48 bit time, layer, experiment, file, run, channel, segment, radioactive bit | Bit shift for the fields; one join for the file path and sha256 | 16 bytes |
 | ULID [7] | 48 bit millisecond time, 80 random bits | Bit shift for the time; the rest carries no meaning | 16 bytes, 26 characters as text |
 | UUIDv7 [9] | 48 bit Unix millisecond time, version and variant, 74 bits random or counter | Bit shift for the time | 16 bytes |
 | OpenLineage [10] | Run events: run id, job, input and output datasets, facets | A query over stored events, at dataset and column grain | None; events per run |
