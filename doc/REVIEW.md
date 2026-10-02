@@ -19,6 +19,7 @@ One entry per phase. What was checked, what failed, what changed.
 | 2026-10-02 | [Own rails and scale basis](#own-rails-and-scale-basis-2026-10-02) | `feat/gold-own-rails-and-scale-basis` | clipped_own_pct and scale_basis added, Gold republished |
 | 2026-10-02 | [NaN as NULL and the walkthrough SQL](#nan-as-null-and-the-walkthrough-sql-2026-10-02) | `docs/nan-as-null-and-five-records` | Docs say NULL for source NaN, walkthrough SQL equals files |
 | 2026-10-02 | [The two open timings](#the-two-open-timings-2026-10-02) | `docs/explain-the-two-open-timings` | Variant gap was the machine, Fault A is bytes |
+| 2026-10-03 | [Documentation audit](#documentation-audit-2026-10-03) | `integration/docs-audit` | Thirty findings in three areas, three agent branches, paper, glossary, lock file |
 
 ## Phase 0, skeleton
 
@@ -592,3 +593,37 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 - Why DuckDB fetches the small row groups whole. It is observed in the request count and the bytes received, not traced in the reader.
 - The bench on loopback with the new columns; only the run against Pages was made.
+
+## Documentation audit, 2026-10-03
+
+- Status: branch `integration/docs-audit`, 38 commits ahead of master. Three agent branches, `docs/practice`, `docs/paper` and `docs/readability`, each cut from master `39f241e`, one commit per finding, merged without conflicts, then nine integration commits.
+
+### Checked
+
+- Clean clone of `integration/docs-audit` at `d292630`, fresh `DATA_DIR`: `make all SYNTH=1` in 24.45 s, publish 8 files, 128,539,975 bytes; `make lint` 19 pages pass; `make test` 97 passed; `docs/data` restored and `git status` empty.
+- `make bench` over GitHub Pages in 137.13 s: one section per fault, a setup table, min / median / max of three for Fault A.
+- Tracked text searched for the word academic and the demo leftovers: none.
+- Diff stats of the CRLF files, `doc/spec.md`, `doc/REVIEW.md` and `docs/five-records.md`, show only the lines edited.
+
+### Found
+
+- The lock file and the bill of materials frozen from the working venv carried six packages of tools that are not dependencies. Both regenerated from a clean venv of the declared dependencies, 41 pins.
+- `pipeline/bench_doc.py` run as a script from a worktree wrote the main checkout's `docs/bench.md`: the editable install resolves `pipeline` there. `make bench` runs it as a module now.
+- The build wall clock spanned every evidence run since ingestion, 605,146.77 s. It ends with the first evidence run now, 355.59 s.
+- `doc/spec.md` left `numpy` out of section 7.
+- Four code comments said canary bit where the spec says radioactive bit.
+- The Fault A timings of 2026-10-01 did not repeat. The run of 2026-10-03 gives one record 1.00 s to 0.58 s and the aggregate 1.11 s to 2.64 s, medians of three. GET counts and bytes received are unchanged.
+
+### Changed
+
+- Practice: `doc/intent.md` rewritten for the public project; `doc/plan.md` and `doc/agent/phase0.md` removed; `CONTRIBUTING.md`; `tests/test_links.py`; every table in `docs/lessons-learned.md` names its source.
+- Paper: `docs/paper.md` with references, the compliance sentence and related work for `lid`; `faults/lib.sh` spread of three and section replace; `pipeline/bench_doc.py` setup table and readable units; `CITATION.cff` DOIs confirmed and version 0.1.0; `requirements.lock` used by CI; `tests/test_citation.py`, `tests/test_bench_doc.py`.
+- Readability: `docs/glossary.md`; spec facts, prose and title; ADR index and consequences as lists; the index of this log; `docs/five-records.md` regenerated from the real build with five real subjects; canary in prose, radioactive for the bit.
+- README: paper, glossary and contributing rows, `doc/` against `docs/`, the compliance sentence, fault numbers from the new run, ECoG spelled out.
+
+### Not checked
+
+- CI on Python 3.12 with the lock file; the pins come from a Python 3.14 venv.
+- The tag `v0.1.0` and the archive, after merge.
+- `make bench` on loopback.
+- The paper is 1,148 words, 250 of them references; the budget was 900.
