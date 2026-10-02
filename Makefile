@@ -28,7 +28,7 @@ publish:
 	$(PY) -m pipeline.publish
 
 bench:
-	$(PY) pipeline/bench_doc.py
+	$(PY) -m pipeline.bench_doc
 	for f in $(wildcard faults/*/bench.sh); do bash $$f; done
 
 test:
