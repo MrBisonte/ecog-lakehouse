@@ -16,7 +16,7 @@ authors:
 repository-code: "https://github.com/MrBisonte/ecog-lakehouse"
 url: "https://mrbisonte.github.io/ecog-lakehouse/"
 license: MIT
-version: 0.0.1
+version: 0.1.0
 keywords:
   - lakehouse
   - data governance

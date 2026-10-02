@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fault G, spec 6: pathological generated SQL. Parse plus bind time of the 512 level nested OR
-# against the IN list, and the parser's message for the malformed variant. Appends to
-# docs/bench.md. silver_record is read from DATA_DIR so the bind has real columns.
+# against the IN list, and the parser's message for the malformed variant. Replaces its
+# section of docs/bench.md. silver_record is read from DATA_DIR so the bind has real columns.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source faults/lib.sh
@@ -20,9 +20,6 @@ error=$("$DUCKDB" -c "$VIEW $(cat "$OUT/malformed.sql")" 2>&1 | grep -v '^$' | h
 depth=$(grep -o '(' "$OUT/nested.sql" | wc -l)
 
 {
-  echo
-  echo "## Fault G: pathological generated SQL"
-  echo
   echo "\`faults/g/plant.py\` wrote three predicates over 512 channels under \`docs/data/faults/g\`. Seconds are wall clock of \`EXPLAIN\` in the CLI, parse and bind, no rows read. The generator in \`pipeline/checks.py\` emits the IN form and refuses the other two (test \`test_generator_rejects_malformed_and_deeply_nested_sql\`)."
   echo
   echo "| predicate | nesting | EXPLAIN seconds |"
@@ -35,4 +32,4 @@ depth=$(grep -o '(' "$OUT/nested.sql" | wc -l)
   echo '```'
   echo "$error"
   echo '```'
-} | tee -a "$BENCH_MD"
+} | replace_section "## Fault G: pathological generated SQL"
