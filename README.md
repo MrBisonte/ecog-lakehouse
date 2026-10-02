@@ -66,6 +66,7 @@ requirements.csv  ──►  generator  ──►  SQL checks  ──►  eviden
 ```
 
 - A new regulation is new rows in the CSV. No code changes.
+- The mapping of clauses to checks is illustrative and has not been reviewed by a compliance professional.
 - The data contracts feed the same generator.
 - The last build ran 111 checks.
 - The same files always give the same `dataset_version`, so evidence can be reproduced.
@@ -96,14 +97,14 @@ Integrity is separate: a sha256 per file and a digest per dataset version.
 
 ## Planted faults
 
-Each fault is a mistake built on purpose, beside its fix. Times are measured against GitHub Pages.
+Each fault is a mistake built on purpose, beside its fix. Times are medians of three runs against GitHub Pages, from [docs/bench.md](docs/bench.md).
 
 | Fault | The mistake | The fix | Measured |
 |---|---|---|---|
-| A | One giant row group | 38 sorted row groups | Fetching one record: 1.71 s to 0.65 s. Aggregating every row: 1.50 s to 3.76 s, slower |
-| D | A Python loop downloads one file at a time | One `read_parquet` over all the URLs | 9.46 s to 0.58 s for 8 files |
+| A | One giant row group | 38 sorted row groups | Fetching one record: 1.00 s to 0.58 s. Aggregating every row: 1.11 s to 2.64 s, slower |
+| D | A Python loop downloads one file at a time | One `read_parquet` over all the URLs | 6.31 s to 0.33 s for 10 files |
 | F | A 503 from the server kills the read | `http_retries` with backoff | 0 of 10 reads succeed, then 10 of 10 |
-| G | Generated SQL nests 512 `OR`s | An `IN` list | Planning: 0.093 s to 0.046 s. The generator now refuses the nested form |
+| G | Generated SQL nests 512 `OR`s | An `IN` list | Planning: 0.09 s to 0.04 s. The generator now refuses the nested form |
 
 Fault A did not go as planned. The fixed layout is faster for the lookup it was designed for and slower for a full aggregate. [Why](docs/lessons-learned.md), and [issue #28](https://github.com/MrBisonte/ecog-lakehouse/issues/28) for the part still open.
 
@@ -111,14 +112,18 @@ Run them with `make bench`. This needs a DuckDB CLI; see `faults/lib.sh`.
 
 ## Docs
 
+`doc/` holds the design and the contract, `docs/` the published site.
+
 | Read | For |
 |---|---|
+| [docs/paper.md](docs/paper.md) | The project in one page: claims, method, results, limits, references |
 | [docs/manual.md](docs/manual.md) | Running, inspecting and resetting the build |
 | [docs/five-records.md](docs/five-records.md) | Five records followed from file to Gold, with the SQL of every step |
 | [docs/lessons-learned.md](docs/lessons-learned.md) | The out of memory incident: cause, proof, and what we got wrong |
 | [docs/bench.md](docs/bench.md) | Row counts and every fault measurement |
 | [doc/spec.md](doc/spec.md) | The contract: every dataset, column and rule |
 | [adr/](adr/README.md) | Six decisions, each with the options rejected |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to propose a change |
 
 ## Limits
 
