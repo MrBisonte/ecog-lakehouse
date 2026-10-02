@@ -3,7 +3,7 @@
 # front of BASE_URL answers 503 to one range request in ten. Ten attempts per setting: success
 # rate and mean wall clock. The attempts run on the pipeline's DuckDB (Python), which honours
 # http_retries = 0; the 2.0 alpha CLI retries a 503 on its own and is reported as a third row.
-# Appends to docs/bench.md.
+# Replaces its section of docs/bench.md.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source faults/lib.sh
@@ -56,9 +56,6 @@ after=$(python_attempts "$AFTER")
 alpha=$(cli_attempts "$BEFORE")
 
 {
-  echo
-  echo "## Fault F: flaky remote reads without retries"
-  echo
   echo "\`faults/f/flaky_proxy.py\` in front of \`$BASE_URL\`, 503 on a fraction $FRACTION of range requests, deterministic. Query: the Fault A aggregate, one range request per row group, over \`${FILE#docs/data/}\`. Ten attempts per row, each timed. The first two rows run on DuckDB $py_version, the pipeline's engine; the third on the CLI \`$("$DUCKDB" --version)\`, which retries a 503 on its own whatever http_retries says."
   echo
   echo "| engine, setting | successes | mean seconds |"
@@ -66,4 +63,4 @@ alpha=$(cli_attempts "$BEFORE")
   echo "| before, $py_version, http_retries = 0 | ${before% *} | ${before#* } |"
   echo "| after, $py_version, http_retries = 8, wait 50 ms, backoff 2 | ${after% *} | ${after#* } |"
   echo "| 2.0 alpha CLI, http_retries = 0 | ${alpha% *} | ${alpha#* } |"
-} | tee -a "$BENCH_MD"
+} | replace_section "## Fault F: flaky remote reads without retries"

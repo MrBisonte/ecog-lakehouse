@@ -46,6 +46,27 @@ spread3() {
   printf '%.2f / %.2f / %.2f' $runs
 }
 
+# replace_section <heading>: the section body on stdin replaces, in BENCH_MD, every section whose
+# heading line equals <heading>, from that line up to the next line starting with "## " or the
+# end of the file. The first such section keeps its place; a heading not present is appended.
+# Runs of blank lines collapse to one. The section is echoed to stdout as well.
+replace_section() {
+  local body tmp
+  body=$(cat)
+  tmp=$(mktemp "$BENCH_MD.XXXXXX")
+  HEADING=$1 BODY=$body awk '
+    function out(s) { if (s == "") { gap = 1; return } if (gap && n) print ""; gap = 0; n++; print s }
+    BEGIN { h = ENVIRON["HEADING"]; b = ENVIRON["BODY"] }
+    $0 == h { if (!done) { out(h); out(""); out(b); gap = 1 } done = skip = 1; next }
+    skip && /^## / { skip = 0 }
+    !skip { out($0) }
+    END { if (!done) { out(""); out(h); out(""); out(b) } }
+  ' "$BENCH_MD" > "$tmp"
+  cat "$tmp" > "$BENCH_MD"  # not mv: keeps the file's mode, mktemp creates 0600
+  rm "$tmp"
+  printf '\n%s\n\n%s\n' "$1" "$body"
+}
+
 # The smallest non canary partition of silver/recording, as FAULT_EXPERIMENT FAULT_SUBJECT.
 pick_partition() {
   read -r FAULT_EXPERIMENT FAULT_SUBJECT < <("$PY" - <<'EOF'
