@@ -1,12 +1,11 @@
 # ecog-lakehouse in one page
 
-A lakehouse over public brain recordings, built to test three claims on real data. This page states the claims, the method, the results and where the test stops.
+A lakehouse over public brain recordings, built to test three claims on real data. The claims, the method, the results and where the test stops.
 
 ## Problem
 
-- Regulated data teams keep the data and the proof of its rules apart. The proof is a document, and it ages the day it is written.
-- The FDA computer software assurance guidance [5] accepts risk based, automated evidence.
-- A number in a report rarely leads back to the bytes it came from. A lineage catalogue can drift from the data it describes.
+- Regulated teams keep the data and the proof of its rules apart. The proof is a document, and it ages the day it is written. The FDA software assurance guidance [5] accepts automated evidence instead.
+- A number in a report rarely leads back to the bytes it came from. A lineage catalogue drifts from the data it describes.
 - File layout is chosen once and seldom measured.
 
 ## Contribution
@@ -27,11 +26,9 @@ Data: three experiments of the Stanford ECoG library [8], `fingerflex`, `motor_b
 | Silver | Microvolts, milliseconds, pseudonyms | No source subject code |
 | Gold | Channel quality, experiment summary, one second windows, evidence | Every value is a query result |
 
-**Check generator.** `pipeline/checks.py` reads `governance/requirements.csv` and the data contracts (Open Data Contract Standard v3 [6]). The requirement rows quote 21 CFR Part 11 [1], ISO 13485 [2], ALCOA+ [3] and GDPR Article 9 [4]. The mapping of clauses to checks is illustrative and has not been reviewed by a compliance professional. Each rule names one of eight check kinds (`doc/spec.md` section 5.2) and renders as plain SQL. Each run appends one evidence row per check, with the dataset version, the engine version and the git commit. The dataset version is a digest of the file digests. A `block` failure stops the build. The same SQL is published and rerun in the browser by DuckDB-WASM.
+**Checks.** `pipeline/checks.py` turns each row of `governance/requirements.csv` and each contract rule (Open Data Contract Standard v3 [6]) into plain SQL, one of eight kinds (`doc/spec.md` section 5.2). The rows quote 21 CFR Part 11 [1], ISO 13485 [2], ALCOA+ [3] and GDPR Article 9 [4]. The mapping of clauses to checks is illustrative and has not been reviewed by a compliance professional. Each run appends one evidence row per check with the dataset version (a digest of the file digests), the engine version and the git commit. A `block` failure stops the build. The browser reruns the same SQL with DuckDB-WASM.
 
-**Lineage identifier.** `lid` is 128 bits in the ULID layout [7]: 48 bits of first ingestion time, then layer, experiment, ingested file, run, channel, segment and a canary bit (`doc/spec.md` section 12.1). Decoding is a bit shift. The file behind a Gold row is one join to `lineage_dim`, one row per ingested file. Every record of one file is a range scan on the prefix.
-
-Related work for `lid`:
+**Lineage identifier.** `lid` is 128 bits in the ULID layout [7]: 48 bits of first ingestion time, then layer, experiment, file, run, channel, segment and a canary bit (`doc/spec.md` section 12.1). Decoding is a bit shift; the source file and its sha256 are one join away. Against other schemes:
 
 | Scheme | What it encodes | What a decode needs | Cost per record |
 |---|---|---|---|
@@ -41,9 +38,7 @@ Related work for `lid`:
 | OpenLineage [10] | Run events: run id, job, input and output datasets, facets | A query over stored events, at dataset and column grain | None; events per run |
 | W3C PROV [11] | Entities, activities, agents and relations such as `wasDerivedFrom` | A graph query over the relations | One entity and its relations per item tracked |
 
-**Planted faults.** Each fault under `faults/<letter>/` has a plant, a fix and a `bench.sh`. The pipeline holds the fixed version.
-
-**How measured.** Wall clock from the shell. Reads go over HTTP to GitHub Pages. Faults A, D and G run on the DuckDB 2.0 alpha CLI, Fault F on the pipeline's DuckDB 1.5.5. Fault A takes the median of three runs, D and G one run, F ten attempts per setting.
+**Planted faults.** Each fault under `faults/<letter>/` has a plant, a fix and a `bench.sh`; the pipeline holds the fixed version. Timings are shell wall clock over HTTP to GitHub Pages. Faults A, D and G run on the DuckDB 2.0 alpha CLI, Fault F on the pipeline's DuckDB 1.5.5. Fault A takes the median of three runs, D and G one run, F ten attempts per setting.
 
 ## Results
 
@@ -55,16 +50,16 @@ Checks, evidence run `01M3WTDATJYQ57CY5YHT2D54NR` of 2026-10-01, queried from `g
 
 The three flags are plausibility checks under ALCOA+ Accurate. Two are on `gold/channel_quality`, 101 and 48 of 2241 records. One is on `gold/experiment_summary`, 1 of 42 rows. A flag reports records and lets the build continue.
 
-Faults, copied from `docs/bench.md` at commit `39f241e`, the last section of each fault:
+Faults, copied from `docs/bench.md`, run of 2026-10-03 over GitHub Pages; Fault A times are the median of three:
 
 | Fault | Mistake | Fix | Before | After |
 |---|---|---|---|---|
-| A | One row group, 51960395 bytes | 2 files, 38 sorted row groups, 76269314 bytes | One record 1.708 s, aggregate 1.504 s | One record 0.649 s, aggregate 3.760 s |
-| D | A Python loop downloads 8 files one at a time | One `read_parquet` over every URL | 9.457 s | 0.583 s |
+| A | One row group, 49.55 MiB | 2 files, 38 sorted row groups, 72.74 MiB | One record 1.00 s, aggregate 1.11 s | One record 0.58 s, aggregate 2.64 s |
+| D | A Python loop downloads 10 files one at a time | One `read_parquet` over every URL | 6.31 s | 0.33 s |
 | F | 503 on one range request in ten, `http_retries = 0` | `http_retries = 8`, backoff 2 | 0/10 reads succeed | 10/10 |
-| G | Generated SQL nests 512 `OR`s | An `IN` list | `EXPLAIN` 0.093 s | `EXPLAIN` 0.046 s |
+| G | Generated SQL nests 512 `OR`s | An `IN` list | `EXPLAIN` 0.09 s | `EXPLAIN` 0.04 s |
 
-Fault A did not go as planned. The fixed layout wins the lookup it was built for and loses the full aggregate, which receives 72.7 MiB against 21.5 MiB. The cause is in `docs/lessons-learned.md` section 8.
+Fault A did not go as planned. The fixed layout wins the lookup it was built for and loses the full aggregate, which receives 72.7 MiB against 21.5 MiB. The cause is in `docs/lessons-learned.md`.
 
 ## Limits
 
@@ -75,7 +70,7 @@ Fault A did not go as planned. The fixed layout wins the lookup it was built for
 | One network location | Every remote read takes one path to GitHub Pages. Another CDN edge gives other times. |
 | One author | No independent review of design, code or results. |
 | `faces_basic` unit scale | The source does not document it. Those rows are marked `scale_basis = assumed`. |
-| Median of three | Fault A reports a median of three runs, D and G one run. No spread is reported. |
+| Three runs | Fault A reports min, median and max of three runs, D and G one run. |
 
 ## References
 
