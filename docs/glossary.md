@@ -9,7 +9,7 @@ The words the other pages assume. The spec column names the section of [doc/spec
 | Silver | The second layer. Typed, timestamped and pseudonymised. The first layer a consumer may read. | [3.2](../doc/spec.md#32-silver) |
 | Gold | The third layer, the model for consumers. Every value is a query result. | [3.3](../doc/spec.md#33-gold) |
 | medallion | The name for the Bronze, Silver, Gold layering. All three layers are Hive partitioned Parquet. | [3](../doc/spec.md#3-layers) |
-| lid | Lineage identifier. 128 bits in the ULID layout: a 48 bit timestamp, then layer, experiment, file, run, channel, segment and the radioactive bit. Decoding it needs no join. | [12](../doc/spec.md#12-lineage-identifier-lid) |
+| lid | Lineage identifier, 128 bits in the ULID layout. A 48 bit timestamp comes first. The other 80 bits hold the layer, the experiment and the file. Then the run, channel, segment and the radioactive bit. Decoding it needs no join. | [12](../doc/spec.md#12-lineage-identifier-lid) |
 | record | One channel of one run of one ingested file, optionally split into segments. Each record has one `lid`. Samples reference their record. | [12](../doc/spec.md#12-lineage-identifier-lid) |
 | channel | One electrode of a recording. `channel_idx` is its zero-based index in the source array. | [3.1](../doc/spec.md#31-bronze) |
 | segment | A fixed part of one channel run, 0 when the run is not split. A run over 24 days at 1 kHz is split. | [12.1](../doc/spec.md#121-shape), [12.6](../doc/spec.md#126-limits) |
@@ -22,6 +22,6 @@ The words the other pages assume. The spec column names the section of [doc/spec
 | check | One SQL query generated from a contract rule or a requirement row, of one of eight kinds. Severity `block` stops the build, `flag` is recorded. | [5.2](../doc/spec.md#52-check-kinds) |
 | evidence | `gold/evidence`: one row per check per run, append-only. It names the dataset version, the result, the engine and the commit. | [5.3](../doc/spec.md#53-goldevidence) |
 | dataset_version | The sha256 of the sorted list of Parquet file digests in a dataset. Identical files give an identical version. | [5.3](../doc/spec.md#53-goldevidence) |
-| ALCOA+ | Data integrity principles: attributable, legible, contemporaneous, original, accurate, plus complete, consistent, enduring, available. One of the frameworks of the requirements table. | [3.1](../doc/spec.md#31-bronze), [5.1](../doc/spec.md#51-governancerequirementscsv) |
+| ALCOA+ | Data integrity principles. ALCOA is attributable, legible, contemporaneous, original and accurate. The plus adds complete, consistent, enduring and available. One of the frameworks of the requirements table. | [3.1](../doc/spec.md#31-bronze), [5.1](../doc/spec.md#51-governancerequirementscsv) |
 | Part 11 | US FDA rule 21 CFR Part 11 on electronic records and signatures. Framework `Part11` in the requirements table. | [5.1](../doc/spec.md#51-governancerequirementscsv) |
 | DuckDB-WASM | DuckDB compiled to WebAssembly. The page loads it from a pinned CDN version and reruns the checks in the browser. | [8](../doc/spec.md#8-browser-page) |

@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-The system ingests recordings from the Stanford ECoG library, stores them in three layers on Parquet, enforces data contracts with checks generated from a regulatory requirements table, writes evidence for every run, and exposes the Gold layer to a browser page. Four faults are planted on purpose, each with a fix and a measurement.
+The system ingests recordings from the Stanford ECoG library and stores them in three layers on Parquet. It enforces data contracts with checks generated from a regulatory requirements table, and writes evidence for every run. It exposes the Gold layer to a browser page. Four faults are planted on purpose, each with a fix and a measurement.
 
 ## 2. Source data
 
@@ -184,7 +184,7 @@ Not part of any layer. Contains two tables.
 
 #### silver/recording
 
-Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `lid, sample_idx`, which is file, run, channel, time order (section 12.2). Row groups of at most 200,000 rows; the writer asks for 198,656, the largest multiple of DuckDB's 2,048 row vector under the limit, because DuckDB rounds the requested size up.
+Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `lid, sample_idx`, which is file, run, channel and time order (section 12.2). Row groups of at most 200,000 rows; the writer asks for 198,656, the largest multiple of DuckDB's 2,048 row vector under the limit, because DuckDB rounds the requested size up.
 
 | Column name | Column type |
 |---|---|
@@ -374,7 +374,7 @@ Every target invokes an entry point as a module, `python -m pipeline.<name>`, ne
 - A script path puts `pipeline/` first on `sys.path`. An editable install then supplies the package from the checkout it was installed from. A run inside a clone would execute another checkout's code.
 - As a module the working directory comes first. A clone runs its own code, and the verifier pass of a clean clone holds whatever virtual environment is active.
 
-All data and DuckDB working files live under `DATA_DIR`, an environment variable defaulting to `$HOME/data/ecog-lakehouse`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`.
+All data and DuckDB working files live under `DATA_DIR`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. `DATA_DIR` is an environment variable defaulting to `$HOME/data/ecog-lakehouse`.
 
 - The repository sits on a Windows mount under WSL2. Per-file operations there are slow and OneDrive style syncing can lock files. Nothing but source, documentation and `docs/data/` is written inside it.
 - `DATA_DIR` is created on first run.
@@ -446,7 +446,8 @@ Rules:
 
 ## 11. Licences
 
-Code: MIT. Published data under `docs/data/`: CC BY-SA 4.0, attributed to Kai J. Miller, "A library of human electrocorticographic data and analyses", Nature Human Behaviour, 2019, with the repository URL, as `docs/data/LICENSE.md`.
+- Code: MIT.
+- Published data under `docs/data/`: CC BY-SA 4.0. `docs/data/LICENSE.md` holds the attribution: the repository URL and Kai J. Miller, "A library of human electrocorticographic data and analyses", Nature Human Behaviour, 2019.
 
 ## 12. Lineage identifier (`lid`)
 
@@ -495,7 +496,7 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
 | `lineage_experiment` | `code TINYINT, experiment VARCHAR` | Experiment code table |
 | `lineage_edge` | `child_lid UUID, parent_lid UUID` | Only for derivations that span more than one record. Empty in this system; present so the limit is explicit |
 
-A Silver record's `lid` differs from its Bronze parent's only in the layer bits; `lid_parent(lid)` returns the same identifier with the layer decremented, so Gold to Silver to Bronze is three bit operations and no lookup. `silver/recording` is sorted by `lid, sample_idx` within each file, which is file, run, channel, time order. Zone maps prune on `lid` ranges.
+A Silver record's `lid` differs from its Bronze parent's only in the layer bits; `lid_parent(lid)` returns the same identifier with the layer decremented, so Gold to Silver to Bronze is three bit operations and no lookup. `silver/recording` is sorted by `lid, sample_idx` within each file, which is file, run, channel and time order. Zone maps prune on `lid` ranges.
 
 ### 12.3 Functions
 
@@ -522,11 +523,11 @@ The generated macros take and return the native `UHUGEINT`, while `lid` is store
 | `lid_children(ing)` | hand written | table: every `silver/record` row of one ingested file | Forward: range scan on the `ingest_ord` prefix |
 | `lid_prefix_lo(ing)`, `lid_prefix_hi(ing)` | hand written | `UUID` | Bounds for the range scan |
 
-Example. Given a `gold/channel_quality` row with `lid = 01K5H2ZQ8G0000000000000000` (text form), `lid_trace` returns the `.mat` file it came from, the sha256 recorded at ingestion, and run 1, channel 17. `lid_children(3)` returns every record derived from the third ingested file.
+Example. Take a `gold/channel_quality` row with `lid = 01K5H2ZQ8G0000000000000000` (text form). `lid_trace` returns the `.mat` file it came from, the sha256 recorded at ingestion, and run 1 and channel 17. `lid_children(3)` returns every record derived from the third ingested file.
 
 ### 12.4 Site behaviour
 
-Every number in the `channel_quality` and `experiment_summary` tables on `docs/index.html` is clickable. Clicking runs `lid_trace` in DuckDB-WASM and shows the result in a side panel: file, digest, run, channel, sample range. The panel text is a query result like everything else on the page.
+Every number in the `channel_quality` and `experiment_summary` tables on `docs/index.html` is clickable. Clicking runs `lid_trace` in DuckDB-WASM and shows the result in a side panel: file, digest, run, channel and sample range. The panel text is a query result like everything else on the page.
 
 ### 12.5 Canary records
 
