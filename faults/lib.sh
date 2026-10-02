@@ -28,13 +28,23 @@ serve_docs_data() {
   export BASE_URL
 }
 
-# seconds() <command...>: wall clock of the command, three decimals, output discarded.
+# seconds() <command...>: wall clock of the command, two decimals, output discarded.
 seconds() {
   local t0 t1
   t0=$(date +%s.%N)
   "$@" >/dev/null 2>&1
   t1=$(date +%s.%N)
-  printf '%.3f' "$(echo "$t1 - $t0" | bc)"
+  printf '%.2f' "$(echo "$t1 - $t0" | bc)"
+}
+
+# thousands <integer>: 15336887 as 15,336,887, the form pipeline/bench_doc.py writes.
+thousands() {
+  echo "$1" | sed -E ':a;s/^([0-9]+)([0-9]{3})/\1,\2/;ta'
+}
+
+# mib <bytes>: bytes as MiB with two decimals, the form pipeline/bench_doc.py writes.
+mib() {
+  printf '%.2f MiB' "$(echo "$1 / 1048576" | bc -l)"
 }
 
 # spread3() <command...>: "min / median / max" of three seconds() runs, two decimals each.
