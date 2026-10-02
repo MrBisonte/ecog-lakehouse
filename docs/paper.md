@@ -5,6 +5,7 @@ A lakehouse over public brain recordings, built to test three claims on real dat
 ## Problem
 
 - Regulated data teams keep the data and the proof of its rules apart. The proof is a document, and it ages the day it is written.
+- The FDA computer software assurance guidance [5] accepts risk based, automated evidence.
 - A number in a report rarely leads back to the bytes it came from. A lineage catalogue can drift from the data it describes.
 - File layout is chosen once and seldom measured.
 
@@ -18,7 +19,7 @@ A lakehouse over public brain recordings, built to test three claims on real dat
 
 ## Method
 
-Data: three experiments of the Stanford ECoG library, `fingerflex`, `motor_basic` and `faces_basic`, MATLAB files at 1 kHz.
+Data: three experiments of the Stanford ECoG library [8], `fingerflex`, `motor_basic` and `faces_basic`, MATLAB files at 1 kHz.
 
 | Layer | Holds | Rule |
 |---|---|---|
@@ -26,9 +27,9 @@ Data: three experiments of the Stanford ECoG library, `fingerflex`, `motor_basic
 | Silver | Microvolts, milliseconds, pseudonyms | No source subject code |
 | Gold | Channel quality, experiment summary, one second windows, evidence | Every value is a query result |
 
-**Check generator.** `pipeline/checks.py` reads `governance/requirements.csv` and the data contracts. Each rule names one of eight check kinds (`doc/spec.md` section 5.2) and renders as plain SQL. Each run appends one evidence row per check, with the dataset version, the engine version and the git commit. The dataset version is a digest of the file digests. A `block` failure stops the build. The same SQL is published and rerun in the browser by DuckDB-WASM.
+**Check generator.** `pipeline/checks.py` reads `governance/requirements.csv` and the data contracts (Open Data Contract Standard v3 [6]). The requirement rows quote 21 CFR Part 11 [1], ISO 13485 [2], ALCOA+ [3] and GDPR Article 9 [4]. Each rule names one of eight check kinds (`doc/spec.md` section 5.2) and renders as plain SQL. Each run appends one evidence row per check, with the dataset version, the engine version and the git commit. The dataset version is a digest of the file digests. A `block` failure stops the build. The same SQL is published and rerun in the browser by DuckDB-WASM.
 
-**Lineage identifier.** `lid` is 128 bits in the ULID layout: 48 bits of first ingestion time, then layer, experiment, ingested file, run, channel, segment and a canary bit (`doc/spec.md` section 12.1). Decoding is a bit shift. The file behind a Gold row is one join to `lineage_dim`, one row per ingested file. Every record of one file is a range scan on the prefix.
+**Lineage identifier.** `lid` is 128 bits in the ULID layout [7]: 48 bits of first ingestion time, then layer, experiment, ingested file, run, channel, segment and a canary bit (`doc/spec.md` section 12.1). Decoding is a bit shift. The file behind a Gold row is one join to `lineage_dim`, one row per ingested file. Every record of one file is a range scan on the prefix.
 
 **Planted faults.** Each fault under `faults/<letter>/` has a plant, a fix and a `bench.sh`. The pipeline holds the fixed version.
 
@@ -65,3 +66,14 @@ Fault A did not go as planned. The fixed layout wins the lookup it was built for
 | One author | No independent review of design, code or results. |
 | `faces_basic` unit scale | The source does not document it. Those rows are marked `scale_basis = assumed`. |
 | Median of three | Fault A reports a median of three runs, D and G one run. No spread is reported. |
+
+## References
+
+1. eCFR, 21 CFR Part 11, Electronic Records; Electronic Signatures. https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-11
+2. ISO 13485:2016, Medical devices, Quality management systems, Requirements for regulatory purposes. https://www.iso.org/standard/59752.html
+3. FDA, Data Integrity and Compliance With Drug CGMP, Questions and Answers, December 2018. It defines ALCOA; the term ALCOA+ does not appear in it. https://www.fda.gov/regulatory-information/search-fda-guidance-documents/data-integrity-and-compliance-drug-cgmp-questions-and-answers
+4. Regulation (EU) 2016/679, General Data Protection Regulation, Article 9. https://eur-lex.europa.eu/eli/reg/2016/679/oj
+5. FDA, Computer Software Assurance for Production and Quality Management System Software, final guidance, February 2026. https://www.fda.gov/regulatory-information/search-fda-guidance-documents/computer-software-assurance-production-and-quality-management-system-software
+6. Bitol, Open Data Contract Standard, v3. https://bitol-io.github.io/open-data-contract-standard/latest/
+7. ULID specification. https://github.com/ulid/spec
+8. Miller, K. J. A library of human electrocorticographic data and analyses. Nature Human Behaviour 3, 1225 to 1235 (2019). https://doi.org/10.1038/s41562-019-0678-3
