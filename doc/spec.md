@@ -367,7 +367,7 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 
 ## 7. Pipeline
 
-`pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `pyyaml` and nothing else. Orchestration is `make`.
+`pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `numpy`, `pyyaml` and nothing else. Orchestration is `make`.
 
 Every target invokes an entry point as a module, `python -m pipeline.<name>`, never as a script path.
 
