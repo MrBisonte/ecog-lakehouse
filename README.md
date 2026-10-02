@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/MrBisonte/ecog-lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/MrBisonte/ecog-lakehouse/actions/workflows/ci.yml)
 
-A lakehouse over public brain recordings: 42 files from the Stanford ECoG library, 2,241 channels, 860 million samples, stored as Parquet and built with DuckDB.
+A lakehouse over public brain recordings: 42 files from the Stanford ECoG (electrocorticography) library, 2,241 channels, 860 million samples, stored as Parquet and built with DuckDB.
 
 It exists to try three ideas on real data.
 
@@ -118,6 +118,7 @@ Run them with `make bench`. This needs a DuckDB CLI; see `faults/lib.sh`.
 |---|---|
 | [docs/paper.md](docs/paper.md) | The project in one page: claims, method, results, limits, references |
 | [docs/manual.md](docs/manual.md) | Running, inspecting and resetting the build |
+| [docs/glossary.md](docs/glossary.md) | Every term the other pages assume, with its spec section |
 | [docs/five-records.md](docs/five-records.md) | Five records followed from file to Gold, with the SQL of every step |
 | [docs/lessons-learned.md](docs/lessons-learned.md) | The out of memory incident: cause, proof, and what we got wrong |
 | [docs/bench.md](docs/bench.md) | Row counts and every fault measurement |
