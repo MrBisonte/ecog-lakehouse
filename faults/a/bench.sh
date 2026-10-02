@@ -2,7 +2,7 @@
 # Fault A, spec 6: single row group, unpartitioned, unsorted against partitioned, sorted,
 # 198,656 row groups. Plants both layouts under docs/data/faults/a, then times the same
 # aggregate over HTTP with read_ahead_depth = 0 and with the default, and the retrieval of one
-# record by lid, with the GET requests and bytes each costs. Appends to docs/bench.md.
+# record by lid, with the GET requests and bytes each costs. Replaces its section of docs/bench.md.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source faults/lib.sh
@@ -54,13 +54,10 @@ row() {  # name, local directory: every Parquet file in it is one layout, one or
 }
 
 {
-  echo
-  echo "## Fault A: single row group, unpartitioned, unsorted"
-  echo
   echo "DuckDB CLI \`$("$DUCKDB" --version)\`. Subject partition \`experiment=$FAULT_EXPERIMENT/subject_pid=$FAULT_SUBJECT\`, the smallest non canary one, over \`$BASE_URL\`, every file of the layout in one read_parquet. Aggregate: \`$AGGREGATE\`. One record: \`$ONE_RECORD\`, the middle record of $RECORDS. Seconds are min / median / max of three CLI runs each; GET requests and bytes received are one run's HTTP statistics from EXPLAIN ANALYZE."
   echo
   echo "| layout | files | row groups | bytes | sorted by lid, sample_idx | aggregate, read_ahead_depth = 0, s min / median / max | aggregate, default, s min / median / max | aggregate GETs | aggregate received | one record, s min / median / max | one record GETs | one record received |"
   echo "|---|---|---|---|---|---|---|---|---|---|---|---|"
   row "before, one row group" "$BAD"
   row "after, partitioned and sorted" "$GOOD"
-} | tee -a "$BENCH_MD"
+} | replace_section "## Fault A: single row group, unpartitioned, unsorted"
