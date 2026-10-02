@@ -2,8 +2,9 @@
 
 Every number is a query result or read from the system at run time.
 Bronze counts leave the canary subjects out, so the table describes the source library.
-Build wall clock is the span from the first ingestion of the audit to the last evidence
-row, so it assumes one build per DATA_DIR and leaves fetch and publish out.
+Build wall clock is the span from the first ingestion of the audit to the end of the first
+evidence run, so it measures the build that ingested and leaves fetch, publish and later
+check runs out.
 """
 
 import datetime
@@ -52,7 +53,8 @@ SELECT
     (SELECT any_value(git_commit) FROM gold_dataset_manifest) AS git_commit,
     (SELECT any_value(duckdb_version) FROM bronze_ingest_audit) AS duckdb_version,
     (SELECT count(*) FROM bronze_ingest_audit) AS files,
-    (SELECT max(ran_at) FROM gold_evidence) - (SELECT min(ingested_at) FROM bronze_ingest_audit) AS wall_clock
+    (SELECT max(ran_at) FROM gold_evidence WHERE run_id = (SELECT min(run_id) FROM gold_evidence))
+        - (SELECT min(ingested_at) FROM bronze_ingest_audit) AS wall_clock
 """
 
 
@@ -173,8 +175,8 @@ def main(argv=None) -> int:
         markdown(con.execute(TABLE)),
         "",
         (
-            f"Files ingested: {cell('files', files)}. Build wall clock, first ingestion to last "
-            f"evidence row: {cell('wall_clock', wall_clock)} seconds."
+            f"Files ingested: {cell('files', files)}. Build wall clock, first ingestion to the end "
+            f"of the first evidence run: {cell('wall_clock', wall_clock)} seconds."
         ),
         "",
     ])
