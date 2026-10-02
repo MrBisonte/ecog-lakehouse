@@ -223,9 +223,9 @@ Gold is the enterprise model for consumers. Everything here is a query result.
 
 - `clipped_pct` is the share of samples at the amplifier's minimum or maximum, in percent. The files carry no amplifier range, so the rails are the observed extremes of the run: the hardware reading, one rail for every channel of the run.
 - `scale_basis` is copied from `silver/record`: `rms_uv` of a record marked `assumed` rests on a scale its source does not state.
-- `clipped_own_pct` is the same share against the record's own extremes: the signal reading, how flat one channel is at its own top. Every record has at least one sample at each extreme, so it is never zero. Both columns come from the same pass over Silver.
+- `clipped_own_pct` is the same share against the record's own extremes: the signal reading, how flat one record is at its own top. Every record has at least one sample at each extreme, so it is never zero. Both columns come from the same pass over Silver.
 - `gold/dataset_manifest` has one row per dataset per build. `dataset_version` is the same digest `gold/evidence` uses; `lid_lo` and `lid_hi` bound the records included; `file_digests` lists the source sha256 values. This is the handle a model registry or a submission package holds to say exactly which data it was built on: one row, and every record and file it covers can be enumerated with `lid_children` and `lineage_dim`.
-- `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per channel in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.
+- `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per record in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.
 
 ### 3.4 Export
 

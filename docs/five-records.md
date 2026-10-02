@@ -119,7 +119,7 @@ Decoded, the five Bronze identifiers say exactly where each record sits. The can
 Experiment codes: 1 fingerflex, 2 motor_basic. The file number is `ingest_ord` from the table above.
 
 <details>
-<summary>sql/bronze/recording.sql, the mint, one lid per channel</summary>
+<summary>sql/bronze/recording.sql, the mint, one lid per record</summary>
 
 ```sql
     JOIN (
@@ -183,7 +183,7 @@ COPY (
 
 The burst arrives as NULL: the file holds NaN, and DuckDB reads NaN from the numpy array as NULL. Bronze keeps the row; the gap is counted later, not hidden.
 
-Electrodes, one row per channel, same identifier as the samples of that channel.
+Electrodes, one row per channel, same identifier as the samples of that record.
 
 <details>
 <summary>sql/bronze/electrode.sql</summary>
@@ -462,7 +462,7 @@ COPY (
 
 ## 6. Gold, every value a query result
 
-The marts read Silver and refuse any record whose identifier carries the canary bit. Record 5 stops here. The others get layer 3.
+The marts read Silver and refuse any record whose identifier carries the radioactive bit. Record 5 stops here. The others get layer 3.
 
 `gold/channel_quality`, one row per record. `missing_samples` is `n_samples_src` minus what Silver holds: the 500 sample burst shows up as 500. `line_noise_ratio` is the share of power at 50 and 60 Hz in the first 10 s; record 1 carries the injected tone, so it stands out at 0.030 against 0.002.
 
@@ -805,4 +805,4 @@ WHERE lid IS NOT NULL AND lid_radioactive(lid_from_uuid(lid)) = 1
 | 2 | Same subject as 1, other experiment: a different file, a different identifier, the same pseudonym. |
 | 3 | The burst lands on a different channel per subject; the identifier's channel field and `sample_lo` tell which. |
 | 4 | A clean record moves through with nothing lost and every value a query result. |
-| 5 | The canary bit set at conversion survives Silver and stops every Gold mart, without any column to lose. |
+| 5 | The radioactive bit set at conversion survives Silver and stops every Gold mart, without any column to lose. |

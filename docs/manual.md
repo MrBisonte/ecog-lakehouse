@@ -110,7 +110,7 @@ FROM silver_record"""))
 EOF
 ```
 
-Expected: a positive number in Silver, 0 in Gold. The canary is a fake subject planted to prove nothing leaks. Its flag is a bit inside the identifier, so a copied row keeps it.
+Expected: a positive number in Silver, 0 in Gold. The canary is a fake subject planted to prove nothing leaks. Its flag is the radioactive bit inside the identifier, so a copied row keeps it.
 
 ### 4.4 What this build is made of
 
