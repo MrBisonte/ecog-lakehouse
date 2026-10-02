@@ -31,6 +31,16 @@ Data: three experiments of the Stanford ECoG library [8], `fingerflex`, `motor_b
 
 **Lineage identifier.** `lid` is 128 bits in the ULID layout [7]: 48 bits of first ingestion time, then layer, experiment, ingested file, run, channel, segment and a canary bit (`doc/spec.md` section 12.1). Decoding is a bit shift. The file behind a Gold row is one join to `lineage_dim`, one row per ingested file. Every record of one file is a range scan on the prefix.
 
+Related work for `lid`:
+
+| Scheme | What it encodes | What a decode needs | Cost per record |
+|---|---|---|---|
+| `lid` | 48 bit time, layer, experiment, file, run, channel, segment, canary bit | Bit shift for the fields; one join for the file path and sha256 | 16 bytes |
+| ULID [7] | 48 bit millisecond time, 80 random bits | Bit shift for the time; the rest carries no meaning | 16 bytes, 26 characters as text |
+| UUIDv7 [9] | 48 bit Unix millisecond time, version and variant, 74 bits random or counter | Bit shift for the time | 16 bytes |
+| OpenLineage [10] | Run events: run id, job, input and output datasets, facets | A query over stored events, at dataset and column grain | None; events per run |
+| W3C PROV [11] | Entities, activities, agents and relations such as `wasDerivedFrom` | A graph query over the relations | One entity and its relations per item tracked |
+
 **Planted faults.** Each fault under `faults/<letter>/` has a plant, a fix and a `bench.sh`. The pipeline holds the fixed version.
 
 **How measured.** Wall clock from the shell. Reads go over HTTP to GitHub Pages. Faults A, D and G run on the DuckDB 2.0 alpha CLI, Fault F on the pipeline's DuckDB 1.5.5. Fault A takes the median of three runs, D and G one run, F ten attempts per setting.
@@ -77,3 +87,6 @@ Fault A did not go as planned. The fixed layout wins the lookup it was built for
 6. Bitol, Open Data Contract Standard, v3. https://bitol-io.github.io/open-data-contract-standard/latest/
 7. ULID specification. https://github.com/ulid/spec
 8. Miller, K. J. A library of human electrocorticographic data and analyses. Nature Human Behaviour 3, 1225 to 1235 (2019). https://doi.org/10.1038/s41562-019-0678-3
+9. RFC 9562, Universally Unique IDentifiers (UUIDs), section 5.7, UUID Version 7. https://www.rfc-editor.org/rfc/rfc9562.html
+10. OpenLineage, object model. https://openlineage.io/docs/spec/object-model
+11. W3C, PROV-DM: The PROV Data Model, Recommendation, 30 April 2013. https://www.w3.org/TR/prov-dm/
