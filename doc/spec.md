@@ -1,7 +1,5 @@
 # spec.md
 
-Working name of the repository: `brain`. Rename freely; nothing depends on it.
-
 ## 1. Scope
 
 The system ingests recordings from the Stanford ECoG library, stores them in three layers on Parquet, enforces data contracts with checks generated from a regulatory requirements table, writes evidence for every run, and exposes the Gold layer to a browser page. Four faults are planted on purpose, each with a fix and a measurement.
@@ -319,7 +317,7 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 
 - Fix, v1.x compatible form used by the pipeline: one `COPY (SELECT ... WHERE experiment = ... AND subject_pid = ... ORDER BY lid, sample_idx) TO '<partition directory>/data_0.parquet' (FORMAT parquet, ROW_GROUP_SIZE 198656);` per partition. DuckDB 1.5's partitioned `COPY` does not keep the `ORDER BY` across its buffer flushes, a plain `COPY` does.
 - Bench: the same aggregate over both layouts, remote URL, with `SET read_ahead_depth = 0;` and with the default. Four timings.
-- Story: parallelism is per row group; a single row group is a single stream, and no I/O scheduler can help it.
+- Result, measured over GitHub Pages and recorded in the last Fault A section of `docs/bench.md`. For the aggregate the single row group fetched 21.5 MiB in 11 GETs, the partitioned layout 72.7 MiB in 38 GETs. For one record by `lid` the partitioned layout wins: 6.7 MiB in 5 GETs, against 19.5 MiB in 10 GETs. Partitioning pays when a filter skips row groups; `docs/lessons-learned.md` section 8 says why.
 
 ### Fault D: synchronous one-file-at-a-time loop
 
@@ -391,9 +389,10 @@ Rules: every number on the page is a query result; system font stack; no request
 
 | Component | Version | Reason |
 |---|---|---|
-| DuckDB CLI for the demo | v2.0.0 alpha, exact build recorded in `docs/bench.md` | Async I/O and the `COPY ... PARTITION BY ... ORDER BY` syntax |
-| DuckDB Python for the pipeline | Latest stable 1.x, or 2.0 alpha if on PyPI at build time | Pipeline uses only syntax valid on both |
-| DuckDB-WASM | Pinned exact version in `docs/index.html` | Reproducibility |
+| Python | 3.12 or later, `requires-python` in `pyproject.toml` | The pipeline language |
+| DuckDB Python for the pipeline | 1.5.5, the `engine_version` of every evidence row | Pipeline uses only syntax valid on 1.x and 2.0 |
+| DuckDB CLI for the fault benches | v2.0.0 alpha, exact build recorded in `docs/bench.md` | Async I/O and the `COPY ... PARTITION BY ... ORDER BY` syntax |
+| DuckDB-WASM | 1.32.0, pinned in `docs/index.html` | Reproducibility |
 
 ## 11. Licences
 
