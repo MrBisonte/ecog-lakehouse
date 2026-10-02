@@ -18,11 +18,11 @@ The paper that describes it:
 
 The paper each experiment first appeared in, as its `README_<experiment>_dataset_notes` gives it:
 
-| Experiment | Paper |
-|---|---|
-| `fingerflex` | Miller, Kai J., Dora Hermes, Christopher J. Honey, Adam O. Hebb, Nick F. Ramsey, Robert T. Knight, Jeffrey G. Ojemann, and Eberhard E. Fetz. "Human motor cortical activity is selectively phase-entrained on underlying rhythms." PLoS computational biology 8, no. 9 (2012): e1002655. |
-| `motor_basic` | Miller, Kai J., Eric C. Leuthardt, Gerwin Schalk, Rajesh PN Rao, Nicholas R. Anderson, Daniel W. Moran, John W. Miller, and Jeffrey G. Ojemann. "Spectral changes in cortical surface potentials during motor movement." Journal of Neuroscience 27, no. 9 (2007): 2424-2432. |
-| `faces_basic` | Miller, Kai J., Gerwin Schalk, Dora Hermes, Jeffrey G. Ojemann, and Rajesh PN Rao. "Spontaneous decoding of the timing and content of human object perception from cortical surface recordings reveals complementary information in the event-related potential and broadband spectral change." PLoS computational biology 12, no. 1 (2016): e1004660. |
+| Experiment | Paper | DOI |
+|---|---|---|
+| `fingerflex` | Miller, Kai J., Dora Hermes, Christopher J. Honey, Adam O. Hebb, Nick F. Ramsey, Robert T. Knight, Jeffrey G. Ojemann, and Eberhard E. Fetz. "Human motor cortical activity is selectively phase-entrained on underlying rhythms." PLoS computational biology 8, no. 9 (2012): e1002655. | https://doi.org/10.1371/journal.pcbi.1002655 |
+| `motor_basic` | Miller, Kai J., Eric C. Leuthardt, Gerwin Schalk, Rajesh PN Rao, Nicholas R. Anderson, Daniel W. Moran, John W. Miller, and Jeffrey G. Ojemann. "Spectral changes in cortical surface potentials during motor movement." Journal of Neuroscience 27, no. 9 (2007): 2424-2432. | https://doi.org/10.1523/JNEUROSCI.3886-06.2007 |
+| `faces_basic` | Miller, Kai J., Gerwin Schalk, Dora Hermes, Jeffrey G. Ojemann, and Rajesh PN Rao. "Spontaneous decoding of the timing and content of human object perception from cortical surface recordings reveals complementary information in the event-related potential and broadband spectral change." PLoS computational biology 12, no. 1 (2016): e1004660. | https://doi.org/10.1371/journal.pcbi.1004660 |
 
 Anatomical labels of the `faces_basic` electrodes follow Destrieux, C., Fischl, B., Dale, A. and Halgren, E. Automatic parcellation of human cortical gyri and sulci using standard anatomical nomenclature. NeuroImage 53, 1 to 15 (2010). https://doi.org/10.1016/j.neuroimage.2010.06.010
 
