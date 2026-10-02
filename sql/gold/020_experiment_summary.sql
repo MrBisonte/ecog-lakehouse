@@ -1,6 +1,6 @@
 -- gold/experiment_summary, spec 3.3. One row per experiment and subject. duration_s is the
 -- sum over runs of the last present sample time plus one millisecond. A subject whose
--- records carry the canary bit (spec 12.5) is left out.
+-- records carry the radioactive bit (spec 12.5) is left out.
 COPY (
     WITH canary AS (
         SELECT DISTINCT subject_pid FROM silver_record WHERE lid_radioactive(lid_from_uuid(lid)) = 1

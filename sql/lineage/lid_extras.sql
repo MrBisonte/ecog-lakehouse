@@ -37,7 +37,7 @@ CREATE OR REPLACE MACRO lid_parent(lid) AS
     END;
 
 -- Bounds of every Silver record of one ingested file: ts_ms and experiment come from the
--- file, layer is 2, run, channel, segment and the canary bit span their full range.
+-- file, layer is 2, run, channel, segment and the radioactive bit span their full range.
 CREATE OR REPLACE MACRO lid_prefix_lo(ing) AS (
     SELECT lid_to_uuid(lid_encode(d.ts_ms, 2, e.code, ing, 0, 0, 0, 0))
     FROM lineage_dim d JOIN lineage_experiment e USING (experiment)
