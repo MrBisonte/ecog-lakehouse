@@ -37,9 +37,13 @@ seconds() {
   printf '%.3f' "$(echo "$t1 - $t0" | bc)"
 }
 
-# median3() <command...>: the median of three seconds() runs, single runs vary on loopback.
-median3() {
-  { seconds "$@"; echo; seconds "$@"; echo; seconds "$@"; echo; } | sort -n | sed -n 2p
+# spread3() <command...>: "min / median / max" of three seconds() runs, two decimals each.
+# Single runs vary, so the spread is shown beside the median.
+spread3() {
+  local runs
+  runs=$({ seconds "$@"; echo; seconds "$@"; echo; seconds "$@"; echo; } | sort -n)
+  # shellcheck disable=SC2086  # three sorted numbers, split on purpose
+  printf '%.2f / %.2f / %.2f' $runs
 }
 
 # The smallest non canary partition of silver/recording, as FAULT_EXPERIMENT FAULT_SUBJECT.
