@@ -30,6 +30,6 @@ files_fix=${verified%,*}; mismatches=${verified#*,}
   echo
   echo "| approach | rows | seconds | digest check seconds | files hashed | digest mismatches |"
   echo "|---|---|---|---|---|---|"
-  echo "| before, sequential download then count | $rows_plant | $t_plant | | 0 | not checked |"
-  echo "| after, one httpfs statement, then verify.sql | $rows_fix | $t_fix | $t_verify | $files_fix | $mismatches |"
+  echo "| before, sequential download then count | $(thousands "$rows_plant") | $t_plant | | 0 | not checked |"
+  echo "| after, one httpfs statement, then verify.sql | $(thousands "$rows_fix") | $t_fix | $t_verify | $files_fix | $mismatches |"
 } | replace_section "## Fault D: synchronous one-file-at-a-time loop"

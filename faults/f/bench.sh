@@ -35,7 +35,7 @@ for _ in range(10):
     except Exception:  # noqa: BLE001, any failure is a failed attempt, DuckDB 1.5.5 raises UnicodeDecodeError on some 503 bodies
         pass
     total += time.perf_counter() - t0
-print(f"{ok}/10 {total / 10:.3f}")
+print(f"{ok}/10 {total / 10:.2f}")
 EOF
 }
 
@@ -47,7 +47,7 @@ cli_attempts() {  # the same ten attempts on the CLI
     t1=$(date +%s.%N)
     total=$(echo "$total + $t1 - $t0" | bc)
   done
-  echo "$ok/10 $(printf '%.3f' "$(echo "$total / 10" | bc -l)")"
+  echo "$ok/10 $(printf '%.2f' "$(echo "$total / 10" | bc -l)")"
 }
 
 py_version=$("$PY" -c "import duckdb; print(duckdb.__version__)")
