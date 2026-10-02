@@ -22,7 +22,7 @@ Adapter roadmap:
 - NWB: `acquisition/ElectricalSeries`, `general/electrodes` and `intervals/trials` into the same Bronze schema.
 - BIDS-iEEG.
 
-NWB and BIDS are the formats the company's science and ML teams name. NWB's `acquisition` group carries the same rule as Bronze: raw data never changes. The NWB adapter needs `pynwb`, and with it `h5py`. That is an optional dependency, introduced by its own ADR in phase 1, never in phase 0.
+NWB and BIDS are the formats neuroscience teams name. NWB's `acquisition` group carries the same rule as Bronze: raw data never changes. The NWB adapter needs `pynwb`, and with it `h5py`. That is an optional dependency, introduced by its own ADR in phase 1, never in phase 0.
 
 > **Note.** Field names inside the `.mat` files differ per experiment. `pipeline/convert_mat.py` holds one adapter per experiment that maps the file's arrays to the Bronze schema. An experiment without an adapter is skipped with a logged reason, never guessed.
 
@@ -246,7 +246,7 @@ Gold is the enterprise model for consumers. Everything here is a query result.
 
 ### 3.4 Export
 
-Gold exports one NWB file per subject and experiment for the science and ML teams. It is written by the same optional `pynwb` dependency as the adapter. The file carries provenance as HDF5 attributes:
+Gold exports one NWB file per subject and experiment for neuroscience teams. It is written by the same optional `pynwb` dependency as the adapter. The file carries provenance as HDF5 attributes:
 
 - `/general/ecog_lakehouse_dataset_version`
 - `/general/ecog_lakehouse_source_sha256` (list)
@@ -367,7 +367,7 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 
 ## 7. Pipeline
 
-`pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `pyyaml` and nothing else. Orchestration is `make`.
+`pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `numpy`, `pyyaml` and nothing else. Orchestration is `make`.
 
 Every target invokes an entry point as a module, `python -m pipeline.<name>`, never as a script path.
 
