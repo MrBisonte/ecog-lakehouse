@@ -1,4 +1,4 @@
-# spec.md
+# Specification
 
 ## 1. Scope
 
