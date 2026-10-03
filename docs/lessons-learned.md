@@ -154,6 +154,7 @@ Source: the last Fault A table of [bench.md](bench.md), commit `0407bcd`.
 
 - The aggregate needs two columns, about 17 MB in either layout. From the 38 row groups the DuckDB 2.0 alpha received the full size of the files.
 - The partitioned files are 47 percent larger. `ts_ms` and `sample_idx` take 28.9 MB each there, against 17.0 MB each in the single row group. One dictionary over 7.2 million rows compresses what a dictionary per 198,656 sorted rows cannot.
+- Silver has the same loss: both columns are stored plain in every row group. Parquet version 2 stores them as deltas and removes almost all of those bytes. Measured, not adopted: the encodings section of [bench.md](bench.md), written by `faults/a/encodings.sh`.
 - Partitioning pays when a filter skips row groups. It costs when the query reads every row.
 - The layout stays: it is right for the range retrieval `lid_children` does, and the `partition_layout` check demands it.
 
