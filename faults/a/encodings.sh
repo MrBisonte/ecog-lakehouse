@@ -70,7 +70,7 @@ http_row() {
   echo "| ${1/_/ } | $(http "$agg") | $(spread3 "$DUCKDB" -c "$SETUP $agg") | $(http "$one") | $(spread3 "$DUCKDB" -c "$SETUP $one") |"
 }
 
-{
+section() {
   echo "Issue 29, measured by \`faults/a/encodings.sh\`. DuckDB Python $(py "SELECT version()"), the pipeline's engine, reads the Parquet metadata and writes the variants; the CLI \`$("$DUCKDB" --version)\` reads them too and runs the queries over HTTP."
   echo
   echo "\`silver/recording\` in DATA_DIR as the pipeline wrote it, $(py "$(sql files "$SILVER")"), from parquet_metadata. A row group keeps a dictionary when its column chunk has a dictionary page."
@@ -90,4 +90,5 @@ http_row() {
   echo "| variant | aggregate GETs | aggregate received | aggregate, s min / median / max | one record GETs | one record received | one record, s min / median / max |"
   echo "|---|---|---|---|---|---|---|"
   for v in $VARIANTS; do http_row "$v"; done
-} | replace_section "## Fault A encodings: delta and zstd against the lost dictionary"
+}
+write_section "## Fault A encodings: delta and zstd against the lost dictionary" section

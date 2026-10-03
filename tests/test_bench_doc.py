@@ -44,3 +44,10 @@ def test_sections_the_fault_scripts_wrote_survive_a_rewrite():
 
 def test_cli_version_says_not_installed_when_absent(tmp_path):
     assert bench_doc.cli_version(tmp_path / "duckdb") == "not installed"
+
+
+def test_cli_sha256_names_the_exact_binary(tmp_path):
+    cli = tmp_path / "duckdb"
+    assert bench_doc.cli_sha256(cli) == "not installed"
+    cli.write_bytes(b"abc")
+    assert bench_doc.cli_sha256(cli) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"

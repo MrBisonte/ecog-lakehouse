@@ -21,6 +21,7 @@ One entry per phase. What was checked, what failed, what changed.
 | 2026-10-02 | [The two open timings](#the-two-open-timings-2026-10-02) | `docs/explain-the-two-open-timings` | Variant gap was the machine, Fault A is bytes |
 | 2026-10-03 | [Documentation audit](#documentation-audit-2026-10-03) | `integration/docs-audit` | Thirty findings in three areas, three agent branches, paper, glossary, lock file |
 | 2026-10-03 | [Fault A, issues 28 and 29](#fault-a-issues-28-and-29-2026-10-03) | `integration/fault-a-issues` | The alpha's file cache fetches 2 MiB blocks; Parquet version 2 deltas measured, not adopted |
+| 2026-10-03 | [Benches on the fixed alpha](#benches-on-the-fixed-alpha-2026-10-03) | `feat/bench-on-fixed-alpha` | The cache finding was known and fixed upstream; benches rerun on the build with the fix |
 
 ## Phase 0, skeleton
 
@@ -675,3 +676,40 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - The DuckDB source was read on GitHub at commit `31adc8b766` and at 1.5.5, not built or stepped through.
 - Whether a later alpha changes the cache. The upstream report is drafted and not posted.
 - Adopting Parquet version 2 in Silver: a writer change, a rebuild and a decision record, in a later change.
+
+## Benches on the fixed alpha, 2026-10-03
+
+- Status: branch `feat/bench-on-fixed-alpha`, cut from master `16d9959`. A correction of the entry above, made the same day.
+
+### What went wrong
+
+- The entry above traced the whole file fetch to the external file cache of the DuckDB CLI `v2.0.0-alpha42839`, called it a regression and drafted an upstream report. DuckDB's contributing guide asks to search the tracker first. That search was made only after the draft: duckdb/duckdb#25670 had already reported the same thing, and duckdb/duckdb#26096, merged 2026-09-29, fixes it. The report was not posted.
+- The trace itself holds. A maintainer describes the same block aligned cache in the upstream issue.
+
+### Checked
+
+- The newest alpha of the official installer's staged channel, `v2.0.0-alpha43763` at commit `96063b9e39`, is 45 commits ahead of the merge of #26096. Its sha256 is in the setup table of `docs/bench.md`.
+- Over GitHub Pages, default settings, the published good layout: 78 GETs and 16.5 MiB for the aggregate, against 38 GETs and 72.7 MiB on the earlier build; 6 GETs and 985.7 KiB for one record.
+- `make bench` over Pages, the sweep with both alpha builds and the encodings, 362.05 s for all three.
+- Clean clone at `b4aad8f`, fresh `DATA_DIR`: both Fault A scripts skip with a message and exit 0 before a build; `make all SYNTH=1` in 23.61 s, publish 8 files, 128,539,971 bytes; `make lint` 19 pages pass; `make test` 111 passed; `docs/data` restored and `git status` empty.
+
+### Found
+
+- Fault A reads as planned on the later build: the aggregate receives 16.3 MiB from one row group and 16.5 MiB from 38, the lookup 16.3 MiB against 985.7 KiB.
+- `faults/a/sweep.sh` failed on the later build: the setting `external_file_cache_remote_block_size` is now `external_file_cache_remote_max_block_size`. The failed row still left a cut-off section in the file it wrote, a scratch copy in that run.
+- On loopback, at 198,656 and 393,216 rows per row group, three runs of one query do not always receive the same bytes, on either alpha build. DuckDB 1.5.5 does. Not traced.
+- With the later build the four encoding variants receive about the same bytes for the aggregate. What Parquet version 2 saves is on disk, 18,281,020 bytes against 76,155,922.
+
+### Changed
+
+- The default CLI on this machine is the later build; the earlier one is kept beside it for the sweep. `faults/lib.sh` is unchanged in what it points at.
+- `faults/lib.sh` `write_section`: a body that fails writes nothing. Used by the three scripts that measure while they print, with a test.
+- `faults/a/sweep.sh`: asks each CLI for the name of its block size setting, takes a second CLI in `DUCKDB_BEFORE`, runs each query three times and shows all values where they differ, no timing.
+- `pipeline/bench_doc.py`: the sha256 of the CLI in the setup table.
+- `docs/bench.md` rerun. README, `docs/paper.md`, `docs/lessons-learned.md` section 8 and lessons 11 and 12, `doc/spec.md` section 6: Fault A on the later build, the earlier result kept as dated history with the build named.
+
+### Not checked
+
+- The sweep and the encodings over GitHub Pages; loopback only.
+- Why the bytes vary between runs at small row groups.
+- A release of DuckDB 2.0; both builds are alphas from a staged channel that keeps no archive this project controls.
