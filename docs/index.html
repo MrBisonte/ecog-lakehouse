@@ -22,12 +22,15 @@
   details table { margin-top: 4px; }
   td.wrap { white-space: normal; min-width: 16rem; overflow-wrap: anywhere; }
   #status { font-weight: 600; }
+  #bar { display: block; width: 100%; max-width: 90ch; height: 1rem; }
 </style>
 </head>
 <body>
 <h1>ecog-lakehouse, governance evidence</h1>
 <p>Every number on this page is a query result computed in your browser by DuckDB-WASM over the published Gold Parquet files, read by HTTP range requests from this site. The checks are the same SQL the pipeline ran; <code>lid.sql</code> holds the lineage identifier macros they use.</p>
-<p id="status">Loading DuckDB-WASM</p>
+<p id="status" aria-live="polite">Step 1 of 5: downloading the DuckDB engine</p>
+<progress id="bar" aria-labelledby="status"></progress>
+<p id="wait">The page is working. It downloads the engine, reruns every check and hashes every file in your browser, so the first visit takes a while. Keep the tab open.</p>
 <h2>Checks</h2>
 <p id="coverage"></p>
 <div id="frameworks"></div>
@@ -48,6 +51,18 @@ import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0
 
 const status = document.getElementById("status");
 const say = (text) => { status.textContent = text; };
+// One bar for five steps. Without a value the bar is indeterminate and the browser animates it.
+// ponytail: the share of each step is a guess. One warm visit from one machine spent 1.1 s in
+// the engine, 2.4 s opening the files, 0.9 s in the checks and 0.5 s hashing; a first visit
+// spends more in the engine and the hashes. Time the steps again if the bar stalls visibly.
+const bar = document.getElementById("bar");
+const STEPS = { engine: [0, 0.25], files: [0.25, 0.5], checks: [0.5, 0.7], tables: [0.7, 0.75], hashes: [0.75, 1] };
+const advance = (step, done, total) => {
+  const [from, to] = STEPS[step];
+  bar.value = from + (to - from) * done / total;
+};
+const finish = () => { bar.hidden = true; document.getElementById("wait").hidden = true; };
+const mib = (bytes) => (bytes / 2 ** 20).toFixed(1);
 const cell = (v, name) => v === null || v === undefined ? "NULL"
   : name.endsWith("_at") ? new Date(Number(v)).toISOString().replace("T", " ").slice(0, 19)
   : typeof v === "number" ? v.toLocaleString("en-US", { maximumFractionDigits: 4 })
@@ -127,10 +142,15 @@ try {
   const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
   const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
   const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  // DuckDB-WASM reports the bytes of the engine as they arrive. Its total is the compressed
+  // size and the count is not, so only the count is shown and the bar stays indeterminate.
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker, (p) => {
+    say(`Step 1 of 5: downloading the DuckDB engine, ${mib(p.bytesLoaded)} MiB so far`);
+  });
   URL.revokeObjectURL(workerUrl);
 
-  say("Reading data/manifest.json");
+  say("Step 2 of 5: opening the Gold files");
+  advance("files", 0, 1);
   const manifest = await (await fetch(`data/manifest.json?v=${Date.now()}`)).json();
   const gold = manifest.files.filter((f) => f.path.startsWith("gold/"));
   for (const f of gold) {
@@ -138,18 +158,19 @@ try {
   }
   const conn = await db.connect();
   const datasets = [...new Set(gold.map((f) => f.path.split("/")[1]))];
-  for (const d of datasets) {
+  for (const [i, d] of datasets.entries()) {
+    advance("files", i, datasets.length);
     const files = gold.filter((f) => f.path.split("/")[1] === d).map((f) => `'${f.path}'`).join(", ");
     await conn.query(`CREATE VIEW gold_${d} AS SELECT * FROM read_parquet([${files}], hive_partitioning = true)`);
   }
-  say("Loading data/lid.sql");
   const lid = await (await fetch("data/lid.sql")).text();
   for (const statement of lid.split(/;\s*\n/)) if (statement.trim()) await conn.query(statement);
 
-  say("Running data/checks.json");
   const checks = await (await fetch(`data/checks.json?v=${Date.now()}`)).json();
   const results = [];
-  for (const c of checks) {
+  for (const [i, c] of checks.entries()) {
+    say(`Step 3 of 5: rerunning check ${i + 1} of ${checks.length}`);
+    advance("checks", i, checks.length);
     let observed, result;
     try {
       observed = Object.values((await query(conn, c.sql)).rows[0])[0];
@@ -177,6 +198,8 @@ try {
     " and their ", link("data/checks.json", "respective SQL statements"), ".");
   checksTable("checks", results);
 
+  say("Step 4 of 5: reading the summary tables");
+  advance("tables", 0, 1);
   const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
   table("summary", summary.columns, summary.rows);
 
@@ -202,14 +225,27 @@ try {
 
   // Every Gold file the page read is fetched once more in full and hashed here; the digest
   // column says whether the bytes match manifest.json. Fault files are listed, not read.
-  say("Hashing the Gold files read");
+  const goldBytes = gold.reduce((n, f) => n + f.bytes, 0);
+  let hashedFiles = 0, hashedBytes = 0;
+  // The body is read chunk by chunk so the bar moves inside one large file.
   const digestOf = async (url) => {
-    const hash = await crypto.subtle.digest("SHA-256", await (await fetch(url)).arrayBuffer());
+    const reader = (await fetch(url)).body.getReader();
+    const chunks = [];
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      hashedBytes += value.length;
+      advance("hashes", hashedBytes, goldBytes);
+      say(`Step 5 of 5: hashing file ${hashedFiles} of ${gold.length}, ${mib(hashedBytes)} of ${mib(goldBytes)} MiB`);
+    }
+    const hash = await crypto.subtle.digest("SHA-256", await new Blob(chunks).arrayBuffer());
     return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
   };
   const files = [];
   for (const f of manifest.files) {
     const read = f.path.startsWith("gold/");
+    if (read) hashedFiles++;
     const digest = read ? await digestOf(new URL(`data/${f.path}`, location.href).href) : null;
     files.push({ path: f.path, bytes: f.bytes, sha256: f.sha256, digest: read ? (digest === f.sha256 ? "match" : "MISMATCH") : "not read" });
   }
@@ -217,8 +253,10 @@ try {
   const matched = files.filter((f) => f.digest === "match").length;
   const mismatched = files.filter((f) => f.digest === "MISMATCH").length;
 
+  finish();
   say(`Ready. ${gold.length} Gold files, ${cell(manifest.bytes, "bytes")} bytes published, DuckDB-WASM 1.32.0. ${matched} Gold files hashed in this browser, ${mismatched} mismatch.`);
 } catch (e) {
+  finish();
   say(`Failed: ${e.message || e}`);
   console.error(e);
 }
