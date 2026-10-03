@@ -20,6 +20,7 @@ One entry per phase. What was checked, what failed, what changed.
 | 2026-10-02 | [NaN as NULL and the walkthrough SQL](#nan-as-null-and-the-walkthrough-sql-2026-10-02) | `docs/nan-as-null-and-five-records` | Docs say NULL for source NaN, walkthrough SQL equals files |
 | 2026-10-02 | [The two open timings](#the-two-open-timings-2026-10-02) | `docs/explain-the-two-open-timings` | Variant gap was the machine, Fault A is bytes |
 | 2026-10-03 | [Documentation audit](#documentation-audit-2026-10-03) | `integration/docs-audit` | Thirty findings in three areas, three agent branches, paper, glossary, lock file |
+| 2026-10-03 | [Fault A, issues 28 and 29](#fault-a-issues-28-and-29-2026-10-03) | `integration/fault-a-issues` | The alpha's file cache fetches 2 MiB blocks; Parquet version 2 deltas measured, not adopted |
 
 ## Phase 0, skeleton
 
@@ -638,3 +639,39 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - The tag `v0.1.0` and the archive, after merge.
 - `make bench` on loopback.
 - The paper is 1,148 words, 250 of them references; the budget was 900.
+
+## Fault A, issues 28 and 29, 2026-10-03
+
+- Status: branch `integration/fault-a-issues`. Two agent branches cut from master `eda3350`, `feat/fault-a-sweep` for issue 28 and `feat/fault-a-encodings` for issue 29, merged without conflicts, then integration commits. Nothing in the pipeline, the contracts or `docs/data` changed.
+
+### Asked
+
+- Issue 28: why the DuckDB 2.0 alpha received the full size of the 38 row group layout for a query that reads two columns.
+- Issue 29: why `ts_ms` and `sample_idx` are larger in sorted row groups, what Silver itself looks like, and what delta encoding and zstd would give.
+
+### Found
+
+- Issue 28 is not the Parquet reader and not the layout. The reader asks for the two columns. The alpha's external file cache rounds each remote read out to aligned blocks of 2,097,152 bytes and fetches whole blocks; a row group of 198,656 rows is about one block wide. File, function and line at both versions are in `docs/lessons-learned.md` section 8.
+- Checked against GitHub Pages, the published good layout: alpha default 38 GETs and 72.7 MiB; alpha with `enable_external_file_cache = false` 78 GETs and 16.2 MiB; DuckDB 1.5.5 78 GETs and 16.2 MiB.
+- Issue 29: Silver stores `ts_ms` and `sample_idx` PLAIN. 0 of 4,408 row groups keep a dictionary for them. Each is 39.0 percent of the compressed bytes of `silver/recording`.
+- The Fault A partition written by DuckDB 1.5.5 with `PARQUET_VERSION v2` is 18,281,020 bytes with snappy against 76,155,922 today; both columns become DELTA_BINARY_PACKED.
+- Every variant reads the same in DuckDB 1.5.5, the alpha CLI and DuckDB-WASM 1.32.0: 7,236,800 rows and the same sums. The first two are in the script; the browser was checked by hand in this pass.
+- `make bench` rewrote `docs/bench.md` whole and would have dropped the two new sections; `pipeline/bench_doc.py` keeps the sections it does not own now.
+
+### Changed
+
+- `faults/a/sweep.sh`, `faults/a/http_stats.py`, `tests/test_sweep.py`: seven row group sizes, both engines, the cache settings, GETs and bytes.
+- `faults/a/encodings.sh`, `faults/a/encodings.py`, `tests/test_encodings.py`: the encodings of Silver, four variants of the partition, read checks, HTTP measurements.
+- `docs/bench.md`: two sections written by those scripts, 149.87 s for both runs, one after the other.
+- `docs/lessons-learned.md` section 8 and lesson 10; the README's Fault A paragraph; `faults/lib.sh` lets `BENCH_MD` point at a scratch copy.
+
+### Checked
+
+- Clean clone at `281cf3e`, fresh `DATA_DIR`: both scripts skip with a message and exit 0 before a build; `make all SYNTH=1` in 23.35 s, publish 8 files, 128,540,003 bytes; `make lint` 19 pages pass; `make test` 109 passed; `docs/data` restored and `git status` empty.
+
+### Not checked
+
+- The sweep and the variants over GitHub Pages; they ran on loopback, where GETs and bytes are exact and seconds say nothing about a network. Only the published layout was checked against Pages.
+- The DuckDB source was read on GitHub at commit `31adc8b766` and at 1.5.5, not built or stepped through.
+- Whether a later alpha changes the cache. The upstream report is drafted and not posted.
+- Adopting Parquet version 2 in Silver: a writer change, a rebuild and a decision record, in a later change.
