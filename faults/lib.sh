@@ -77,6 +77,18 @@ replace_section() {
   printf '\n%s\n\n%s\n' "$1" "$body"
 }
 
+# write_section <heading> <function>: the function's output becomes the section, through
+# replace_section, only when the function succeeds. A row that fails inside it ends the script
+# with BENCH_MD untouched; the same body piped straight into replace_section is written cut off.
+# For a body that measures while it prints. One that only echoes may keep the pipe.
+write_section() {
+  local tmp
+  tmp=$(mktemp)
+  ( "$2" ) > "$tmp"
+  replace_section "$1" < "$tmp"
+  rm "$tmp"
+}
+
 # The smallest non canary partition of silver/recording, as FAULT_EXPERIMENT FAULT_SUBJECT.
 pick_partition() {
   read -r FAULT_EXPERIMENT FAULT_SUBJECT < <("$PY" - <<'EOF'

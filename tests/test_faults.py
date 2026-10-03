@@ -3,6 +3,7 @@ and F's flaky proxy. A and D are benchmarks over published files, run by make be
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -97,3 +98,21 @@ def test_fault_d_fix_verifies_every_fetched_file_against_the_manifest(built, tmp
     assert con.execute(sql).fetchone() == (len(paths), 0)
     (tmp_path / paths[0]).write_bytes(b"not the published bytes")
     assert con.execute(sql).fetchone() == (len(paths), 1)
+
+
+def test_write_section_leaves_bench_md_untouched_when_a_row_fails(tmp_path):
+    """A body that fails halfway must not replace its section with the half it printed."""
+    md = tmp_path / "bench.md"
+    md.write_text("# Benchmarks\n\n## T\n\nold\n")
+    script = """
+        set -euo pipefail
+        source faults/lib.sh
+        good() { echo new; }
+        bad() { echo half; x=$(false); echo never; }
+        write_section "## T" good > /dev/null
+        write_section "## T" bad > /dev/null
+    """
+    run = subprocess.run(["bash", "-c", script], cwd=db.REPO, check=False,
+                         env={**os.environ, "BENCH_MD": str(md)})
+    assert run.returncode != 0
+    assert md.read_text().split() == ["#", "Benchmarks", "##", "T", "new"]
