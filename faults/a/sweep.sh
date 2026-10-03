@@ -6,9 +6,7 @@
 # docs/bench.md. Not part of make bench; the files stay under SWEEP_DIR, nothing is published.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-md=${BENCH_MD:-}
 source faults/lib.sh
-BENCH_MD=${md:-$BENCH_MD}  # lib.sh sets docs/bench.md; a scratch run points BENCH_MD at a copy
 need_cli "fault a sweep"; need_silver "fault a sweep"
 pick_partition
 

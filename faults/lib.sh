@@ -5,7 +5,7 @@
 export DATA_DIR=${DATA_DIR:-$HOME/data/ecog-lakehouse}
 DUCKDB=${DUCKDB:-$HOME/.local/duckdb-alpha/duckdb}
 PY=${PY:-python3}
-BENCH_MD=docs/bench.md
+BENCH_MD=${BENCH_MD:-docs/bench.md}  # a trial run points it at a scratch copy
 
 need_cli() {
   [ -x "$DUCKDB" ] || { echo "$1: no DuckDB CLI at $DUCKDB, skipped (DUCKDB=<path> to point at one)"; exit 0; }
