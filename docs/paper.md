@@ -54,12 +54,12 @@ Faults, copied from `docs/bench.md`, run of 2026-10-03 over GitHub Pages; Fault 
 
 | Fault | Mistake | Fix | Before | After |
 |---|---|---|---|---|
-| A | One row group, 49.55 MiB | 2 files, 38 sorted row groups, 72.74 MiB | One record 1.00 s, aggregate 1.11 s | One record 0.58 s, aggregate 2.64 s |
-| D | A Python loop downloads 10 files one at a time | One `read_parquet` over every URL | 6.31 s | 0.33 s |
+| A | One row group, 49.55 MiB | 2 files, 38 sorted row groups, 72.74 MiB | One record 1.14 s, aggregate 0.89 s | One record 0.37 s, aggregate 1.07 s |
+| D | A Python loop downloads 10 files one at a time | One `read_parquet` over every URL | 7.84 s | 0.37 s |
 | F | 503 on one range request in ten, `http_retries = 0` | `http_retries = 8`, backoff 2 | 0/10 reads succeed | 10/10 |
-| G | Generated SQL nests 512 `OR`s | An `IN` list | `EXPLAIN` 0.09 s | `EXPLAIN` 0.04 s |
+| G | Generated SQL nests 512 `OR`s | An `IN` list | `EXPLAIN` 0.08 s | `EXPLAIN` 0.04 s |
 
-Fault A did not go as planned. The fixed layout wins the lookup it was built for and loses the full aggregate, which receives 72.7 MiB against 21.5 MiB. The cause is in `docs/lessons-learned.md`.
+For Fault A the fixed layout wins the lookup it was built for, 985.7 KiB received against 16.3 MiB, and costs the aggregate no bytes, 16.5 MiB against 16.3 MiB. An earlier alpha build received 72.7 MiB for that aggregate. `docs/lessons-learned.md` section 8 traces it to that build's file cache.
 
 ## Limits
 
@@ -68,6 +68,7 @@ Fault A did not go as planned. The fixed layout wins the lookup it was built for
 | One dataset | Three experiments of one library. Another source may behave differently. |
 | One machine | Every timing comes from one WSL virtual machine. |
 | One network location | Every remote read takes one path to GitHub Pages. Another CDN edge gives other times. |
+| An alpha engine | The fault benches run on a DuckDB 2.0 alpha build, named with its sha256 in `docs/bench.md`. Fault A's result changed between two alpha builds. |
 | One author | No independent review of design, code or results. |
 | `faces_basic` unit scale | The source does not document it. Those rows are marked `scale_basis = assumed`. |
 | Three runs | Fault A reports min, median and max of three runs, D and G one run. |

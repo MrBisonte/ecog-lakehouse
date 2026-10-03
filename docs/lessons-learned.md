@@ -98,7 +98,7 @@ Five explanations were written down before they were tested. All five were wrong
 | The group key was too wide | Narrowed to `lid` alone, it still ran out of memory |
 | Variant B is four times faster than A | Remeasured: no gap (section 6) |
 | Over a CDN, 38 row groups lose because of 38 round trips | Measured: it is bytes, not round trips (section 8) |
-| DuckDB fetches each small row group whole | Traced: the reader asks for two columns, the 2.0 cache rounds each read to 2 MiB blocks (section 8) |
+| DuckDB fetches each small row group whole | Traced: the reader asks for two columns, the file cache of one 2.0 alpha build rounds each read to 2 MiB blocks (section 8) |
 
 ## 6. Three query shapes, timed
 
@@ -143,7 +143,7 @@ Run on the real host instead of the local machine, three things changed.
 
 Source: `doc/REVIEW.md`, Phase 3 addendum, GitHub Pages, 2026-09-23.
 
-**Fault A inverted.** The partitioned layout was slower for an aggregate and faster for fetching one record. Measured on 2026-10-02:
+**Fault A inverted, on one engine build.** On the DuckDB CLI `v2.0.0-alpha42839` the partitioned layout was slower for an aggregate and faster for fetching one record. Measured on 2026-10-02:
 
 | Layout | Size | Aggregate over every row | One record by `lid` |
 |---|---|---|---|
@@ -152,7 +152,17 @@ Source: `doc/REVIEW.md`, Phase 3 addendum, GitHub Pages, 2026-09-23.
 
 Source: the last Fault A table of [bench.md](bench.md), commit `0407bcd`.
 
-- The aggregate needs two columns, about 17 MB in either layout. From the 38 row groups the DuckDB 2.0 alpha received the full size of the files.
+The same files on `v2.0.0-alpha43763`, measured on 2026-10-03:
+
+| Layout | Aggregate over every row | One record by `lid` |
+|---|---|---|
+| One row group | 0.89 s, 16.3 MiB, 11 requests | 1.14 s, 16.3 MiB, 11 requests |
+| 38 sorted row groups | 1.07 s, 16.5 MiB, 78 requests | 0.37 s, 985.7 KiB, 6 requests |
+
+Source: the Fault A section of [bench.md](bench.md) as it stands; seconds are the median of three.
+
+- The inversion was the engine build, not the layout. On the later build the aggregate costs the same bytes in both layouts, and the lookup costs under 1 MiB against 16.3 MiB.
+- The aggregate needs two columns, about 17 MB in either layout. From the 38 row groups the earlier build received the full size of the files.
 - The partitioned files are 47 percent larger. `ts_ms` and `sample_idx` take 28.9 MB each there, against 17.0 MB each in the single row group. One dictionary over 7.2 million rows compresses what a dictionary per 198,656 sorted rows cannot.
 - Silver has the same loss: both columns are stored plain in every row group. Parquet version 2 stores them as deltas and removes almost all of those bytes. Measured, not adopted: the encodings section of [bench.md](bench.md), written by `faults/a/encodings.sh`.
 - Partitioning pays when a filter skips row groups. It costs when the query reads every row.
@@ -160,7 +170,7 @@ Source: the last Fault A table of [bench.md](bench.md), commit `0407bcd`.
 
 Source: the Parquet metadata, commit `0d7c2d3`, and `doc/REVIEW.md`, The two open timings.
 
-**Why the files came whole.** The Parquet reader asks for the two columns only. Under it, the 2.0 alpha's external file cache rounds every remote read out to aligned blocks of 2 MiB and fetches each block with its own GET. A row group of 198,656 rows spans about one block, so every block holds a byte of a needed column. The 38 GETs are one per block, not one per row group.
+**Why the files came whole.** The Parquet reader asks for the two columns only. Under it, the external file cache of the earlier alpha build rounds every remote read out to aligned blocks of 2 MiB and fetches each block with its own GET. A row group of 198,656 rows spans about one block, so every block holds a byte of a needed column. The 38 GETs are one per block, not one per row group.
 
 | Step | DuckDB 2.0 alpha, commit `31adc8b766` | DuckDB 1.5.5 |
 |---|---|---|
@@ -170,10 +180,12 @@ Source: the Parquet metadata, commit `0d7c2d3`, and `doc/REVIEW.md`, The two ope
 | Block size | `external_file_cache_remote_block_size`, default 2,097,152 bytes, `src/include/duckdb/main/settings.hpp` line 1469 | no blocks |
 
 - The 95 percent rule does not fire: `channel_idx` and `value_uv` are 22 percent of a row group's compressed bytes in the published layout.
-- The sweep writes the same partition at seven row group sizes. With the defaults the alpha receives the whole file up to 393,216 rows per row group, and less from 786,432 rows up. A block is skipped only when unread columns cover all of it.
-- With `SET enable_external_file_cache = false` the alpha receives what 1.5.5 receives, at every row group size. Smaller blocks help less: each read still rounds out to a block.
+- The sweep writes the same partition at seven row group sizes. With the defaults the earlier build receives the whole file up to 393,216 rows per row group, and less from 786,432 rows up. A block is skipped only when unread columns cover all of it.
+- **Known and fixed upstream.** [duckdb/duckdb#25670](https://github.com/duckdb/duckdb/issues/25670) reported it before this page did. [duckdb/duckdb#26096](https://github.com/duckdb/duckdb/pull/26096) makes the cache keep the byte ranges that are read. The build `v2.0.0-alpha43763` contains it, and the benches run on it now.
+- One residue: at 198,656 and 393,216 rows per row group, three runs of the same query do not always receive the same bytes, on either alpha build. DuckDB 1.5.5 receives the same bytes every run. The sweep shows all three values where they differ.
+- A report to DuckDB was drafted from this trace before their tracker was searched. It was not posted.
 
-Source: the DuckDB source at both versions, file and line as in the table; 22 percent from `parquet_metadata` of `data_0.parquet`, row group 0; the sweep section of [bench.md](bench.md), written by `faults/a/sweep.sh`.
+Source: the DuckDB source at both versions, file and line as in the table; 22 percent from `parquet_metadata` of `data_0.parquet`, row group 0; the sweep section of [bench.md](bench.md), written by `faults/a/sweep.sh`; the upstream issue and pull request as linked.
 
 **Faults D and F held.** D: 5.1 s for the download loop against 0.3 s for one statement. F: 0 of 10 reads succeed without retries, 10 of 10 with.
 
@@ -191,3 +203,5 @@ Source: the second Fault D and Fault F tables of [bench.md](bench.md), commit `9
 8. **Write the definition down before optimising it.** A and B compute different things. Which one is right was Alex's call, not the optimizer's.
 9. **Measure on the network the claim is made on.** And write down the claim that did not hold.
 10. **Find the layer before blaming the layout.** The row groups were read by column; the cache under the reader fetched the rest.
+11. **Search the tracker and test the newest build before writing the report.** The cause was already reported and already fixed.
+12. **A result on an alpha build carries the build's name.** Fault A read one way on one build and the other way on the next.
