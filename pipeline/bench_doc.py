@@ -8,6 +8,7 @@ check runs out.
 """
 
 import datetime
+import hashlib
 import os
 import platform
 import subprocess
@@ -110,6 +111,13 @@ def cli_version(path: Path) -> str:
     return subprocess.run([str(path), "--version"], capture_output=True, text=True, check=False).stdout.strip()
 
 
+def cli_sha256(path: Path) -> str:
+    """The sha256 of the CLI binary: an alpha build has no release to cite, its digest names it."""
+    if not path.is_file():
+        return "not installed"
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def setup_rows() -> list[tuple[str, str]]:
     """(setting, value) of the machine and software this run used, read at run time."""
     meminfo = Path("/proc/meminfo")
@@ -120,6 +128,7 @@ def setup_rows() -> list[tuple[str, str]]:
         ("Python", platform.python_version()),
         ("DuckDB Python", duckdb.__version__),
         ("DuckDB CLI", cli_version(DUCKDB_CLI)),
+        ("DuckDB CLI sha256", cli_sha256(DUCKDB_CLI)),
         ("git commit", db.git_commit()),
         ("Network location", network_location(os.environ)),
     ]
