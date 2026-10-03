@@ -90,7 +90,7 @@ Source: `doc/REVIEW.md`, Memory incident root cause, corrected, 2026-09-25.
 
 ## 5. What we got wrong
 
-Four explanations were written down before they were tested. All four were wrong.
+Five explanations were written down before they were tested. All five were wrong.
 
 | We said | The test said |
 |---|---|
@@ -98,6 +98,7 @@ Four explanations were written down before they were tested. All four were wrong
 | The group key was too wide | Narrowed to `lid` alone, it still ran out of memory |
 | Variant B is four times faster than A | Remeasured: no gap (section 6) |
 | Over a CDN, 38 row groups lose because of 38 round trips | Measured: it is bytes, not round trips (section 8) |
+| DuckDB fetches each small row group whole | Traced: the reader asks for two columns, the 2.0 cache rounds each read to 2 MiB blocks (section 8) |
 
 ## 6. Three query shapes, timed
 
@@ -151,12 +152,27 @@ Source: `doc/REVIEW.md`, Phase 3 addendum, GitHub Pages, 2026-09-23.
 
 Source: the last Fault A table of [bench.md](bench.md), commit `0407bcd`.
 
-- The aggregate needs two columns, about 17 MB in either layout. From the 38 row groups DuckDB fetched every row group whole: the full size of the files.
+- The aggregate needs two columns, about 17 MB in either layout. From the 38 row groups the DuckDB 2.0 alpha received the full size of the files.
 - The partitioned files are 47 percent larger. `ts_ms` and `sample_idx` take 28.9 MB each there, against 17.0 MB each in the single row group. One dictionary over 7.2 million rows compresses what a dictionary per 198,656 sorted rows cannot.
 - Partitioning pays when a filter skips row groups. It costs when the query reads every row.
 - The layout stays: it is right for the range retrieval `lid_children` does, and the `partition_layout` check demands it.
 
 Source: the Parquet metadata, commit `0d7c2d3`, and `doc/REVIEW.md`, The two open timings.
+
+**Why the files came whole.** The Parquet reader asks for the two columns only. Under it, the 2.0 alpha's external file cache rounds every remote read out to aligned blocks of 2 MiB and fetches each block with its own GET. A row group of 198,656 rows spans about one block, so every block holds a byte of a needed column. The 38 GETs are one per block, not one per row group.
+
+| Step | DuckDB 2.0 alpha, commit `31adc8b766` | DuckDB 1.5.5 |
+|---|---|---|
+| Whole row group only when the read columns exceed 95 percent of its bytes | `extension/parquet/parquet_reader.cpp`, `ParquetReader::RegisterRowGroupReads`, lines 2350 to 2354; 0.95 in `include/parquet_reader.hpp` line 99 | `extension/parquet/parquet_reader.cpp`, `ParquetReader::Scan`, line 1454; 0.95 in `include/parquet_reader.hpp` line 47 |
+| Otherwise one range per read column, near ranges merged | `ParquetReader::ColumnWisePrefetch`, lines 2210 to 2279; merge gap from `DetermineAcceptedColumnGap`, lines 221 to 238 | `ParquetReader::Scan`, lines 1480 to 1502; merge gap 16 KiB, `include/thrift_tools.hpp` line 41 |
+| What the cache fetches for a range | `src/storage/external_file_cache/caching_file_system.cpp`, `CachingFileHandle::Read`, lines 356 to 374: every aligned block the range touches, one task each; `FetchBlockTask::ExecuteTask`, lines 87 to 99, reads the whole block | `src/storage/caching_file_system.cpp`, `CachingFileHandle::Read`, lines 162 to 191: the range itself, grown only to close a gap of at most 1 MiB to a cached range |
+| Block size | `external_file_cache_remote_block_size`, default 2,097,152 bytes, `src/include/duckdb/main/settings.hpp` line 1469 | no blocks |
+
+- The 95 percent rule does not fire: `channel_idx` and `value_uv` are 22 percent of a row group's compressed bytes in the published layout.
+- The sweep writes the same partition at seven row group sizes. With the defaults the alpha receives the whole file up to 393,216 rows per row group, and less from 786,432 rows up. A block is skipped only when unread columns cover all of it.
+- With `SET enable_external_file_cache = false` the alpha receives what 1.5.5 receives, at every row group size. Smaller blocks help less: each read still rounds out to a block.
+
+Source: the DuckDB source at both versions, file and line as in the table; 22 percent from `parquet_metadata` of `data_0.parquet`, row group 0; the sweep section of [bench.md](bench.md), written by `faults/a/sweep.sh`.
 
 **Faults D and F held.** D: 5.1 s for the download loop against 0.3 s for one statement. F: 0 of 10 reads succeed without retries, 10 of 10 with.
 
@@ -173,3 +189,4 @@ Source: the second Fault D and Fault F tables of [bench.md](bench.md), commit `9
 7. **Know the machine.** A RAM disk for `/tmp`, a clock that jumps when the host sleeps, a mount that refuses temp files: each cost a run.
 8. **Write the definition down before optimising it.** A and B compute different things. Which one is right was Alex's call, not the optimizer's.
 9. **Measure on the network the claim is made on.** And write down the claim that did not hold.
+10. **Find the layer before blaming the layout.** The row groups were read by column; the cache under the reader fetched the rest.
