@@ -36,5 +36,11 @@ def test_network_location_is_base_url_or_loopback():
     assert bench_doc.network_location({"BASE_URL": ""}) == "loopback"
 
 
+def test_sections_the_fault_scripts_wrote_survive_a_rewrite():
+    faults = "## Fault A: one\n\na\n\n## Fault A sweep\n\nb\n"
+    assert bench_doc.other_sections("# Benchmarks\n\n## Setup\n\nx\n\n## Build\n\ny\n\n" + faults) == faults
+    assert bench_doc.other_sections("# Benchmarks\n\n## Setup\n\nx\n") == ""
+
+
 def test_cli_version_says_not_installed_when_absent(tmp_path):
     assert bench_doc.cli_version(tmp_path / "duckdb") == "not installed"

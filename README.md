@@ -106,7 +106,7 @@ Each fault is a mistake built on purpose, beside its fix. Times are medians of t
 | F | A 503 from the server kills the read | `http_retries` with backoff | 0 of 10 reads succeed, then 10 of 10 |
 | G | Generated SQL nests 512 `OR`s | An `IN` list | Planning: 0.09 s to 0.04 s. The generator now refuses the nested form |
 
-Fault A did not go as planned. The fixed layout is faster for the lookup it was designed for and slower for a full aggregate. [Why](docs/lessons-learned.md), and [issue #28](https://github.com/MrBisonte/ecog-lakehouse/issues/28) for the part still open.
+Fault A did not go as planned. The fixed layout is faster for the lookup it was designed for and slower for a full aggregate. The cause is not the layout: the file cache of the DuckDB 2.0 alpha fetches remote files in 2 MiB blocks, so a read of two columns pulls the whole file. [Traced and measured](docs/lessons-learned.md).
 
 Run them with `make bench`. This needs a DuckDB CLI; see `faults/lib.sh`.
 
