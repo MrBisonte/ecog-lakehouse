@@ -53,11 +53,12 @@ row() {  # name, local directory: every Parquet file in it is one layout, one or
   echo "| $1 | $(echo $files | wc -w) | $(thousands "$groups") | $(mib "$bytes") | $sorted | $(spread3 "$DUCKDB" -c "$SETUP SET read_ahead_depth = 0; $agg") | $(spread3 "$DUCKDB" -c "$SETUP $agg") | $(http "$agg") | $(spread3 "$DUCKDB" -c "$SETUP $one") | $(http "$one") |"
 }
 
-{
+section() {
   echo "DuckDB CLI \`$("$DUCKDB" --version)\`. Subject partition \`experiment=$FAULT_EXPERIMENT/subject_pid=$FAULT_SUBJECT\`, the smallest non canary one, over \`$BASE_URL\`, every file of the layout in one read_parquet. Aggregate: \`$AGGREGATE\`. One record: \`$ONE_RECORD\`, the middle record of $(thousands "$RECORDS"). Seconds are min / median / max of three CLI runs each; GET requests and bytes received are one run's HTTP statistics from EXPLAIN ANALYZE."
   echo
   echo "| layout | files | row groups | size | sorted by lid, sample_idx | aggregate, read_ahead_depth = 0, s min / median / max | aggregate, default, s min / median / max | aggregate GETs | aggregate received | one record, s min / median / max | one record GETs | one record received |"
   echo "|---|---|---|---|---|---|---|---|---|---|---|---|"
   row "before, one row group" "$BAD"
   row "after, partitioned and sorted" "$GOOD"
-} | replace_section "## Fault A: single row group, unpartitioned, unsorted"
+}
+write_section "## Fault A: single row group, unpartitioned, unsorted" section
