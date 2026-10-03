@@ -70,3 +70,73 @@ Malformed variant, one parenthesis short, as the parser reports it:
     LINE 1: ...) OR channel_idx = 509) OR channel_idx = 510) OR channel_idx = 511
                                                                               ^^^
 ```
+
+## Fault A sweep: row group size against requests and bytes
+
+DuckDB CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766` and DuckDB `1.5.5` through Python. Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, sorted by `lid, sample_idx`, written as one file per row group size and served by `faults/serve.py` on `http://127.0.0.1:8765`. Query: `SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet([URLS]) GROUP BY 1`, over one file. GET requests and bytes received are one run's HTTP statistics from EXPLAIN ANALYZE. Seconds are min / median / max of three CLI runs on loopback, not evidence of a network. Written by `faults/a/sweep.sh`, not by make bench.
+
+| rows per row group | row groups | size | engine | setting | GETs | received | s min / median / max |
+|---|---|---|---|---|---|---|---|
+| 198,656 | 37 | 72.65 MiB | cli | default | 37 | 72.6 MiB | 1.29 / 1.51 / 2.10 |
+| 198,656 | 37 | 72.65 MiB | cli | SET enable_external_file_cache = false; | 75 | 16.1 MiB | 1.91 / 2.20 / 3.74 |
+| 198,656 | 37 | 72.65 MiB | cli | SET external_file_cache_remote_block_size = 262144; | 188 | 46.8 MiB | 1.91 / 3.32 / 5.98 |
+| 198,656 | 37 | 72.65 MiB | python | default | 75 | 16.1 MiB | not timed |
+| 393,216 | 19 | 71.32 MiB | cli | default | 36 | 71.3 MiB | 1.50 / 1.51 / 1.91 |
+| 393,216 | 19 | 71.32 MiB | cli | SET enable_external_file_cache = false; | 39 | 15.2 MiB | 1.66 / 1.66 / 1.72 |
+| 393,216 | 19 | 71.32 MiB | cli | SET external_file_cache_remote_block_size = 262144; | 102 | 25.3 MiB | 1.59 / 1.59 / 2.17 |
+| 393,216 | 19 | 71.32 MiB | python | default | 39 | 15.2 MiB | not timed |
+| 786,432 | 10 | 71.13 MiB | cli | default | 27 | 53.1 MiB | 1.50 / 1.50 / 2.10 |
+| 786,432 | 10 | 71.13 MiB | cli | SET enable_external_file_cache = false; | 21 | 15.4 MiB | 1.26 / 1.28 / 1.28 |
+| 786,432 | 10 | 71.13 MiB | cli | SET external_file_cache_remote_block_size = 262144; | 81 | 20.1 MiB | 1.59 / 2.10 / 2.31 |
+| 786,432 | 10 | 71.13 MiB | python | default | 21 | 15.4 MiB | not timed |
+| 1,048,576 | 7 | 59.95 MiB | cli | default | 22 | 43.9 MiB | 1.27 / 1.27 / 1.30 |
+| 1,048,576 | 7 | 59.95 MiB | cli | SET enable_external_file_cache = false; | 15 | 15.1 MiB | 1.08 / 1.08 / 1.09 |
+| 1,048,576 | 7 | 59.95 MiB | cli | SET external_file_cache_remote_block_size = 262144; | 75 | 18.6 MiB | 1.28 / 1.29 / 2.30 |
+| 1,048,576 | 7 | 59.95 MiB | python | default | 15 | 15.1 MiB | not timed |
+| 2,097,152 | 4 | 54.78 MiB | cli | default | 16 | 30.7 MiB | 1.07 / 1.08 / 1.08 |
+| 2,097,152 | 4 | 54.78 MiB | cli | SET enable_external_file_cache = false; | 9 | 15.6 MiB | 0.06 / 1.07 / 1.09 |
+| 2,097,152 | 4 | 54.78 MiB | cli | SET external_file_cache_remote_block_size = 262144; | 73 | 18.0 MiB | 1.53 / 2.10 / 2.11 |
+| 2,097,152 | 4 | 54.78 MiB | python | default | 9 | 15.6 MiB | not timed |
+| 4,194,304 | 2 | 50.81 MiB | cli | default | 14 | 26.8 MiB | 1.08 / 1.08 / 1.08 |
+| 4,194,304 | 2 | 50.81 MiB | cli | SET enable_external_file_cache = false; | 5 | 15.6 MiB | 0.07 / 0.07 / 0.08 |
+| 4,194,304 | 2 | 50.81 MiB | cli | SET external_file_cache_remote_block_size = 262144; | 67 | 16.5 MiB | 1.50 / 1.51 / 2.34 |
+| 4,194,304 | 2 | 50.81 MiB | python | default | 5 | 15.6 MiB | not timed |
+| one row group | 1 | 49.55 MiB | cli | default | 11 | 21.5 MiB | 1.11 / 1.11 / 1.11 |
+| one row group | 1 | 49.55 MiB | cli | SET enable_external_file_cache = false; | 3 | 16.3 MiB | 0.09 / 0.09 / 0.10 |
+| one row group | 1 | 49.55 MiB | cli | SET external_file_cache_remote_block_size = 262144; | 70 | 17.3 MiB | 1.53 / 1.63 / 2.13 |
+| one row group | 1 | 49.55 MiB | python | default | 3 | 16.3 MiB | not timed |
+
+## Fault A encodings: delta and zstd against the lost dictionary
+
+Issue 29, measured by `faults/a/encodings.sh`. DuckDB Python v1.5.5, the pipeline's engine, reads the Parquet metadata and writes the variants; the CLI `v2.0.0-alpha42839 (Cyanoptera) 31adc8b766` reads them too and runs the queries over HTTP.
+
+`silver/recording` in DATA_DIR as the pipeline wrote it, 45 files, 4,408 row groups, 871,159,620 rows, from parquet_metadata. A row group keeps a dictionary when its column chunk has a dictionary page.
+
+| column | encodings | row groups with a dictionary | compressed bytes | uncompressed bytes | compressed bytes per value | share of compressed bytes, percent |
+|---|---|---|---|---|---|---|
+| sample_idx | PLAIN | 0 of 4,408 | 3,484,958,980 | 3,484,775,124 | 4.00 | 39.0 |
+| ts_ms | PLAIN | 0 of 4,408 | 3,484,958,980 | 3,484,775,124 | 4.00 | 39.0 |
+| value_uv | PLAIN, PLAIN_DICTIONARY | 4,154 of 4,408 | 1,969,591,200 | 1,969,569,507 | 2.26 | 22.0 |
+| lid | PLAIN_DICTIONARY | 4,408 of 4,408 | 315,482 | 316,512 | 0.00 | 0.0 |
+| subject_pid | PLAIN_DICTIONARY | 4,408 of 4,408 | 304,149 | 286,517 | 0.00 | 0.0 |
+| experiment | PLAIN_DICTIONARY | 4,408 of 4,408 | 280,783 | 263,151 | 0.00 | 0.0 |
+| channel_idx | PLAIN_DICTIONARY | 4,408 of 4,408 | 252,535 | 234,903 | 0.00 | 0.0 |
+| run | PLAIN_DICTIONARY | 4,408 of 4,408 | 233,621 | 215,989 | 0.00 | 0.0 |
+
+Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one, 1 file, 37 row groups, 7,236,800 rows in Silver, written once per variant into one file under ENCODINGS_DIR by `DuckDB version v1.5.5 (build d8cdaa33fd)`, sorted by lid, sample_idx, row groups of 198,656 rows, the columns of `faults/a/fix.sql`'s output. Variant names are Parquet writer version and compression; v1 snappy is today's. `same` means the row count and sum match v1 snappy read by DuckDB Python, 7,236,800 rows, sum(value_uv) -1873984.021144.
+
+| variant | file bytes | row groups | ts_ms bytes | sample_idx bytes | value_uv bytes | ts_ms encodings | sample_idx encodings | value_uv encodings | DuckDB Python read | CLI read |
+|---|---|---|---|---|---|---|---|---|---|---|
+| v1 snappy | 76,155,922 | 37 | 28,949,874 | 28,949,874 | 16,814,334 | PLAIN | PLAIN | PLAIN_DICTIONARY | same | same |
+| v2 snappy | 18,281,020 | 37 | 12,542 | 12,542 | 16,814,334 | DELTA_BINARY_PACKED | DELTA_BINARY_PACKED | RLE_DICTIONARY | same | same |
+| v1 zstd | 52,958,402 | 37 | 17,462,325 | 17,462,325 | 16,590,195 | PLAIN | PLAIN | PLAIN_DICTIONARY | same | same |
+| v2 zstd | 18,040,532 | 37 | 3,508 | 3,508 | 16,590,195 | DELTA_BINARY_PACKED | DELTA_BINARY_PACKED | RLE_DICTIONARY | same | same |
+
+The same files over `http://127.0.0.1:8765`, `faults/serve.py` on loopback, with the CLI. Aggregate: `SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet([URLS]) GROUP BY 1`. One record: `SELECT avg(value_uv), count(*) FROM read_parquet([URLS]) WHERE lid = '01a0d595-33ba-2030-000c-105000000000'`, the middle record of 40. Seconds are min / median / max of three CLI runs each; GET requests and bytes received are one run's HTTP statistics from EXPLAIN ANALYZE.
+
+| variant | aggregate GETs | aggregate received | aggregate, s min / median / max | one record GETs | one record received | one record, s min / median / max |
+|---|---|---|---|---|---|---|
+| v1 snappy | 37 | 72.6 MiB | 1.50 / 2.11 / 2.11 | 5 | 8.6 MiB | 0.05 / 0.05 / 0.06 |
+| v2 snappy | 9 | 17.4 MiB | 0.06 / 0.06 / 0.06 | 3 | 5.4 MiB | 0.05 / 0.05 / 0.05 |
+| v1 zstd | 26 | 50.5 MiB | 0.07 / 1.08 / 1.08 | 4 | 6.5 MiB | 0.05 / 0.05 / 0.05 |
+| v2 zstd | 9 | 17.2 MiB | 0.05 / 0.05 / 0.06 | 3 | 5.2 MiB | 0.05 / 0.05 / 0.05 |
