@@ -97,16 +97,16 @@ Integrity is separate: a sha256 per file and a digest per dataset version.
 
 ## Planted faults
 
-Each fault is a mistake built on purpose, beside its fix. Times are medians of three runs against GitHub Pages, from [docs/bench.md](docs/bench.md).
+Each fault is a mistake built on purpose, beside its fix. Times are measured against GitHub Pages, from [docs/bench.md](docs/bench.md); Fault A's are medians of three runs.
 
 | Fault | The mistake | The fix | Measured |
 |---|---|---|---|
-| A | One giant row group | 38 sorted row groups | Fetching one record: 1.00 s to 0.58 s. Aggregating every row: 1.11 s to 2.64 s, slower |
-| D | A Python loop downloads one file at a time | One `read_parquet` over all the URLs | 6.31 s to 0.33 s for 10 files |
+| A | One giant row group | 38 sorted row groups | Fetching one record: 1.14 s to 0.37 s, 16.3 MiB to 985.7 KiB. Aggregating every row: 0.89 s to 1.07 s, the same bytes |
+| D | A Python loop downloads one file at a time | One `read_parquet` over all the URLs | 7.84 s to 0.37 s for 10 files |
 | F | A 503 from the server kills the read | `http_retries` with backoff | 0 of 10 reads succeed, then 10 of 10 |
-| G | Generated SQL nests 512 `OR`s | An `IN` list | Planning: 0.09 s to 0.04 s. The generator now refuses the nested form |
+| G | Generated SQL nests 512 `OR`s | An `IN` list | Planning: 0.08 s to 0.04 s. The generator now refuses the nested form |
 
-Fault A did not go as planned. The fixed layout is faster for the lookup it was designed for and slower for a full aggregate. The cause is not the layout: the file cache of the DuckDB 2.0 alpha fetches remote files in 2 MiB blocks, so a read of two columns pulls the whole file. [Traced and measured](docs/lessons-learned.md).
+Fault A read differently on an earlier DuckDB 2.0 alpha build: there the fixed layout downloaded the whole file for a two column aggregate, because that build's file cache fetched 2 MiB blocks. It is fixed upstream, and the benches run on a build with the fix. [The trace, and what we got wrong](docs/lessons-learned.md).
 
 Run them with `make bench`. This needs a DuckDB CLI; see `faults/lib.sh`.
 
