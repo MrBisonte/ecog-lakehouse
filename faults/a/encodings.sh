@@ -8,9 +8,7 @@
 # BENCH_MD. The SQL is in faults/a/encodings.py.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-md=${BENCH_MD:-docs/bench.md}
 source faults/lib.sh
-BENCH_MD=$md  # lib.sh pins docs/bench.md; a trial run points elsewhere
 need_cli "fault a encodings"; need_silver "fault a encodings"
 pick_partition
 
