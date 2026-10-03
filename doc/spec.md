@@ -1,10 +1,8 @@
-# spec.md
-
-Working name of the repository: `brain`. Rename freely; nothing depends on it.
+# Specification
 
 ## 1. Scope
 
-The system ingests recordings from the Stanford ECoG library, stores them in three layers on Parquet, enforces data contracts with checks generated from a regulatory requirements table, writes evidence for every run, and exposes the Gold layer to a browser page. Four faults are planted on purpose, each with a fix and a measurement.
+The system ingests recordings from the Stanford ECoG library and stores them in three layers on Parquet. It enforces data contracts with checks generated from a regulatory requirements table, and writes evidence for every run. It exposes the Gold layer to a browser page. Four faults are planted on purpose, each with a fix and a measurement.
 
 ## 2. Source data
 
@@ -18,7 +16,13 @@ Experiments used, one directory each under `data/raw/<experiment>/`:
 | `motor_basic` | Cued hand and tongue movement | Event-driven task, exercises the `event` entity |
 | One further experiment chosen at conversion time | | Third dimension for Silver partitioning and a Gold use case |
 
-Adapter roadmap: `.mat` (phase 0 and 1), then NWB (`acquisition/ElectricalSeries`, `general/electrodes`, `intervals/trials` into the same Bronze schema) and BIDS-iEEG. NWB and BIDS are the formats the company's science and ML teams name; NWB's `acquisition` group carries the same rule as Bronze, raw data never changes. The NWB adapter needs `pynwb` (and with it `h5py`), an optional dependency introduced by its own ADR in phase 1, never in phase 0.
+Adapter roadmap:
+
+- `.mat`, phase 0 and 1.
+- NWB: `acquisition/ElectricalSeries`, `general/electrodes` and `intervals/trials` into the same Bronze schema.
+- BIDS-iEEG.
+
+NWB and BIDS are the formats neuroscience teams name. NWB's `acquisition` group carries the same rule as Bronze: raw data never changes. The NWB adapter needs `pynwb`, and with it `h5py`. That is an optional dependency, introduced by its own ADR in phase 1, never in phase 0.
 
 > **Note.** Field names inside the `.mat` files differ per experiment. `pipeline/convert_mat.py` holds one adapter per experiment that maps the file's arrays to the Bronze schema. An experiment without an adapter is skipped with a logged reason, never guessed.
 
@@ -82,7 +86,10 @@ Partition: `experiment=<experiment>/subject_src=<code>/ingest_id=<id>/`.
 - `sample_idx` is the zero-based sample position at the source sampling rate. Not NULL. Timestamp in milliseconds is `sample_idx * 1000 / sample_rate_hz` and is derived in Silver, not stored here.
 - `value_raw` is the amplifier value as stored in the file, in the file's units. NULL where the file holds NaN: DuckDB reads NaN from the source array as NULL. The row is kept.
 - `ingest_id` is a ULID assigned per conversion run. Not NULL. References `bronze/ingest_audit.ingest_id`.
-- `lid` is the Bronze-layer lineage identifier of the record (layer 1, see section 12), computed at conversion time from the file's `ingest_ord`, `run` and `channel_idx`. Not NULL. Bronze is the first layer that carries it, so the chain is unbroken from the ingested file downward: `lid_trace` on a Bronze row returns the source path, the source URL at the Stanford repository and the sha256 recorded in `bronze/ingest_audit`.
+- `lid` is the Bronze-layer lineage identifier of the record, layer 1, see section 12. Not NULL.
+  - It is computed at conversion time from the file's `ingest_ord`, `run` and `channel_idx`.
+  - Bronze is the first layer that carries it, so the chain is unbroken from the ingested file downward.
+  - `lid_trace` on a Bronze row returns the source path, the source URL at the Stanford repository and the sha256 recorded in `bronze/ingest_audit`.
 
 #### bronze/electrode
 
@@ -142,8 +149,14 @@ One row per source file converted. Not partitioned.
 | ingested_at | TIMESTAMP |
 
 - `sha256` is the hex digest of the source file. Not NULL. This is the "original" of ALCOA+.
-- `data_root` is `DATA_DIR` as it stood when the file was read, and `source_path_rel` is the file below it. Neither is NULL, and the absolute path is never stored: a reader joins them, which is what `lineage_dim.source_path` and therefore `lid_trace` return. `hash_match` uses only `source_path_rel`, against the current root, so moving or renaming the lakehouse does not read as tampering, while `data_root` keeps the fact that it was somewhere else. A file read from outside `DATA_DIR` has no path below it, so `source_path_rel` is absolute and begins with a slash; `hash_match` will not find it, which is the honest answer for a file that is not in the lakehouse.
-- `ingest_host` is the pseudonym of the machine that performed the conversion, ALCOA+ Attributable. Not NULL. It is HMAC-SHA256 of the hostname and the installation id under the same keyring secret that pseudonymises a subject; a hostname and a machine id are device identifiers under GDPR recital 30, and Bronze is append-only, so the raw values stay in `keyring.duckdb` in `host_map` and never enter a dataset. A MAC address is not recorded: it is link-local, so the source server's is never observable, and the ingesting machine's changes with the adapter.
+- `data_root` is `DATA_DIR` as it stood when the file was read. `source_path_rel` is the file below it. Neither is NULL.
+  - The absolute path is never stored. A reader joins the two, which is what `lineage_dim.source_path` and therefore `lid_trace` return.
+  - `hash_match` uses only `source_path_rel`, against the current root. Moving or renaming the lakehouse does not read as tampering, while `data_root` keeps the fact that it was somewhere else.
+  - A file read from outside `DATA_DIR` has no path below it, so `source_path_rel` is absolute and begins with a slash. `hash_match` will not find it, which is the honest answer for a file that is not in the lakehouse.
+- `ingest_host` is the pseudonym of the machine that performed the conversion, ALCOA+ Attributable. Not NULL.
+  - It is HMAC-SHA256 of the hostname and the installation id, under the same keyring secret that pseudonymises a subject.
+  - A hostname and a machine id are device identifiers under GDPR recital 30, and Bronze is append-only. The raw values stay in `keyring.duckdb` in `host_map` and never enter a dataset.
+  - A MAC address is not recorded. It is link-local, so the source server's is never observable, and the ingesting machine's changes with the adapter.
 - `tool` and `tool_version` identify the converter, for example `convert_mat.py` and the git commit hash. Not NULL.
 - `ingested_at` is UTC. Not NULL.
 
@@ -171,7 +184,7 @@ Not part of any layer. Contains two tables.
 
 #### silver/recording
 
-Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `lid, sample_idx`, which is file, run, channel, time order (section 12.2). Row groups of at most 200,000 rows; the writer asks for 198,656, the largest multiple of DuckDB's 2,048 row vector under the limit, because DuckDB rounds the requested size up.
+Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `lid, sample_idx`, which is file, run, channel and time order (section 12.2). Row groups of at most 200,000 rows; the writer asks for 198,656, the largest multiple of DuckDB's 2,048 row vector under the limit, because DuckDB rounds the requested size up.
 
 | Column name | Column type |
 |---|---|
@@ -223,13 +236,23 @@ Gold is the enterprise model for consumers. Everything here is a query result.
 
 - `clipped_pct` is the share of samples at the amplifier's minimum or maximum, in percent. The files carry no amplifier range, so the rails are the observed extremes of the run: the hardware reading, one rail for every channel of the run.
 - `scale_basis` is copied from `silver/record`: `rms_uv` of a record marked `assumed` rests on a scale its source does not state.
-- `clipped_own_pct` is the same share against the record's own extremes: the signal reading, how flat one channel is at its own top. Every record has at least one sample at each extreme, so it is never zero. Both columns come from the same pass over Silver.
-- `gold/dataset_manifest` has one row per dataset per build. `dataset_version` is the same digest `gold/evidence` uses; `lid_lo` and `lid_hi` bound the records included; `file_digests` lists the source sha256 values. This is the handle a model registry or a submission package holds to say exactly which data it was built on: one row, and every record and file it covers can be enumerated with `lid_children` and `lineage_dim`.
-- `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per channel in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.
+- `clipped_own_pct` is the same share against the record's own extremes: the signal reading, how flat one record is at its own top. Every record has at least one sample at each extreme, so it is never zero. Both columns come from the same pass over Silver.
+- `gold/dataset_manifest` has one row per dataset per build.
+  - `dataset_version` is the same digest `gold/evidence` uses.
+  - `lid_lo` and `lid_hi` bound the records included.
+  - `file_digests` lists the source sha256 values.
+  - It is the handle a model registry or a submission package holds to say exactly which data it was built on. One row, and every record and file it covers can be enumerated with `lid_children` and `lineage_dim`.
+- `line_noise_ratio` is the ratio of spectral power in the 49 to 51 Hz and 59 to 61 Hz bands to total power, computed on a 10 s excerpt per record in Python (DuckDB has no FFT). NULL when the excerpt is shorter than 10 s.
 
 ### 3.4 Export
 
-Gold exports one NWB file per subject and experiment for the science and ML teams, written by the same optional `pynwb` dependency as the adapter. The file carries provenance as HDF5 attributes: `/general/ecog_lakehouse_dataset_version`, `/general/ecog_lakehouse_source_sha256` (list), and on each series `ecog_lakehouse_lid_lo` and `ecog_lakehouse_lid_hi`. A consumer that records the dataset version it read can enumerate every record and source file behind it through `gold/dataset_manifest` and `lid_children`. Parquet slices and BIDS-iEEG folders are the other export forms; the middle of the platform never stores HDF5.
+Gold exports one NWB file per subject and experiment for neuroscience teams. It is written by the same optional `pynwb` dependency as the adapter. The file carries provenance as HDF5 attributes:
+
+- `/general/ecog_lakehouse_dataset_version`
+- `/general/ecog_lakehouse_source_sha256` (list)
+- on each series, `ecog_lakehouse_lid_lo` and `ecog_lakehouse_lid_hi`
+
+A consumer that records the dataset version it read can enumerate every record and source file behind it, through `gold/dataset_manifest` and `lid_children`. Parquet slices and BIDS-iEEG folders are the other export forms. The middle of the platform never stores HDF5.
 
 ## 4. Contracts
 
@@ -319,7 +342,10 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 
 - Fix, v1.x compatible form used by the pipeline: one `COPY (SELECT ... WHERE experiment = ... AND subject_pid = ... ORDER BY lid, sample_idx) TO '<partition directory>/data_0.parquet' (FORMAT parquet, ROW_GROUP_SIZE 198656);` per partition. DuckDB 1.5's partitioned `COPY` does not keep the `ORDER BY` across its buffer flushes, a plain `COPY` does.
 - Bench: the same aggregate over both layouts, remote URL, with `SET read_ahead_depth = 0;` and with the default. Four timings.
-- Story: parallelism is per row group; a single row group is a single stream, and no I/O scheduler can help it.
+- Result, measured over GitHub Pages and recorded in the last Fault A section of `docs/bench.md`:
+  - Aggregate: the single row group fetched 21.5 MiB in 11 GETs, the partitioned layout 72.7 MiB in 38 GETs.
+  - One record by `lid`: the partitioned layout fetched 6.7 MiB in 5 GETs, the single row group 19.5 MiB in 10 GETs.
+  - Partitioning pays when a filter skips row groups. `docs/lessons-learned.md` section 8 says why.
 
 ### Fault D: synchronous one-file-at-a-time loop
 
@@ -341,9 +367,19 @@ COPY silver.recording TO 'docs/data/faults/a/good'
 
 ## 7. Pipeline
 
-`pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `pyyaml` and nothing else. Orchestration is `make`. Every target invokes an entry point as a module, `python -m pipeline.<name>`, never as a script path: a script path puts `pipeline/` first on `sys.path`, an editable install then supplies the package from the checkout it was installed from, and a run inside a clone would execute another checkout's code. As a module the working directory comes first, so a clone runs its own code and the verifier pass of a clean clone holds whatever virtual environment is active.
+`pipeline/` is Python 3.12 with `duckdb`, `scipy` (for `.mat`), `numpy`, `pyyaml` and nothing else. Orchestration is `make`.
 
-All data and DuckDB working files live under `DATA_DIR`, an environment variable defaulting to `$HOME/data/ecog-lakehouse`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. The repository sits on a Windows mount under WSL2, where per-file operations are slow and OneDrive style syncing can lock files, so nothing but source, documentation and `docs/data/` is written inside it. `DATA_DIR` is created on first run. Paths in this document written as `data/<layer>/` mean `$DATA_DIR/<layer>/`. `publish` resolves `docs/data/` against the working directory, not against the location the `pipeline` package was installed from, so a run inside a clone publishes into that clone even when the active virtual environment holds an editable install of another checkout.
+Every target invokes an entry point as a module, `python -m pipeline.<name>`, never as a script path.
+
+- A script path puts `pipeline/` first on `sys.path`. An editable install then supplies the package from the checkout it was installed from. A run inside a clone would execute another checkout's code.
+- As a module the working directory comes first. A clone runs its own code, and the verifier pass of a clean clone holds whatever virtual environment is active.
+
+All data and DuckDB working files live under `DATA_DIR`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. `DATA_DIR` is an environment variable defaulting to `$HOME/data/ecog-lakehouse`.
+
+- The repository sits on a Windows mount under WSL2. Per-file operations there are slow and OneDrive style syncing can lock files. Nothing but source, documentation and `docs/data/` is written inside it.
+- `DATA_DIR` is created on first run.
+- Paths in this document written as `data/<layer>/` mean `$DATA_DIR/<layer>/`.
+- `publish` resolves `docs/data/` against the working directory, not against the location the `pipeline` package was installed from. A run inside a clone publishes into that clone, even when the active virtual environment holds an editable install of another checkout.
 
 Targets:
 
@@ -369,13 +405,25 @@ Every SQL file is plain DuckDB SQL with `{{var}}` placeholders resolved by a 20-
 4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables.
 5. Reads every Gold file once more in full and compares its sha256 with `manifest.json`.
 
-The checks table reads in the order a reader needs: whatever did not pass, then privacy and the canary, then lineage, then the plausibility flags, then the contract rules, which collapse into one `details` element per dataset because they all pass or they would not be there. A row leads with one plain sentence and the clause behind it, never with a check id. Above the table the summary links the governance rows the checks are generated from and the published SQL of every check.
+The checks table reads in the order a reader needs:
+
+1. Whatever did not pass.
+2. Privacy and the canary.
+3. Lineage.
+4. The plausibility flags.
+5. The contract rules. They collapse into one `details` element per dataset, because they all pass or they would not be there.
+
+A row leads with one plain sentence and the clause behind it, never with a check id. Above the table the summary links the governance rows the checks are generated from and the published SQL of every check.
 
 The page can only read Gold, so the checks that ran on Bronze, Silver and the published copy are reported above the table from the latest `gold/evidence` run, grouped by framework.
 
 A `lid` is shown in its 26 character text form, `lid_text`, so the page, this document and the deck read the same identifier. The UUID stays in the data.
 
-Rules: every number on the page is a query result; system font stack; no request to any host other than the page's origin and the pinned CDN.
+Rules:
+
+- Every number on the page is a query result.
+- System font stack.
+- No request to any host other than the page's origin and the pinned CDN.
 
 ## 9. Publishing limits
 
@@ -391,13 +439,15 @@ Rules: every number on the page is a query result; system font stack; no request
 
 | Component | Version | Reason |
 |---|---|---|
-| DuckDB CLI for the demo | v2.0.0 alpha, exact build recorded in `docs/bench.md` | Async I/O and the `COPY ... PARTITION BY ... ORDER BY` syntax |
-| DuckDB Python for the pipeline | Latest stable 1.x, or 2.0 alpha if on PyPI at build time | Pipeline uses only syntax valid on both |
-| DuckDB-WASM | Pinned exact version in `docs/index.html` | Reproducibility |
+| Python | 3.12 or later, `requires-python` in `pyproject.toml` | The pipeline language |
+| DuckDB Python for the pipeline | 1.5.5, the `engine_version` of every evidence row | Pipeline uses only syntax valid on 1.x and 2.0 |
+| DuckDB CLI for the fault benches | v2.0.0 alpha, exact build recorded in `docs/bench.md` | Async I/O and the `COPY ... PARTITION BY ... ORDER BY` syntax |
+| DuckDB-WASM | 1.32.0, pinned in `docs/index.html` | Reproducibility |
 
 ## 11. Licences
 
-Code: MIT. Published data under `docs/data/`: CC BY-SA 4.0, attributed to Kai J. Miller, "A library of human electrocorticographic data and analyses", Nature Human Behaviour, 2019, with the repository URL, as `docs/data/LICENSE.md`.
+- Code: MIT.
+- Published data under `docs/data/`: CC BY-SA 4.0. `docs/data/LICENSE.md` holds the attribution: the repository URL and Kai J. Miller, "A library of human electrocorticographic data and analyses", Nature Human Behaviour, 2019.
 
 ## 12. Lineage identifier (`lid`)
 
@@ -405,7 +455,11 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
 
 ### 12.1 Shape
 
-`lid` is 128 bits in the ULID layout (https://github.com/ulid/spec): 48 bits of millisecond timestamp followed by 80 bits that the ULID specification reserves for randomness. This system fills those 80 bits with the hierarchy. The value is stored as `UUID` in DuckDB and PostgreSQL and displayed as the 26-character Crockford base32 ULID string. Any tool that sorts, indexes or parses ULIDs handles it unchanged.
+`lid` is 128 bits in the ULID layout (https://github.com/ulid/spec).
+
+- 48 bits of millisecond timestamp, followed by 80 bits that the ULID specification reserves for randomness. This system fills those 80 bits with the hierarchy.
+- The value is stored as `UUID` in DuckDB and PostgreSQL, and displayed as the 26-character Crockford base32 ULID string.
+- Any tool that sorts, indexes or parses ULIDs handles it unchanged.
 
 ```
  hi word
@@ -422,7 +476,9 @@ Every record in Silver and Gold carries a lineage identifier, `lid`, from which 
  bits  22..0    reserved       23   zero
 ```
 
-No field straddles the 64 bit boundary, so a hi and lo pair of 64 bit words is equivalent to the native 128 bit value on engines without one. The layout is the file `data/ids/layouts/lid.yaml` in the arch-standards repository. Every macro that touches these bits is generated from it by `idgen` and committed as `sql/lineage/lid_generated.sql`, never edited by hand; section 12.3 says which of the macros below are generated and which are this system's own.
+- No field straddles the 64 bit boundary. A hi and lo pair of 64 bit words is equivalent to the native 128 bit value on engines without one.
+- The layout is the file `data/ids/layouts/lid.yaml` in the arch-standards repository.
+- Every macro that touches these bits is generated from it by `idgen` and committed as `sql/lineage/lid_generated.sql`, never edited by hand. Section 12.3 says which of the macros below are generated and which are this system's own.
 
 `ts_ms` is the timestamp of the first ingestion of that sha256, read from `ingest_audit`. A rerun of the same file reuses it, so identical inputs yield identical identifiers within one environment. A fresh environment assigns new timestamps; the sha256 in `lineage_dim` is what ties the two.
 
@@ -440,11 +496,15 @@ No field straddles the 64 bit boundary, so a hi and lo pair of 64 bit words is e
 | `lineage_experiment` | `code TINYINT, experiment VARCHAR` | Experiment code table |
 | `lineage_edge` | `child_lid UUID, parent_lid UUID` | Only for derivations that span more than one record. Empty in this system; present so the limit is explicit |
 
-A Silver record's `lid` differs from its Bronze parent's only in the layer bits; `lid_parent(lid)` returns the same identifier with the layer decremented, so Gold to Silver to Bronze is three bit operations and no lookup. `silver/recording` is sorted by `lid, sample_idx` within each file, which is file, run, channel, time order. Zone maps prune on `lid` ranges.
+A Silver record's `lid` differs from its Bronze parent's only in the layer bits; `lid_parent(lid)` returns the same identifier with the layer decremented, so Gold to Silver to Bronze is three bit operations and no lookup. `silver/recording` is sorted by `lid, sample_idx` within each file, which is file, run, channel and time order. Zone maps prune on `lid` ranges.
 
 ### 12.3 Functions
 
-All are DuckDB macros, split by who owns them. `sql/lineage/lid_generated.sql` is copied from arch-standards by `make lineage` and never edited here: every bit operation, the layer check, the text form and the UUID bridge. `sql/lineage/lid_extras.sql` is hand written and holds only what is specific to this system, the lineage tables and the navigation. The PostgreSQL versions are not written yet; when they are they come from the same layout file, not by hand.
+All are DuckDB macros, split by who owns them.
+
+- `sql/lineage/lid_generated.sql` is copied from arch-standards by `make lineage` and never edited here. It holds every bit operation, the layer check, the text form and the UUID bridge.
+- `sql/lineage/lid_extras.sql` is hand written. It holds only what is specific to this system: the lineage tables and the navigation.
+- The PostgreSQL versions are not written yet. When they are, they come from the same layout file, not by hand.
 
 The generated macros take and return the native `UHUGEINT`, while `lid` is stored as `UUID`, so a call wraps with `lid_from_uuid` going in and `lid_to_uuid` coming out. The `Returns` column below is the type of the macro itself, before that wrapping.
 
@@ -463,11 +523,11 @@ The generated macros take and return the native `UHUGEINT`, while `lid` is store
 | `lid_children(ing)` | hand written | table: every `silver/record` row of one ingested file | Forward: range scan on the `ingest_ord` prefix |
 | `lid_prefix_lo(ing)`, `lid_prefix_hi(ing)` | hand written | `UUID` | Bounds for the range scan |
 
-Example. Given a `gold/channel_quality` row with `lid = 01K5H2ZQ8G0000000000000000` (text form), `lid_trace` returns the `.mat` file it came from, the sha256 recorded at ingestion, and run 1, channel 17. `lid_children(3)` returns every record derived from the third ingested file.
+Example. Take a `gold/channel_quality` row with `lid = 01K5H2ZQ8G0000000000000000` (text form). `lid_trace` returns the `.mat` file it came from, the sha256 recorded at ingestion, and run 1 and channel 17. `lid_children(3)` returns every record derived from the third ingested file.
 
 ### 12.4 Site behaviour
 
-Every number in the `channel_quality` and `experiment_summary` tables on `docs/index.html` is clickable. Clicking runs `lid_trace` in DuckDB-WASM and shows the result in a side panel: file, digest, run, channel, sample range. The panel text is a query result like everything else on the page.
+Every number in the `channel_quality` and `experiment_summary` tables on `docs/index.html` is clickable. Clicking runs `lid_trace` in DuckDB-WASM and shows the result in a side panel: file, digest, run, channel and sample range. The panel text is a query result like everything else on the page.
 
 ### 12.5 Canary records
 

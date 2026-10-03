@@ -1,34 +1,34 @@
-# intent.md
+# Intent
 
-## Why this repository exists
+## Why
 
-A working example of a governed data platform for implanted neural recordings, built to be shown in one hour and reproduced by anyone with a browser and the DuckDB CLI. It exists to make three claims checkable rather than stated:
+A governed lakehouse over implanted neural recordings that anyone can rebuild and check. It makes three claims checkable:
 
-1. Governance can execute. Regulatory requirements are rows in a table that generate checks; every run leaves evidence.
-2. Open formats on object storage are the right default for this kind of data, and the file layout is a performance decision, not a detail.
-3. The author fixes performance problems by changing the design, and can show the before and after with numbers.
+1. Governance can execute. Requirements are rows in a table that generate checks. Every run leaves evidence.
+2. Open formats on static storage are a sound default here, and file layout is a performance decision.
+3. A performance problem is fixed by changing the design. Each planted fault sits beside its fix, measured before and after.
 
-## Who it is for
+## For whom
 
-Anyone evaluating the author's data architecture work: how a governed lakehouse is designed, verified and explained, with every number traceable to the bytes it came from.
+Data engineers who want a governed lakehouse to read end to end, every number traceable to its bytes.
 
 ## What it is not
 
-Not a product. Not a claim about how any organisation's real data is structured. Not a benchmark of DuckDB; the numbers are illustrations of design choices, produced on the author's machine and reproducible from the README.
+Not a product. Not a model of any organisation's real data. Not a DuckDB benchmark: the timings illustrate design choices, and `docs/bench.md` names the host and engine of each.
 
-## Constraints the design accepts
+## Constraints
 
 | Constraint | Consequence |
 |---|---|
-| Public data only | Stanford ECoG library (Miller, 2019), CC BY-SA 4.0. Published derivatives carry the same licence and attribution. |
-| No employer code | Everything is written new in this repository. No code from DataLocker, Quackrail or any Dynatrace work. |
-| Reproducible by a stranger | One command builds everything from the raw files; one URL runs the governance checks in the browser; two CLI commands reproduce the performance comparison. |
-| GitHub Pages as storage | Every published file under 95 MB; total published data under 500 MB; no third-party request at view time. |
-| Demo in under five minutes | Four planted faults, each with a fix and a measurement. Nothing else is shown live. |
+| Public data only | Stanford ECoG library (Miller, 2019), CC BY-SA 4.0. Derivatives carry the same licence. |
+| Original code only | Everything is written new here. |
+| Reproducible by a stranger | One command builds every layer. One URL reruns the checks in a browser. |
+| GitHub Pages as storage | Files under 95 MB, `docs/data/` under 500 MB, no third-party request but the pinned DuckDB-WASM CDN. |
 
 ## Definition of done
 
-- `make all` builds Bronze, Silver, Gold, runs the checks and writes evidence, from either the real data or the synthetic generator.
-- The GitHub Pages site loads the Gold layer with DuckDB-WASM, runs the checks and displays the evidence table, with no server.
-- The README contains the exact CLI commands for each fault's before and after, and the numbers observed on the author's machine.
-- `doc/intent.md`, `doc/spec.md`, `doc/plan.md`, `CLAUDE.md` and `doc/REVIEW.md` are committed and current. Decisions live in `adr/`.
+- `make all` builds Bronze, Silver and Gold, runs the checks, writes evidence and publishes. `SYNTH=1` uses generated data.
+- The site loads Gold with DuckDB-WASM, reruns the checks and verifies the file digests, with no server.
+- `make bench` measures each fault before and after into `docs/bench.md`.
+- CI runs `make lint`, `make test` and `make all SYNTH=1` on every pull request.
+- `doc/spec.md` is the contract. Decisions live in `adr/`, review passes in `doc/REVIEW.md`.

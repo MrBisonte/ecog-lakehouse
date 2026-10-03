@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Governed lakehouse over public ECoG recordings with four planted performance faults. Read `doc/intent.md`, `doc/spec.md`, `doc/plan.md` before changing anything. `doc/spec.md` is the contract; if code and spec disagree, fix one and say which.
+Governed lakehouse over public ECoG recordings with four planted performance faults. Read `doc/intent.md` and `doc/spec.md` before changing anything. `doc/spec.md` is the contract; if code and spec disagree, fix one and say which.
 
 ## Stack
 Python 3.12, DuckDB, Parquet, `make`. Plain SQL in `sql/`, no ORM. DuckDB-WASM in `docs/index.html`. No other runtime dependency without an ADR.

@@ -28,7 +28,7 @@ publish:
 	$(PY) -m pipeline.publish
 
 bench:
-	$(PY) pipeline/bench_doc.py
+	$(PY) -m pipeline.bench_doc
 	for f in $(wildcard faults/*/bench.sh); do bash $$f; done
 
 test:
@@ -38,7 +38,7 @@ lineage:
 	cp $(ARCH_STANDARDS)/data/ids/generated/lid/duckdb.sql sql/lineage/lid_generated.sql
 
 lint:
-	ruff check . && $(PY) scripts/lint_doc.py README.md CLAUDE.md doc/*.md doc/agent/*.md adr/*.md docs/*.md
+	ruff check . && $(PY) scripts/lint_doc.py README.md CLAUDE.md CONTRIBUTING.md doc/*.md adr/*.md docs/*.md
 
 # CycloneDX 1.6 bill of materials of the installed environment, the project as root component.
 sbom:
