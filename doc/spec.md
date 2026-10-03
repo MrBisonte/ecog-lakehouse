@@ -405,6 +405,8 @@ Every SQL file is plain DuckDB SQL with `{{var}}` placeholders resolved by a 20-
 4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables.
 5. Reads every Gold file once more in full and compares its sha256 with `manifest.json`.
 
+While it loads, a progress bar and a status line name the step, 1 to 5: the engine download, the Gold files, the checks, the summary tables, the hashes. The engine step shows the bytes DuckDB-WASM reports and the bar stays indeterminate, because the total it reports is the compressed size. The other steps advance by count or by bytes. Both disappear when the page is ready or has failed.
+
 The checks table reads in the order a reader needs:
 
 1. Whatever did not pass.
@@ -417,7 +419,7 @@ A row leads with one plain sentence and the clause behind it, never with a check
 
 The page can only read Gold, so the checks that ran on Bronze, Silver and the published copy are reported above the table from the latest `gold/evidence` run, grouped by framework.
 
-A `lid` is shown in its 26 character text form, `lid_text`, so the page, this document and the deck read the same identifier. The UUID stays in the data.
+A `lid` is shown in its 26 character text form, `lid_text`, so the page and this document read the same identifier. The UUID stays in the data.
 
 Rules:
 
