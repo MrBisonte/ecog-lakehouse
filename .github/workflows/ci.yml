@@ -19,7 +19,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+          cache-dependency-path: requirements.lock
+      # requirements.lock is pip freeze of the development environment, dev tools included.
+      - run: pip install -r requirements.lock -e .
       - run: make lint
       - run: make test
       # The whole pipeline on generated data, no download.

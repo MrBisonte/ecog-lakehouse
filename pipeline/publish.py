@@ -22,7 +22,7 @@ BROWSER_KINDS = {"not_null", "unique", "row_count_min", "no_direct_identifier", 
 
 
 def radioactive_rows(con, path: Path) -> int:
-    """Rows of one Parquet file whose lid carries the canary bit, 0 when it has no lid."""
+    """Rows of one Parquet file whose lid carries the radioactive bit, 0 when it has no lid."""
     columns = {r[0] for r in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{path.as_posix()}')").fetchall()}
     if "lid" not in columns:
         return 0

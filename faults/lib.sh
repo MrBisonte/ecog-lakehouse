@@ -28,18 +28,53 @@ serve_docs_data() {
   export BASE_URL
 }
 
-# seconds() <command...>: wall clock of the command, three decimals, output discarded.
+# seconds() <command...>: wall clock of the command, two decimals, output discarded.
 seconds() {
   local t0 t1
   t0=$(date +%s.%N)
   "$@" >/dev/null 2>&1
   t1=$(date +%s.%N)
-  printf '%.3f' "$(echo "$t1 - $t0" | bc)"
+  printf '%.2f' "$(echo "$t1 - $t0" | bc)"
 }
 
-# median3() <command...>: the median of three seconds() runs, single runs vary on loopback.
-median3() {
-  { seconds "$@"; echo; seconds "$@"; echo; seconds "$@"; echo; } | sort -n | sed -n 2p
+# thousands <integer>: 15336887 as 15,336,887, the form pipeline/bench_doc.py writes.
+thousands() {
+  echo "$1" | sed -E ':a;s/^([0-9]+)([0-9]{3})/\1,\2/;ta'
+}
+
+# mib <bytes>: bytes as MiB with two decimals, the form pipeline/bench_doc.py writes.
+mib() {
+  printf '%.2f MiB' "$(echo "$1 / 1048576" | bc -l)"
+}
+
+# spread3() <command...>: "min / median / max" of three seconds() runs, two decimals each.
+# Single runs vary, so the spread is shown beside the median.
+spread3() {
+  local runs
+  runs=$({ seconds "$@"; echo; seconds "$@"; echo; seconds "$@"; echo; } | sort -n)
+  # shellcheck disable=SC2086  # three sorted numbers, split on purpose
+  printf '%.2f / %.2f / %.2f' $runs
+}
+
+# replace_section <heading>: the section body on stdin replaces, in BENCH_MD, every section whose
+# heading line equals <heading>, from that line up to the next line starting with "## " or the
+# end of the file. The first such section keeps its place; a heading not present is appended.
+# Runs of blank lines collapse to one. The section is echoed to stdout as well.
+replace_section() {
+  local body tmp
+  body=$(cat)
+  tmp=$(mktemp "$BENCH_MD.XXXXXX")
+  HEADING=$1 BODY=$body awk '
+    function out(s) { if (s == "") { gap = 1; return } if (gap && n) print ""; gap = 0; n++; print s }
+    BEGIN { h = ENVIRON["HEADING"]; b = ENVIRON["BODY"] }
+    $0 == h { if (!done) { out(h); out(""); out(b); gap = 1 } done = skip = 1; next }
+    skip && /^## / { skip = 0 }
+    !skip { out($0) }
+    END { if (!done) { out(""); out(h); out(""); out(b) } }
+  ' "$BENCH_MD" > "$tmp"
+  cat "$tmp" > "$BENCH_MD"  # not mv: keeps the file's mode, mktemp creates 0600
+  rm "$tmp"
+  printf '\n%s\n\n%s\n' "$1" "$body"
 }
 
 # The smallest non canary partition of silver/recording, as FAULT_EXPERIMENT FAULT_SUBJECT.

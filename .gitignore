@@ -3,10 +3,12 @@
 !*/
 !.gitignore
 !README.md
+!CONTRIBUTING.md
 !LICENSE
 !CLAUDE.md
 !Makefile
 !pyproject.toml
+!requirements.lock
 !CITATION.cff
 !REUSE.toml
 !LICENSES/*.txt

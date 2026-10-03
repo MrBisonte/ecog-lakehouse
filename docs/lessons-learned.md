@@ -4,6 +4,8 @@ The first build on real data ran out of memory. This page shows why, what fixed 
 
 Setup: 871,160,120 Silver rows, 12 threads, 15 GB in the WSL VM, DuckDB 1.5.5, memory limit 12.1 GB. Every number is a query result or a timer.
 
+Source: `doc/REVIEW.md`, Phase 1, real data, 2026-09-21; the thread count from commit `0d7c2d3`.
+
 ## 1. The cause, in one picture
 
 ```
@@ -15,6 +17,8 @@ Setup: 871,160,120 Silver rows, 12 threads, 15 GB in the WSL VM, DuckDB 1.5.5, m
 ```
 
 A table computed inside the same statement has no row count. Handed the same 45 rows as a real table, the identical query finishes in about 8 seconds.
+
+Source: `doc/REVIEW.md`, Memory incident root cause, corrected, 2026-09-25.
 
 ## 2. Timeline
 
@@ -32,6 +36,8 @@ A table computed inside the same statement has no row count. Handed the same 45 
 ```
 
 Fix 2 changed nothing. Fix 3 is the one that worked.
+
+Source: `doc/REVIEW.md`, Phase 1, real data; the verifier is checks run `01M32SPQ2CVDTH7CNN3MS8WJYX` at commit `5ed73af`.
 
 ## 3. The query, before and after
 
@@ -65,6 +71,8 @@ Fix 2 changed nothing. Fix 3 is the one that worked.
 
 `gold/feature_window` got the same treatment.
 
+Source of the row counts: `doc/REVIEW.md`, Memory incident root cause, corrected, 2026-09-25.
+
 ## 4. The proof
 
 Each test ran twice. Only one thing helps: giving the planner a real row count.
@@ -77,6 +85,8 @@ Each test ran twice. Only one thing helps: giving the planner a real row count.
 | Group key narrowed to `lid`, rails still inline | out of memory, 17.6 s and 15.5 s | ✘ |
 | Rails handed over as a table of the same 45 rows | 2,241 rows in 7.9 s and 7.7 s | ✔ |
 | The committed query | 2,241 rows in 6.2 s and 6.3 s | ✔ |
+
+Source: `doc/REVIEW.md`, Memory incident root cause, corrected, 2026-09-25.
 
 ## 5. What we got wrong
 
@@ -100,12 +110,16 @@ Alex asked to compare the committed query with a variant that measures clipping 
 | C: one scan with a window function | 29.9 s | not rerun |
 | A with `MATERIALIZED` | 34.3 s | not rerun |
 
+Source: 2026-09-21 timed in phase 1, first recorded in commit `203ea98`; 2026-10-02 from `doc/REVIEW.md`, The two open timings.
+
 - **The four times gap was not real.** Both plans have the same shape: an 859,640,120 row scan joined to 2,241 rows. A's two extra joins handle 2,241 and 42 rows in 0.00 s.
 - **The slow A runs were the machine, not the query.** 8.5 GB of Silver in a 15 GB VM, timed in the hours after the out of memory runs. This is the likeliest cause; it cannot be proven now.
 - **The page contradicted itself for eleven days.** Section 4 had the committed query at 6.2 s since 2026-09-25, beside the 33 s here.
 - **A and B agree** on count and RMS for all 2,241 records. `clipped_pct` differs on 2,107, because the definition differs, not because of an error.
 - **C is not the fastest.** One scan, but the window function has to partition 871M rows by `lid` and spill to disk.
 - **Both readings are in the mart** since #25: `clipped_pct` from A, `clipped_own_pct` from B.
+
+Sources: plans and scan count from commit `0d7c2d3`, 2026-10-02; 2,107 from commit `203ea98`; 8.5 GB from the phase 1 verifier output in `doc/REVIEW.md`.
 
 ## 7. What is in place now
 
@@ -118,11 +132,15 @@ Alex asked to compare the committed query with a variant that measures clipping 
 | Verifier runs under `$HOME` | `~/verify_phase1.sh` | `/tmp` is a 7.6 GB RAM disk in this WSL and filled up |
 | Download with resume | `pipeline/fetch.py` | The Stanford host stalled at 359 MB |
 
+Source: `doc/REVIEW.md`, Phase 1, real data.
+
 ## 8. The same faults against GitHub Pages
 
 Run on the real host instead of the local machine, three things changed.
 
 **The CDN gave one file two identities.** Pages returned ETag `6ab394b5-385b0b5` from one server and `6ab394b4-385b0b5` from another. DuckDB pins the first one, the next request lands on the other server, and the read fails with a 412. The way through is `unsafe_disable_etag_checks`; the sha256 in the manifest is the integrity check that remains.
+
+Source: `doc/REVIEW.md`, Phase 3 addendum, GitHub Pages, 2026-09-23.
 
 **Fault A inverted.** The partitioned layout was slower for an aggregate and faster for fetching one record. Measured on 2026-10-02:
 
@@ -131,12 +149,18 @@ Run on the real host instead of the local machine, three things changed.
 | One row group | 52.0 MB | 1.50 s, 21.5 MiB, 11 requests | 1.71 s, 19.5 MiB, 10 requests |
 | 38 sorted row groups | 76.3 MB | 3.76 s, 72.7 MiB, 38 requests | 0.65 s, 6.7 MiB, 5 requests |
 
+Source: the last Fault A table of [bench.md](bench.md), commit `0407bcd`.
+
 - The aggregate needs two columns, about 17 MB in either layout. From the 38 row groups DuckDB fetched every row group whole: the full size of the files.
 - The partitioned files are 47 percent larger. `ts_ms` and `sample_idx` take 28.9 MB each there, against 17.0 MB each in the single row group. One dictionary over 7.2 million rows compresses what a dictionary per 198,656 sorted rows cannot.
 - Partitioning pays when a filter skips row groups. It costs when the query reads every row.
 - The layout stays: it is right for the range retrieval `lid_children` does, and the `partition_layout` check demands it.
 
+Source: the Parquet metadata, commit `0d7c2d3`, and `doc/REVIEW.md`, The two open timings.
+
 **Faults D and F held.** D: 5.1 s for the download loop against 0.3 s for one statement. F: 0 of 10 reads succeed without retries, 10 of 10 with.
+
+Source: the second Fault D and Fault F tables of [bench.md](bench.md), commit `9f61d91`, 2026-09-23.
 
 ## 9. Lessons
 
