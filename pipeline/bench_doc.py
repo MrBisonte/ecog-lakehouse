@@ -148,6 +148,15 @@ def build_files():
     return rows
 
 
+def other_sections(existing: str) -> str:
+    """What the fault scripts wrote: from the first `## ` heading that is not Setup or Build on."""
+    lines = existing.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if line.startswith("## ") and line.strip() not in ("## Setup", "## Build"):
+            return "".join(lines[i:])
+    return ""
+
+
 def main(argv=None) -> int:
     con = db.connect()
     con.execute("CREATE TEMP TABLE build_files (layer VARCHAR, experiment VARCHAR, bytes BIGINT)")
@@ -180,7 +189,10 @@ def main(argv=None) -> int:
         ),
         "",
     ])
-    OUT.write_text(text, encoding="utf-8")
+    # A section stays until its own script replaces it; the sweep and the encodings are not
+    # part of make bench and would be lost otherwise.
+    kept = other_sections(OUT.read_text(encoding="utf-8")) if OUT.exists() else ""
+    OUT.write_text(text + ("\n" + kept if kept else ""), encoding="utf-8")
     print(f"bench_doc: wrote {OUT}")
     return 0
 
