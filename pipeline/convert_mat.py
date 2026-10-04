@@ -248,6 +248,28 @@ def stage(con, src: Source):
     )
 
 
+def audit_values(con, path: Path, src: Source, sha256: str) -> dict:
+    """The ingest_audit row of a staged source. Computed before the first Bronze write, so a
+    failure here, the keyring held by another process or no git, leaves no file behind."""
+    # A source read from outside DATA_DIR has no path below it, so it keeps its absolute one
+    # and hash_match will not find it, which is the honest answer for a file that is not here.
+    root = db.data_dir()
+    below = path.relative_to(root) if path.is_relative_to(root) else path
+    return {
+        "data_root": root.as_posix(),
+        "source_path_rel": below.as_posix(),
+        "source_url": src.source_url,
+        "sha256": sha256,
+        "bytes": path.stat().st_size,
+        "sample_rate_hz": src.sample_rate_hz,
+        "rows_written": con.execute("SELECT count(*) FROM src_recording").fetchone()[0],
+        "tool": TOOL,
+        "tool_version": db.git_commit(),
+        "duckdb_version": duckdb.__version__,
+        "ingest_host": keyring.host(),
+    }
+
+
 def convert(con, path: Path, adapter) -> int:
     """Write one file to Bronze. Returns rows written to bronze/recording, 0 when skipped."""
     sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -266,6 +288,7 @@ def convert(con, path: Path, adapter) -> int:
         print(f"convert: skip {path}, experiment '{src.experiment}' has no lineage code")
         return 0
     stage(con, src)
+    audit = audit_values(con, path, src, sha256)
     for name in ("recording", "electrode", "event", "ingest_audit"):
         (db.data_dir() / "bronze" / name).mkdir(parents=True, exist_ok=True)
     values = {
@@ -281,30 +304,11 @@ def convert(con, path: Path, adapter) -> int:
     }
     for name in ("recording", "electrode", "event"):
         db.run_sql(con, db.SQL / "bronze" / f"{name}.sql", **values)
-    rows = con.execute("SELECT count(*) FROM src_recording").fetchone()[0]
-    # A source read from outside DATA_DIR has no path below it, so it keeps its absolute one
-    # and hash_match will not find it, which is the honest answer for a file that is not here.
-    root = db.data_dir()
-    below = path.relative_to(root) if path.is_relative_to(root) else path
-    db.run_sql(
-        con,
-        db.SQL / "bronze" / "ingest_audit.sql",
-        data_root=root.as_posix(),
-        source_path_rel=below.as_posix(),
-        source_url=src.source_url,
-        sha256=sha256,
-        bytes=path.stat().st_size,
-        sample_rate_hz=src.sample_rate_hz,
-        rows_written=rows,
-        tool=TOOL,
-        tool_version=db.git_commit(),
-        duckdb_version=duckdb.__version__,
-        ingest_host=keyring.host(),
-        **values,
-    )
+    # The audit row is the commit marker, written last, spec 3.1.
+    db.run_sql(con, db.SQL / "bronze" / "ingest_audit.sql", **audit, **values)
     db.views(con)
-    print(f"convert: wrote {path} as {values['ingest_id']}, {rows} rows")
-    return rows
+    print(f"convert: wrote {path} as {values['ingest_id']}, {audit['rows_written']} rows")
+    return audit["rows_written"]
 
 
 def main(argv=None) -> int:

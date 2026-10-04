@@ -3,7 +3,7 @@ visible trace, and the next ingest moves its files to quarantine before writing 
 
 import pytest
 
-from pipeline import convert_mat, db, synth
+from pipeline import convert_mat, db, keyring, synth
 
 CHANNELS = 4
 BRONZE = ("bronze_recording", "bronze_electrode", "bronze_event")
@@ -41,3 +41,13 @@ def test_rows_without_an_audit_row_are_not_read(one_file, monkeypatch):
     con = db.connect()
     for view in BRONZE:
         assert con.execute(f"SELECT count(*) FROM {view}").fetchone()[0] == 0, view
+
+
+def test_a_keyring_failure_writes_nothing_to_bronze(one_file, monkeypatch):
+    def host():
+        raise RuntimeError("keyring.duckdb is held by another process")
+
+    monkeypatch.setattr(keyring, "host", host)
+    with pytest.raises(RuntimeError):
+        convert_mat.main([])
+    assert data_files(one_file) == []
