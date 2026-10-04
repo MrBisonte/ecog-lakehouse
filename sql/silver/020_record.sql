@@ -18,4 +18,4 @@ COPY (
         ON u.experiment = r.experiment
     GROUP BY ALL
     ORDER BY 1
-) TO '{{data_dir}}/silver/record/data_0.parquet' (FORMAT parquet);
+) TO '{{data_dir}}/silver/record/data_0.parquet' (FORMAT parquet, PARQUET_VERSION v2);

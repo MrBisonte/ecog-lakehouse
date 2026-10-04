@@ -4,4 +4,4 @@ COPY (
     FROM keyring.key_map k
     JOIN (SELECT DISTINCT subject_src FROM bronze_recording) b USING (subject_src)
     ORDER BY 1
-) TO '{{data_dir}}/silver/subject/data_0.parquet' (FORMAT parquet);
+) TO '{{data_dir}}/silver/subject/data_0.parquet' (FORMAT parquet, PARQUET_VERSION v2);
