@@ -16,13 +16,15 @@
   table { border-collapse: collapse; width: 100%; overflow-x: auto; display: block; }
   th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid #8884; white-space: nowrap; }
   th { position: sticky; top: 0; background: Canvas; }
-  .pass { color: #1a7f37; } .fail, .error { color: #b3261e; font-weight: 600; }
+  .pass { color: #1a7f37; } .fail, .error, .not.run { color: #b3261e; font-weight: 600; }
   .flag { color: #9a6700; font-weight: 600; }
   details summary { cursor: pointer; }
   details table { margin-top: 4px; }
   td.wrap { white-space: normal; min-width: 16rem; overflow-wrap: anywhere; }
   #status { font-weight: 600; }
   #bar { display: block; width: 100%; max-width: 90ch; height: 1rem; }
+  /* display above would otherwise win over the hidden attribute and keep the bar on screen. */
+  #bar[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -209,7 +211,7 @@ try {
     (d) => c.dataset === `gold/${d}` || new RegExp(`\\bgold_${d}\\b`).test(c.sql));
   const notShown = (id, d) => {
     document.getElementById(id).textContent =
-      `Not shown: a file of gold/${d} did not match its published digest, so the page did not read it.`;
+      `Not shown: a file of gold/${d} did not verify against its published digest, so the page did not read it.`;
   };
 
   const conn = await db.connect();
@@ -297,7 +299,7 @@ try {
   if (unverified.size) {
     status.className = "fail";
     say(`Not all files verified. ${verified.size} of ${gold.length} Gold files match their digests and ` +
-      `${gold.length - verified.size} do not, so nothing read from ${unverifiedNames} is shown. ${engine}`);
+      `${gold.length - verified.size} ${gold.length - verified.size === 1 ? "does" : "do"} not, so nothing read from ${unverifiedNames} is shown. ${engine}`);
   } else {
     say(`Ready. ${gold.length} Gold files, ${engine} All ${verified.size} Gold files match their digests, checked in this browser before any query.`);
   }
