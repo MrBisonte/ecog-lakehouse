@@ -159,7 +159,11 @@ The same files on `v2.0.0-alpha43763`, measured on 2026-10-03:
 | One row group | 0.89 s, 16.3 MiB, 11 requests | 1.14 s, 16.3 MiB, 11 requests |
 | 38 sorted row groups | 1.07 s, 16.5 MiB, 78 requests | 0.37 s, 985.7 KiB, 6 requests |
 
-Source: the Fault A section of [bench.md](bench.md) as it stands; seconds are the median of three.
+Source: the Fault A section of [bench.md](bench.md), commit `18134c0`; seconds are the median of three.
+
+Since ADR-0007 the fixed layout is Parquet version 2, 17.45 MiB in 37 row groups. Measured on 2026-10-04: aggregate 1.00 s, 16.1 MiB, 39 requests; one record 0.38 s, 487.8 KiB, 5 requests.
+
+Source: the Fault A section of [bench.md](bench.md) as it stands.
 
 - The inversion was the engine build, not the layout. On the later build the aggregate costs the same bytes in both layouts, and the lookup costs under 1 MiB against 16.3 MiB.
 - The aggregate needs two columns, about 17 MB in either layout. From the 38 row groups the earlier build received the full size of the files.
