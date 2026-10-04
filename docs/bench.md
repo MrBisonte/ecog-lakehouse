@@ -12,7 +12,7 @@ Read by `pipeline/bench_doc.py` when this file was written.
 | DuckDB Python | 1.5.5 |
 | DuckDB CLI | v2.0.0-alpha43763 (Cyanoptera) 96063b9e39 |
 | DuckDB CLI sha256 | 8e3d17e36ebfb868c020787f60dffe2457f3b43ab7013adf40e9cb2c1be449e8 |
-| git commit | 4832d84b0c46a19bbf4fd130fe5df2dcee4ac818 |
+| git commit | 4357e4a7b242bdbc173abf527fab09fc0f5bf946 |
 | Network location | https://mrbisonte.github.io/ecog-lakehouse/data |
 
 ## Build
@@ -29,21 +29,21 @@ Files ingested: 45. Build wall clock, first ingestion to the end of the first ev
 
 ## Fault A: single row group, unpartitioned, unsorted
 
-DuckDB CLI `v2.0.0-alpha43763 (Cyanoptera) 96063b9e39`. Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one, over `https://mrbisonte.github.io/ecog-lakehouse/data`, every file of the layout in one read_parquet. Aggregate: `SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet([URLS]) GROUP BY 1`. One record: `SELECT avg(value_uv), count(*) FROM read_parquet([URLS]) WHERE lid = '01a0c53a-e0f9-2030-000c-105000000000'`, the middle record of 40. Seconds are min / median / max of three CLI runs each; GET requests and bytes received are one run's HTTP statistics from EXPLAIN ANALYZE.
+DuckDB CLI `v2.0.0-alpha43763 (Cyanoptera) 96063b9e39`. Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one, over `https://mrbisonte.github.io/ecog-lakehouse/data`, every file of the layout in one read_parquet. Aggregate: `SELECT channel_idx, avg(value_uv), count(*) FROM read_parquet([URLS]) GROUP BY 1`. One record: `SELECT avg(value_uv), count(*) FROM read_parquet([URLS]) WHERE lid = '01a0d595-33ba-2030-000c-105000000000'`, the middle record of 40. Seconds are min / median / max of three CLI runs each; GET requests and bytes received are one run's HTTP statistics from EXPLAIN ANALYZE.
 
 | layout | files | row groups | size | sorted by lid, sample_idx | aggregate, read_ahead_depth = 0, s min / median / max | aggregate, default, s min / median / max | aggregate GETs | aggregate received | one record, s min / median / max | one record GETs | one record received |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| before, one row group | 1 | 1 | 49.55 MiB | true | 0.85 / 0.89 / 1.20 | 0.86 / 0.89 / 0.94 | 11 | 16.3 MiB | 0.92 / 1.14 / 1.47 | 11 | 16.3 MiB |
-| after, partitioned and sorted | 2 | 38 | 72.74 MiB | true | 1.03 / 1.03 / 1.35 | 1.06 / 1.07 / 1.19 | 78 | 16.5 MiB | 0.37 / 0.37 / 0.38 | 6 | 985.7 KiB |
+| before, one row group | 1 | 1 | 49.55 MiB | true | 1.02 / 1.47 / 3.37 | 1.01 / 1.43 / 1.59 | 11 | 16.3 MiB | 0.97 / 1.05 / 1.07 | 11 | 16.3 MiB |
+| after, partitioned and sorted | 2 | 37 | 17.45 MiB | true | 0.92 / 1.20 / 2.65 | 0.99 / 1.00 / 1.21 | 39 | 16.1 MiB | 0.37 / 0.38 / 0.39 | 5 | 487.8 KiB |
 
 ## Fault D: synchronous one-file-at-a-time loop
 
-10 Parquet files from `docs/data/manifest.json` over `https://mrbisonte.github.io/ecog-lakehouse/data`. Before: `faults/d/plant.py`, urllib, one file after another into a temp directory, then count. After: `faults/d/fix.sql`, one `read_parquet` over the URL list, then `faults/d/verify.sql`, every file read once more in full with read_blob and its sha256 compared with the manifest, the integrity check that replaces the CDN's ETag. Seconds are wall clock of one run each; the digest check downloads every byte, so it is timed apart.
+11 Parquet files from `docs/data/manifest.json` over `https://mrbisonte.github.io/ecog-lakehouse/data`. Before: `faults/d/plant.py`, urllib, one file after another into a temp directory, then count. After: `faults/d/fix.sql`, one `read_parquet` over the URL list, then `faults/d/verify.sql`, every file read once more in full with read_blob and its sha256 compared with the manifest, the integrity check that replaces the CDN's ETag. Seconds are wall clock of one run each; the digest check downloads every byte, so it is timed apart.
 
 | approach | rows | seconds | digest check seconds | files hashed | digest mismatches |
 |---|---|---|---|---|---|
-| before, sequential download then count | 15,337,108 | 7.84 | | 0 | not checked |
-| after, one httpfs statement, then verify.sql | 15,337,108 | 0.37 | 7.47 | 10 | 0 |
+| before, sequential download then count | 15,337,219 | 6.60 | | 0 | not checked |
+| after, one httpfs statement, then verify.sql | 15,337,219 | 0.64 | 5.45 | 11 | 0 |
 
 ## Fault F: flaky remote reads without retries
 
@@ -51,9 +51,9 @@ DuckDB CLI `v2.0.0-alpha43763 (Cyanoptera) 96063b9e39`. Subject partition `exper
 
 | engine, setting | successes | mean seconds |
 |---|---|---|
-| before, 1.5.5, http_retries = 0 | 0/10 | 1.47 |
-| after, 1.5.5, http_retries = 8, wait 50 ms, backoff 2 | 10/10 | 1.93 |
-| 2.0 alpha CLI, http_retries = 0 | 10/10 | 2.06 |
+| before, 1.5.5, http_retries = 0 | 0/10 | 5.97 |
+| after, 1.5.5, http_retries = 8, wait 50 ms, backoff 2 | 10/10 | 1.49 |
+| 2.0 alpha CLI, http_retries = 0 | 10/10 | 1.94 |
 
 ## Fault G: pathological generated SQL
 
