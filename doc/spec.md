@@ -64,6 +64,10 @@ All layers are Parquet under `data/<layer>/`, Hive partitioned. Published copies
 
 Bronze is the raw arrays, one row per sample, with no cleaning. It is append-only. A file, once written, is never modified; a re-ingestion writes a new partition with a new `ingest_id`.
 
+The `bronze/ingest_audit` row is written last and commits an ingest. A reader sees a Bronze recording, electrode or event row only when its `ingest_id` has an audit row. The views in `pipeline/db.py` apply this, so no SQL file repeats it.
+
+Every input that can fail, the keyring and the git commit among them, is computed before the first Bronze write. Rows written by an ingest that failed before its audit row are not committed. When the next ingest starts, their files move to `quarantine/<ingest_id>/` below `DATA_DIR`, keeping their path below it, and the source file is ingested again. Nothing is deleted.
+
 #### bronze/recording
 
 Partition: `experiment=<experiment>/subject_src=<code>/ingest_id=<id>/`.
@@ -375,7 +379,7 @@ Every target invokes an entry point as a module, `python -m pipeline.<name>`, ne
 - A script path puts `pipeline/` first on `sys.path`. An editable install then supplies the package from the checkout it was installed from. A run inside a clone would execute another checkout's code.
 - As a module the working directory comes first. A clone runs its own code, and the verifier pass of a clean clone holds whatever virtual environment is active.
 
-All data and DuckDB working files live under `DATA_DIR`: `raw/`, `bronze/`, `silver/`, `gold/` and `keyring.duckdb`. `DATA_DIR` is an environment variable defaulting to `$HOME/data/ecog-lakehouse`.
+All data and DuckDB working files live under `DATA_DIR`: `raw/`, `bronze/`, `silver/`, `gold/`, `quarantine/` and `keyring.duckdb`. `DATA_DIR` is an environment variable defaulting to `$HOME/data/ecog-lakehouse`.
 
 - The repository sits on a Windows mount under WSL2. Per-file operations there are slow and OneDrive style syncing can lock files. Nothing but source, documentation and `docs/data/` is written inside it.
 - `DATA_DIR` is created on first run.
@@ -401,12 +405,18 @@ Every SQL file is plain DuckDB SQL with `{{var}}` placeholders resolved by a 20-
 `docs/index.html`, one file, DuckDB-WASM loaded from `cdn.jsdelivr.net` at a pinned version. On load it:
 
 1. Reads `docs/data/manifest.json`.
-2. Attaches the Gold Parquet files over HTTP range requests.
+2. Downloads each Gold Parquet file once, at a URL that carries its sha256 from the manifest, hashes the bytes and compares the digest with `manifest.json`. Only bytes that match are handed to DuckDB, so every query reads verified bytes.
 3. Runs the same check SQL the pipeline ran, from `docs/data/checks.json`.
 4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables.
-5. Reads every Gold file once more in full and compares its sha256 with `manifest.json`.
 
-While it loads, a progress bar and a status line name the step, 1 to 5: the engine download, the Gold files, the checks, the summary tables, the hashes. The engine step shows the bytes DuckDB-WASM reports and the bar stays indeterminate, because the total it reports is the compressed size. The other steps advance by count or by bytes. Both disappear when the page is ready or has failed.
+While it loads, a progress bar and a status line name the step, 1 to 4: the engine download, verifying the Gold files, the checks, the summary tables. The engine step shows the bytes DuckDB-WASM reports and the bar stays indeterminate, because the total it reports is the compressed size. The Gold step advances by bytes received, the checks by count. Both disappear when the page is ready or has failed.
+
+A Gold file whose digest does not match, or that cannot be fetched, is never read, and neither is anything that depends on it:
+
+- A dataset is verified only if every one of its files matched. Only a verified dataset gets a view.
+- A check on an unverified dataset, or whose SQL names the view of one, is not run. It is listed at the top of the checks table as `not run`, with `file not verified`, and the summary counts it.
+- A table or note on an unverified dataset is replaced by one line saying why it is not shown.
+- The files table shows the digest received next to the published one, or why the file was not received. The status line says how many files matched and how many did not.
 
 The checks table reads in the order a reader needs:
 

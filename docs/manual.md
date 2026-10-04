@@ -27,10 +27,12 @@ Needs Python 3.12 or later and `make`, on Linux, macOS or WSL.
 
 | Where | What lives there |
 |---|---|
-| `DATA_DIR`, default `$HOME/data/ecog-lakehouse` | `raw/`, `bronze/`, `silver/`, `gold/`, `keyring.duckdb` |
+| `DATA_DIR`, default `$HOME/data/ecog-lakehouse` | `raw/`, `bronze/`, `silver/`, `gold/`, `quarantine/`, `keyring.duckdb` |
 | `docs/data/` in the repository | The published copy of Gold, the fault files, `manifest.json`. Tracked by git |
 
 Data never goes anywhere else inside the repository.
+
+`quarantine/<ingest_id>/` holds Bronze files of an ingest that failed before its audit row. `make bronze` moves them there when it starts and prints one `convert: quarantined ...` line per ingest. Nothing reads them and nothing deletes them.
 
 ## 2. Build
 
