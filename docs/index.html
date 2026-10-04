@@ -200,12 +200,22 @@ try {
   }
   table("files", ["path", "bytes", "sha256", "digest"], files,
     (r) => r.digest === "match" ? "pass" : r.digest === "not read" ? "" : "fail");
-  if (verified.size < gold.length) throw new Error(`${gold.length - verified.size} Gold files did not verify`);
+  // A dataset is verified only if every one of its files matched. What reads an unverified
+  // dataset is withheld: no view, no check, no table.
+  const datasetOf = (path) => path.split("/")[1];
+  const unverified = new Set(gold.filter((f) => !verified.has(f.path)).map((f) => datasetOf(f.path)));
+  const unverifiedNames = new Intl.ListFormat("en").format([...unverified].map((d) => `gold/${d}`));
+  const withheld = (c) => [...unverified].some(
+    (d) => c.dataset === `gold/${d}` || new RegExp(`\\bgold_${d}\\b`).test(c.sql));
+  const notShown = (id, d) => {
+    document.getElementById(id).textContent =
+      `Not shown: a file of gold/${d} did not match its published digest, so the page did not read it.`;
+  };
 
   const conn = await db.connect();
-  const datasets = [...new Set(gold.map((f) => f.path.split("/")[1]))];
+  const datasets = [...new Set(gold.map((f) => datasetOf(f.path)))].filter((d) => !unverified.has(d));
   for (const d of datasets) {
-    const paths = gold.filter((f) => f.path.split("/")[1] === d).map((f) => `'${f.path}'`).join(", ");
+    const paths = gold.filter((f) => datasetOf(f.path) === d).map((f) => `'${f.path}'`).join(", ");
     await conn.query(`CREATE VIEW gold_${d} AS SELECT * FROM read_parquet([${paths}], hive_partitioning = true)`);
   }
   const lid = await (await fetch("data/lid.sql")).text();
@@ -217,7 +227,9 @@ try {
     say(`Step 3 of 4: rerunning check ${i + 1} of ${checks.length}`);
     advance("checks", i, checks.length);
     let observed, result;
-    try {
+    if (withheld(c)) {
+      observed = "file not verified"; result = "not run";
+    } else try {
       observed = Object.values((await query(conn, c.sql)).rows[0])[0];
       result = holds(c, observed) ? "pass" : c.severity === "flag" ? "flag" : "fail";
     } catch (e) {
@@ -233,9 +245,12 @@ try {
   }
   const counts = results.reduce((a, r) => ((a[r.result] = (a[r.result] || 0) + 1), a), {});
   const checksSummary = document.getElementById("checks-summary");
+  const notRun = counts["not run"] || 0;
   checksSummary.textContent =
-    `${results.length} checks rerun here: ${counts.pass || 0} pass, ${counts.fail || 0} fail, ` +
-    `${counts.flag || 0} flagged, ${counts.error || 0} error. A flag is a plausibility range the ` +
+    `${notRun ? `${results.length - notRun} of ${results.length}` : results.length} checks rerun here: ` +
+    `${counts.pass || 0} pass, ${counts.fail || 0} fail, ${counts.flag || 0} flagged, ${counts.error || 0} error. ` +
+    (notRun ? `${notRun} checks were not run because ${unverifiedNames} did not verify. ` : "") +
+    `A flag is a plausibility range the ` +
     `recordings fall outside; it is recorded and does not stop the build. `;
   const link = (href, text) => Object.assign(document.createElement("a"), { href, textContent: text });
   checksSummary.append(
@@ -245,31 +260,47 @@ try {
 
   say("Step 4 of 4: reading the summary tables");
   advance("tables", 0, 1);
-  const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
-  table("summary", summary.columns, summary.rows);
+  if (unverified.has("experiment_summary")) notShown("summary", "experiment_summary");
+  else {
+    const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
+    table("summary", summary.columns, summary.rows);
+  }
 
-  const total = (await query(conn, "SELECT count(*) AS n FROM gold_channel_quality")).rows[0].n;
-  const quality = await query(conn,
-    "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, " +
-    "rms_uv AS \"rms_uv µV\", clipped_pct AS \"clipped_pct %\", clipped_own_pct AS \"clipped_own_pct %\", line_noise_ratio, scale_basis, " +
-    "lid_text(lid_from_uuid(lid)) AS lid " +
-    "FROM gold_channel_quality ORDER BY line_noise_ratio DESC NULLS LAST LIMIT 100");
-  document.getElementById("quality-note").textContent = `${cell(total, "total")} records in gold/channel_quality; the 100 with the highest line noise ratio:`;
-  table("quality", quality.columns, quality.rows);
+  if (unverified.has("channel_quality")) notShown("quality-note", "channel_quality");
+  else {
+    const total = (await query(conn, "SELECT count(*) AS n FROM gold_channel_quality")).rows[0].n;
+    const quality = await query(conn,
+      "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, " +
+      "rms_uv AS \"rms_uv µV\", clipped_pct AS \"clipped_pct %\", clipped_own_pct AS \"clipped_own_pct %\", line_noise_ratio, scale_basis, " +
+      "lid_text(lid_from_uuid(lid)) AS lid " +
+      "FROM gold_channel_quality ORDER BY line_noise_ratio DESC NULLS LAST LIMIT 100");
+    document.getElementById("quality-note").textContent = `${cell(total, "total")} records in gold/channel_quality; the 100 with the highest line noise ratio:`;
+    table("quality", quality.columns, quality.rows);
+  }
 
-  const latest = "(SELECT max(run_id) FROM gold_evidence)";
-  const ran = (await query(conn, "SELECT count(*) AS total, count(*) FILTER (WHERE dataset NOT LIKE 'gold/%') AS elsewhere FROM gold_evidence WHERE run_id = " + latest)).rows[0];
-  document.getElementById("coverage").textContent =
-    `The pipeline's own run covered ${cell(ran.total, "total")} checks. ${cell(ran.elsewhere, "elsewhere")} of them ran on Bronze, ` +
-    `Silver and the published copy, which this page cannot read, so they are reported here rather than rerun:`;
-  const byFramework = await query(conn, "SELECT framework, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass FROM gold_evidence WHERE run_id = " + latest + " GROUP BY 1 ORDER BY 1");
-  table("frameworks", byFramework.columns, byFramework.rows.map((r) => ({ ...r, framework: named(r.framework) })));
+  if (unverified.has("evidence")) { notShown("coverage", "evidence"); notShown("runs", "evidence"); }
+  else {
+    const latest = "(SELECT max(run_id) FROM gold_evidence)";
+    const ran = (await query(conn, "SELECT count(*) AS total, count(*) FILTER (WHERE dataset NOT LIKE 'gold/%') AS elsewhere FROM gold_evidence WHERE run_id = " + latest)).rows[0];
+    document.getElementById("coverage").textContent =
+      `The pipeline's own run covered ${cell(ran.total, "total")} checks. ${cell(ran.elsewhere, "elsewhere")} of them ran on Bronze, ` +
+      `Silver and the published copy, which this page cannot read, so they are reported here rather than rerun:`;
+    const byFramework = await query(conn, "SELECT framework, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass FROM gold_evidence WHERE run_id = " + latest + " GROUP BY 1 ORDER BY 1");
+    table("frameworks", byFramework.columns, byFramework.rows.map((r) => ({ ...r, framework: named(r.framework) })));
 
-  const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
-  table("runs", evidence.columns, evidence.rows);
+    const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
+    table("runs", evidence.columns, evidence.rows);
+  }
 
   finish();
-  say(`Ready. ${gold.length} Gold files, ${cell(manifest.bytes, "bytes")} bytes published, DuckDB-WASM 1.32.0. All ${verified.size} Gold files match their digests, checked in this browser before any query.`);
+  const engine = `${cell(manifest.bytes, "bytes")} bytes published, DuckDB-WASM 1.32.0.`;
+  if (unverified.size) {
+    status.className = "fail";
+    say(`Not all files verified. ${verified.size} of ${gold.length} Gold files match their digests and ` +
+      `${gold.length - verified.size} do not, so nothing read from ${unverifiedNames} is shown. ${engine}`);
+  } else {
+    say(`Ready. ${gold.length} Gold files, ${engine} All ${verified.size} Gold files match their digests, checked in this browser before any query.`);
+  }
 } catch (e) {
   finish();
   say(`Failed: ${e.message || e}`);
