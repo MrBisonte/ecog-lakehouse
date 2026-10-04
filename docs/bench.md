@@ -12,12 +12,12 @@ Read by `pipeline/bench_doc.py` when this file was written.
 | DuckDB Python | 1.5.5 |
 | DuckDB CLI | v2.0.0-alpha43763 (Cyanoptera) 96063b9e39 |
 | DuckDB CLI sha256 | 8e3d17e36ebfb868c020787f60dffe2457f3b43ab7013adf40e9cb2c1be449e8 |
-| git commit | 4357e4a7b242bdbc173abf527fab09fc0f5bf946 |
+| git commit | 192f7b8f0c161592dbab219314fabe4e0fe199e1 |
 | Network location | https://mrbisonte.github.io/ecog-lakehouse/data |
 
 ## Build
 
-Counts of the build in `DATA_DIR`, built at commit `4832d84b0c46a19bbf4fd130fe5df2dcee4ac818` with DuckDB 1.5.5. Canary subjects are left out. Bytes are the recording Parquet files of each layer.
+Counts of the build in `DATA_DIR`, built at commit `3461dd85f151009d065ceb5e7997f7e33f0ddfd5` with DuckDB 1.5.5. Canary subjects are left out. Bytes are the recording Parquet files of each layer.
 
 | experiment | subjects | runs | channels | samples | bronze_bytes | silver_bytes |
 |---|---|---|---|---|---|---|

@@ -28,7 +28,7 @@ One entry per phase. What was checked, what failed, what changed.
 
 ## Phase 0, skeleton
 
-- Status: done, 2026-09-19, branch `feat/phase0`, eleven commits after the scaffold, merged to master as pull request 1, `89c0ce1`
+- Status: done, 2026-09-19, branch `feat/phase0`, eleven commits after the scaffold, merged to master as pull request 1, `4be774b`
 - Environment: WSL2 Ubuntu 26.04, Python 3.14.4, DuckDB 1.5.5, scipy 1.18.1, PyYAML 6.0.3, pytest 9.1.1, ruff 0.16.8
 
 ### Checked
@@ -80,12 +80,12 @@ One entry per phase. What was checked, what failed, what changed.
 
 ### Verifier output
 
-Clean clone inside WSL, fresh venv, fresh `DATA_DIR`, run at commit `1ff7cd8`, the last code commit; the docs commit that adds this entry came after. `make lint` printed `result: pass` for every document and exited 0.
+Clean clone inside WSL, fresh venv, fresh `DATA_DIR`, run at commit `f247ced`, the last code commit; the docs commit that adds this entry came after. `make lint` printed `result: pass` for every document and exited 0.
 
 ```
 $ git clone -q -b feat/phase0 <checkout> /tmp/ecog-lakehouse_verify
 $ git log --oneline | head -1
-1ff7cd8 fix(silver): rerun with no new subject adds no pseudonym
+f247ced fix(silver): rerun with no new subject adds no pseudonym
 $ python3 -m venv --without-pip /tmp/ecog-lakehouse_verify_venv
 $ pip --python /tmp/ecog-lakehouse_verify_venv/bin/python install -e .[dev]
 $ export DATA_DIR=/tmp/ecog-lakehouse_verify_data
@@ -127,7 +127,7 @@ $ python -c "import duckdb; print(duckdb.__version__)"
 
 ## Phase 0 amendment, lid layout from arch-standards
 
-- Status: done, 2026-09-20, branch `feat/lid-layout` on top of the merged phase 0, spec commits `957efe5` and `d6acc21` merged in, merged to master as pull requests 2 and 4, `5e136b0` and `747ea27`
+- Status: done, 2026-09-20, branch `feat/lid-layout` on top of the merged phase 0, spec commits `fb28bcb` and `750ded6` merged in, merged to master as pull requests 2 and 4, `eff6500` and `812f836`
 - Environment: as phase 0, arch-standards at `../arch-standards` on branch `feat/ids-open-items`
 
 ### Checked
@@ -165,7 +165,7 @@ $ python -c "import duckdb; print(duckdb.__version__)"
 ```
 $ git clone -q -b feat/lid-layout <checkout> /tmp/ecog-lakehouse_verify
 $ git log --oneline | head -1
-853fa52 refactor(lineage): take the UUID bridge from the generated macros
+1e8f35e refactor(lineage): take the UUID bridge from the generated macros
 $ cmp sql/lineage/lid_generated.sql ../arch-standards/ids/generated/lid/duckdb.sql && echo identical
 identical
 $ python3 -m venv --without-pip /tmp/ecog-lakehouse_verify_venv
@@ -210,7 +210,7 @@ $ du -sh $DATA_DIR/*
 
 ## Phase 0 amendment, text, parse and relayer from the generator
 
-- Status: done, 2026-09-20, branch `feat/lid-generated-macros` on top of `feat/lid-layout`, merged as pull request 3, `f951eed`, and reached master through pull request 4
+- Status: done, 2026-09-20, branch `feat/lid-generated-macros` on top of `feat/lid-layout`, merged as pull request 3, `0325e16`, and reached master through pull request 4
 - Environment: as phase 0, arch-standards at `../arch-standards` on branch `feat/ids-text-parse-relayer`, its pull requests 2 and 3 open
 
 ### Checked
@@ -243,7 +243,7 @@ $ du -sh $DATA_DIR/*
 ```
 $ git clone -q -b feat/lid-generated-macros <checkout> /tmp/ecog-lakehouse_verify
 $ git log --oneline | head -1
-d58cbcf refactor(lineage): take text, parse and relayer from the generated macros
+5ad8c4c refactor(lineage): take text, parse and relayer from the generated macros
 $ cmp sql/lineage/lid_generated.sql ../arch-standards/ids/generated/lid/duckdb.sql && echo identical
 identical
 $ export DATA_DIR=/tmp/ecog-lakehouse_verify_data
@@ -266,11 +266,11 @@ $ git status --short
 
 - Status: done, 2026-09-21, branch `feat/phase1`, fourteen commits after the merge of #4, not merged
 - Environment: as phase 0, WSL2 Ubuntu 26.04, Python 3.14.4, DuckDB 1.5.5, scipy 1.18.1, 15 GB of RAM in the WSL VM, 12 GB DuckDB memory limit
-- Spec: patch 0003 (NWB and BIDS on the roadmap, 3.4 Export) applied as `86dc21e`; patches 0001 and 0002 were already on master as `957efe5` and `d6acc21`, so "reach 9acef75" is satisfied by content
+- Spec: patch 0003 (NWB and BIDS on the roadmap, 3.4 Export) applied as `e4fe717`; patches 0001 and 0002 were already on master as `fb28bcb` and `750ded6`, so "reach 9acef75" is satisfied by content
 
 ### Pre-flight
 
-- `origin/master` at `747ea27`, `git status --short` empty, `make all SYNTH=1 && make test` rerun: exit 0, 55 passed.
+- `origin/master` at `812f836`, `git status --short` empty, `make all SYNTH=1 && make test` rerun: exit 0, 55 passed.
 - `echo $DATA_DIR` prints nothing in a login shell; the Makefile exports `$(HOME)/data/ecog-lakehouse` and every pipeline call went through `make` or an explicit export. Free under `$HOME`: 952 GB.
 - Sections 2, 3.4, 7 and 12 of the spec and plan phase 1 read after patch 0003.
 
@@ -316,11 +316,11 @@ NWB adapter and export (ADR-0005 proposed, nothing imports `pynwb`), faults, the
 
 ### Verifier output
 
-Clean clone inside WSL under `$HOME`, fresh venv, fresh `DATA_DIR` with the three verified zips copied in so `make fetch` verifies and extracts without a second 2 GB download; the download path itself ran for real the same day. Run at commit `5ed73af`, the last code commit; the docs commits came after.
+Clean clone inside WSL under `$HOME`, fresh venv, fresh `DATA_DIR` with the three verified zips copied in so `make fetch` verifies and extracts without a second 2 GB download; the download path itself ran for real the same day. Run at commit `b3c688a`, the last code commit; the docs commits came after.
 
 ```
 $ bash ~/verify_phase1.sh feat/phase1     # clone under $HOME, three verified zips copied into a fresh DATA_DIR
-commit 5ed73af
+commit b3c688a
 duckdb 1.5.5 scipy 1.18.1
 python3 pipeline/fetch.py
 fetch: 3 of 3 files verified
@@ -437,7 +437,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Plausibility checks and the evidence page, 2026-09-25
 
-- Status: done, branch `feat/evidence-page`, on top of `e1f2bcb`.
+- Status: done, branch `feat/evidence-page`, on top of `3c9dc83`.
 - Alex's ask, five parts: checks that are allowed to fail, the frameworks that do not run in the browser, order and grouping in the checks table, lids as text, and a set of small fixes. Two decisions came back mid flight: the ingest audit gains the machine that captured the file, and it stores the data root with the path below it rather than the absolute path twice.
 
 ### The two implausible subjects, investigated before anything was built
@@ -601,11 +601,11 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Documentation audit, 2026-10-03
 
-- Status: branch `integration/docs-audit`, 38 commits ahead of master. Three agent branches, `docs/practice`, `docs/paper` and `docs/readability`, each cut from master `39f241e`, one commit per finding, merged without conflicts, then nine integration commits.
+- Status: branch `integration/docs-audit`, 38 commits ahead of master. Three agent branches, `docs/practice`, `docs/paper` and `docs/readability`, each cut from master `10456ae`, one commit per finding, merged without conflicts, then nine integration commits.
 
 ### Checked
 
-- Clean clone of `integration/docs-audit` at `d292630`, fresh `DATA_DIR`: `make all SYNTH=1` in 24.45 s, publish 8 files, 128,539,975 bytes; `make lint` 19 pages pass; `make test` 97 passed; `docs/data` restored and `git status` empty.
+- Clean clone of `integration/docs-audit` at `f06c7f0`, fresh `DATA_DIR`: `make all SYNTH=1` in 24.45 s, publish 8 files, 128,539,975 bytes; `make lint` 19 pages pass; `make test` 97 passed; `docs/data` restored and `git status` empty.
 - `make bench` over GitHub Pages in 137.13 s: one section per fault, a setup table, min / median / max of three for Fault A.
 - Tracked text searched for the word academic and the demo leftovers: none.
 - Diff stats of the CRLF files, `doc/spec.md`, `doc/REVIEW.md` and `docs/five-records.md`, show only the lines edited.
@@ -635,7 +635,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Fault A, issues 28 and 29, 2026-10-03
 
-- Status: branch `integration/fault-a-issues`. Two agent branches cut from master `eda3350`, `feat/fault-a-sweep` for issue 28 and `feat/fault-a-encodings` for issue 29, merged without conflicts, then integration commits. Nothing in the pipeline, the contracts or `docs/data` changed.
+- Status: branch `integration/fault-a-issues`. Two agent branches cut from master `ac27d81`, `feat/fault-a-sweep` for issue 28 and `feat/fault-a-encodings` for issue 29, merged without conflicts, then integration commits. Nothing in the pipeline, the contracts or `docs/data` changed.
 
 ### Asked
 
@@ -660,7 +660,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ### Checked
 
-- Clean clone at `281cf3e`, fresh `DATA_DIR`: both scripts skip with a message and exit 0 before a build; `make all SYNTH=1` in 23.35 s, publish 8 files, 128,540,003 bytes; `make lint` 19 pages pass; `make test` 109 passed; `docs/data` restored and `git status` empty.
+- Clean clone at `8cf473a`, fresh `DATA_DIR`: both scripts skip with a message and exit 0 before a build; `make all SYNTH=1` in 23.35 s, publish 8 files, 128,540,003 bytes; `make lint` 19 pages pass; `make test` 109 passed; `docs/data` restored and `git status` empty.
 
 ### Not checked
 
@@ -671,7 +671,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Benches on the fixed alpha, 2026-10-03
 
-- Status: branch `feat/bench-on-fixed-alpha`, cut from master `16d9959`. A correction of the entry above, made the same day.
+- Status: branch `feat/bench-on-fixed-alpha`, cut from master `00ce06c`. A correction of the entry above, made the same day.
 
 ### What went wrong
 
@@ -683,7 +683,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - The newest alpha of the official installer's staged channel, `v2.0.0-alpha43763` at commit `96063b9e39`, is 45 commits ahead of the merge of #26096. Its sha256 is in the setup table of `docs/bench.md`.
 - Over GitHub Pages, default settings, the published good layout: 78 GETs and 16.5 MiB for the aggregate, against 38 GETs and 72.7 MiB on the earlier build; 6 GETs and 985.7 KiB for one record.
 - `make bench` over Pages, the sweep with both alpha builds and the encodings, 362.05 s for all three.
-- Clean clone at `b4aad8f`, fresh `DATA_DIR`: both Fault A scripts skip with a message and exit 0 before a build; `make all SYNTH=1` in 23.61 s, publish 8 files, 128,539,971 bytes; `make lint` 19 pages pass; `make test` 111 passed; `docs/data` restored and `git status` empty.
+- Clean clone at `ef6e5e4`, fresh `DATA_DIR`: both Fault A scripts skip with a message and exit 0 before a build; `make all SYNTH=1` in 23.61 s, publish 8 files, 128,539,971 bytes; `make lint` 19 pages pass; `make test` 111 passed; `docs/data` restored and `git status` empty.
 
 ### Found
 
@@ -708,7 +708,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Parquet version 2 for Silver, 2026-10-04
 
-- Status: branch `feat/silver-parquet-v2`, cut from master `18134c0`. Decision in ADR-0007. Alex chose: Silver only, snappy, rebuilt in place, Fault A's fixed layout follows.
+- Status: branch `feat/silver-parquet-v2`, cut from master `03aea3b`. Decision in ADR-0007. Alex chose: Silver only, snappy, rebuilt in place, Fault A's fixed layout follows.
 
 ### Changed
 
@@ -735,7 +735,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Benches over Pages after ADR-0007, 2026-10-04
 
-- Status: branch `docs/bench-pages-after-v2`, cut from master `4357e4a`. Closes the gap the entry above left open: the fault benches needed the deploy.
+- Status: branch `docs/bench-pages-after-v2`, cut from master `192f7b8`. Closes the gap the entry above left open: the fault benches needed the deploy.
 
 ### Checked
 
@@ -756,8 +756,8 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Three review findings, 2026-10-04
 
-- Status: branch `integration/review-first-three`, cut from master `ae6d25a`. Two agent branches, `fix/bronze-committed-view` and `fix/page-verify-first`, merged here; the third finding was fixed on this branch.
-- Source: an architecture review and a ponytail review of master `4357e4a`, 15 and 14 findings. The three marked first were verified against the code and the real build before any change. The rest stay queued.
+- Status: branch `integration/review-first-three`, cut from master `4422fce`. Two agent branches, `fix/bronze-committed-view` and `fix/page-verify-first`, merged here; the third finding was fixed on this branch.
+- Source: an architecture review and a ponytail review of master `192f7b8`, 15 and 14 findings. The three marked first were verified against the code and the real build before any change. The rest stay queued.
 
 ### Checked
 
@@ -766,7 +766,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - A1, cost of the committed view on the real build, median of three: `count(*)` 0.04 s before and 1.03 s after, the per record group by 0.33 s before and 1.35 s after, 871,160,120 rows either way. A list of constants in the view measured 0.05 s and 0.32 s; the join was kept because it reads the audit as it is, not as it was when the view was made. The quarantine scan took 0.08 s and moved nothing.
 - A2, the page, in a browser over a local server, three copies of `docs/`: every file intact, 67 checks rerun and 8 files matched, each Gold file requested once with its digest in the URL; one byte flipped in `gold/channel_quality`, 49 of 67 rerun, 18 not run, that table withheld, the others shown; one evidence file removed, 54 of 67 rerun, 13 not run, the evidence notes withheld.
 - zstd against snappy, the open item: all of `silver/recording` rewritten both ways under scratch with DuckDB 1.5.5, 45 files, 871,159,620 rows. Snappy 2,075,346,690 bytes, equal to Silver; zstd 2,036,292,905 bytes, 1.9 percent smaller. Write 20.7 s and 20.5 s. A full scan, median of five, 0.68 s and 0.73 s. Silver stays on snappy and the item is closed. The numbers come from a scratch script, not from a script in the repository.
-- Verifier, clean clone at `e3aef87`, fresh `DATA_DIR`: `make all SYNTH=1` exit 0 in 25.24 s, 111 checks pass, 0 blocking; `make lint` 20 pages pass; `make test` 119 passed; a second `make bronze` converted nothing and quarantined nothing.
+- Verifier, clean clone at `8e9a4f0`, fresh `DATA_DIR`: `make all SYNTH=1` exit 0 in 25.24 s, 111 checks pass, 0 blocking; `make lint` 20 pages pass; `make test` 119 passed; a second `make bronze` converted nothing and quarantined nothing.
 
 ### Failed, then fixed
 

@@ -4,7 +4,7 @@ The first build on real data ran out of memory. This page shows why, what fixed 
 
 Setup: 871,160,120 Silver rows, 12 threads, 15 GB in the WSL VM, DuckDB 1.5.5, memory limit 12.1 GB. Every number is a query result or a timer.
 
-Source: `doc/REVIEW.md`, Phase 1, real data, 2026-09-21; the thread count from commit `0d7c2d3`.
+Source: `doc/REVIEW.md`, Phase 1, real data, 2026-09-21; the thread count from commit `b0a3609`.
 
 ## 1. The cause, in one picture
 
@@ -37,7 +37,7 @@ Source: `doc/REVIEW.md`, Memory incident root cause, corrected, 2026-09-25.
 
 Fix 2 changed nothing. Fix 3 is the one that worked.
 
-Source: `doc/REVIEW.md`, Phase 1, real data; the verifier is checks run `01M32SPQ2CVDTH7CNN3MS8WJYX` at commit `5ed73af`.
+Source: `doc/REVIEW.md`, Phase 1, real data; the verifier is checks run `01M32SPQ2CVDTH7CNN3MS8WJYX` at commit `b3c688a`.
 
 ## 3. The query, before and after
 
@@ -111,7 +111,7 @@ Alex asked to compare the committed query with a variant that measures clipping 
 | C: one scan with a window function | 29.9 s | not rerun |
 | A with `MATERIALIZED` | 34.3 s | not rerun |
 
-Source: 2026-09-21 timed in phase 1, first recorded in commit `203ea98`; 2026-10-02 from `doc/REVIEW.md`, The two open timings.
+Source: 2026-09-21 timed in phase 1, first recorded in commit `b816f3d`; 2026-10-02 from `doc/REVIEW.md`, The two open timings.
 
 - **The four times gap was not real.** Both plans have the same shape: an 859,640,120 row scan joined to 2,241 rows. A's two extra joins handle 2,241 and 42 rows in 0.00 s.
 - **The slow A runs were the machine, not the query.** 8.5 GB of Silver in a 15 GB VM, timed in the hours after the out of memory runs. This is the likeliest cause; it cannot be proven now.
@@ -120,7 +120,7 @@ Source: 2026-09-21 timed in phase 1, first recorded in commit `203ea98`; 2026-10
 - **C is not the fastest.** One scan, but the window function has to partition 871M rows by `lid` and spill to disk.
 - **Both readings are in the mart** since #25: `clipped_pct` from A, `clipped_own_pct` from B.
 
-Sources: plans and scan count from commit `0d7c2d3`, 2026-10-02; 2,107 from commit `203ea98`; 8.5 GB from the phase 1 verifier output in `doc/REVIEW.md`.
+Sources: plans and scan count from commit `b0a3609`, 2026-10-02; 2,107 from commit `b816f3d`; 8.5 GB from the phase 1 verifier output in `doc/REVIEW.md`.
 
 ## 7. What is in place now
 
@@ -150,7 +150,7 @@ Source: `doc/REVIEW.md`, Phase 3 addendum, GitHub Pages, 2026-09-23.
 | One row group | 52.0 MB | 1.50 s, 21.5 MiB, 11 requests | 1.71 s, 19.5 MiB, 10 requests |
 | 38 sorted row groups | 76.3 MB | 3.76 s, 72.7 MiB, 38 requests | 0.65 s, 6.7 MiB, 5 requests |
 
-Source: the last Fault A table of [bench.md](bench.md), commit `0407bcd`.
+Source: the last Fault A table of [bench.md](bench.md), commit `69d983e`.
 
 The same files on `v2.0.0-alpha43763`, measured on 2026-10-03:
 
@@ -159,7 +159,7 @@ The same files on `v2.0.0-alpha43763`, measured on 2026-10-03:
 | One row group | 0.89 s, 16.3 MiB, 11 requests | 1.14 s, 16.3 MiB, 11 requests |
 | 38 sorted row groups | 1.07 s, 16.5 MiB, 78 requests | 0.37 s, 985.7 KiB, 6 requests |
 
-Source: the Fault A section of [bench.md](bench.md), commit `18134c0`; seconds are the median of three.
+Source: the Fault A section of [bench.md](bench.md), commit `03aea3b`; seconds are the median of three.
 
 Since ADR-0007 the fixed layout is Parquet version 2, 17.45 MiB in 37 row groups. Measured on 2026-10-04: aggregate 1.00 s, 16.1 MiB, 39 requests; one record 0.38 s, 487.8 KiB, 5 requests.
 
@@ -172,7 +172,7 @@ Source: the Fault A section of [bench.md](bench.md) as it stands.
 - Partitioning pays when a filter skips row groups. It costs when the query reads every row.
 - The layout stays: it is right for the range retrieval `lid_children` does, and the `partition_layout` check demands it.
 
-Source: the Parquet metadata, commit `0d7c2d3`, and `doc/REVIEW.md`, The two open timings.
+Source: the Parquet metadata, commit `b0a3609`, and `doc/REVIEW.md`, The two open timings.
 
 **Why the files came whole.** The Parquet reader asks for the two columns only. Under it, the external file cache of the earlier alpha build rounds every remote read out to aligned blocks of 2 MiB and fetches each block with its own GET. A row group of 198,656 rows spans about one block, so every block holds a byte of a needed column. The 38 GETs are one per block, not one per row group.
 
@@ -193,7 +193,7 @@ Source: the DuckDB source at both versions, file and line as in the table; 22 pe
 
 **Faults D and F held.** D: 5.1 s for the download loop against 0.3 s for one statement. F: 0 of 10 reads succeed without retries, 10 of 10 with.
 
-Source: the second Fault D and Fault F tables of [bench.md](bench.md), commit `9f61d91`, 2026-09-23.
+Source: the second Fault D and Fault F tables of [bench.md](bench.md), commit `d2c5c57`, 2026-09-23.
 
 ## 9. Lessons
 
