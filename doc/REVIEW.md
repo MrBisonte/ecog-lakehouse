@@ -23,6 +23,7 @@ One entry per phase. What was checked, what failed, what changed.
 | 2026-10-03 | [Fault A, issues 28 and 29](#fault-a-issues-28-and-29-2026-10-03) | `integration/fault-a-issues` | The alpha's file cache fetches 2 MiB blocks; Parquet version 2 deltas measured, not adopted |
 | 2026-10-03 | [Benches on the fixed alpha](#benches-on-the-fixed-alpha-2026-10-03) | `feat/bench-on-fixed-alpha` | The cache finding was known and fixed upstream; benches rerun on the build with the fix |
 | 2026-10-04 | [Parquet version 2 for Silver](#parquet-version-2-for-silver-2026-10-04) | `feat/silver-parquet-v2` | Silver written as Parquet version 2, rebuilt in place, Fault A's fixed layout republished |
+| 2026-10-04 | [Benches over Pages after ADR-0007](#benches-over-pages-after-adr-0007-2026-10-04) | `docs/bench-pages-after-v2` | The fault benches rerun on the files published by the Parquet version 2 change |
 
 ## Phase 0, skeleton
 
@@ -730,3 +731,24 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - The fault benches over GitHub Pages on the new files. They need the deploy; the Fault A, D, F and G sections of `docs/bench.md` and the numbers in the README, the paper and the spec still describe the files published before this change, until that run.
 - A row by row comparison of old and new Silver. The old files are gone; the unchanged Gold marts and the unchanged check results stand in for it.
 - Gold and the published files as version 2, zstd, a fresh `DATA_DIR`: on the list, not in this change.
+
+## Benches over Pages after ADR-0007, 2026-10-04
+
+- Status: branch `docs/bench-pages-after-v2`, cut from master `4357e4a`. Closes the gap the entry above left open: the fault benches needed the deploy.
+
+### Checked
+
+- The manifest served by GitHub Pages equals the one in the repository: 11 files, 81,182,417 bytes.
+- `make bench` over Pages, 152.96 s, exit 0. Fault D hashed 11 files, 0 mismatches.
+- Fault A, fixed layout as Parquet version 2: 17.45 MiB in 2 files and 37 row groups; aggregate 16.1 MiB in 39 GETs, one record 487.8 KiB in 5 GETs. The single row group: 16.3 MiB in 11 GETs for either query.
+- `make lint` 20 pages pass, `make test` 112 passed.
+
+### Changed
+
+- `docs/bench.md`: the Setup table and the Fault A, D, F and G sections.
+- README, `docs/paper.md`, `doc/spec.md` section 6: the numbers of that run. `docs/lessons-learned.md` section 8: the earlier table keeps its commit as source, the version 2 layout is added beside it.
+- `doc/spec.md` section 6: the two forms of the fix show `PARQUET_VERSION v2`, as `faults/a/fix.sql` and `sql/silver/030_recording.sql` do.
+
+### Not checked
+
+- The sweep and the encodings sections were not rerun; they are loopback measurements of scratch files and did not change with the deploy.
