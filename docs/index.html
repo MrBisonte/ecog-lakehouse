@@ -27,10 +27,10 @@
 </head>
 <body>
 <h1>ecog-lakehouse, governance evidence</h1>
-<p>Every number on this page is a query result computed in your browser by DuckDB-WASM over the published Gold Parquet files, read by HTTP range requests from this site. The checks are the same SQL the pipeline ran; <code>lid.sql</code> holds the lineage identifier macros they use.</p>
-<p id="status" aria-live="polite">Step 1 of 5: downloading the DuckDB engine</p>
+<p>Every number on this page is a query result computed in your browser by DuckDB-WASM over the published Gold Parquet files. Each file is downloaded once from this site and its digest checked against the published one before any query reads it. The checks are the same SQL the pipeline ran; <code>lid.sql</code> holds the lineage identifier macros they use.</p>
+<p id="status" aria-live="polite">Step 1 of 4: downloading the DuckDB engine</p>
 <progress id="bar" aria-labelledby="status"></progress>
-<p id="wait">The page is working. It downloads the engine, reruns every check and hashes every file in your browser, so the first visit takes a while. Keep the tab open.</p>
+<p id="wait">The page is working. It downloads the engine and the Gold files, checks the digest of every file, then reruns every check in your browser, so the first visit takes a while. Keep the tab open.</p>
 <h2>Checks</h2>
 <p id="coverage"></p>
 <div id="frameworks"></div>
@@ -51,12 +51,13 @@ import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0
 
 const status = document.getElementById("status");
 const say = (text) => { status.textContent = text; };
-// One bar for five steps. Without a value the bar is indeterminate and the browser animates it.
-// ponytail: the share of each step is a guess. One warm visit from one machine spent 1.1 s in
-// the engine, 2.4 s opening the files, 0.9 s in the checks and 0.5 s hashing; a first visit
-// spends more in the engine and the hashes. Time the steps again if the bar stalls visibly.
+// One bar for four steps. Without a value the bar is indeterminate and the browser animates it.
+// ponytail: the share of each step is a guess, not yet timed since each file became one
+// download. The last timing, of the old order, spent 1.1 s in the engine, 2.4 s opening the
+// files by range requests, 0.9 s in the checks and 0.5 s hashing. Time the steps again if the
+// bar stalls visibly.
 const bar = document.getElementById("bar");
-const STEPS = { engine: [0, 0.25], files: [0.25, 0.5], checks: [0.5, 0.7], tables: [0.7, 0.75], hashes: [0.75, 1] };
+const STEPS = { engine: [0, 0.25], files: [0.25, 0.6], checks: [0.6, 0.95], tables: [0.95, 1] };
 const advance = (step, done, total) => {
   const [from, to] = STEPS[step];
   bar.value = from + (to - from) * done / total;
@@ -145,23 +146,77 @@ try {
   // DuckDB-WASM reports the bytes of the engine as they arrive. Its total is the compressed
   // size and the count is not, so only the count is shown and the bar stays indeterminate.
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker, (p) => {
-    say(`Step 1 of 5: downloading the DuckDB engine, ${mib(p.bytesLoaded)} MiB so far`);
+    say(`Step 1 of 4: downloading the DuckDB engine, ${mib(p.bytesLoaded)} MiB so far`);
   });
   URL.revokeObjectURL(workerUrl);
 
-  say("Step 2 of 5: opening the Gold files");
+  say("Step 2 of 4: verifying the Gold files");
   advance("files", 0, 1);
   const manifest = await (await fetch(`data/manifest.json?v=${Date.now()}`)).json();
   const gold = manifest.files.filter((f) => f.path.startsWith("gold/"));
-  for (const f of gold) {
-    await db.registerFileURL(f.path, new URL(`data/${f.path}`, location.href).href, duckdb.DuckDBDataProtocol.HTTP, false);
+  // Each Gold file is downloaded once, hashed, and only bytes that match manifest.json are
+  // handed to DuckDB, so every query reads verified bytes. The digest in the URL makes a changed
+  // file a new URL, so no cache can pair a fresh manifest with a stale file. Fault files are
+  // listed, not read.
+  // ponytail: Gold (10.9 MB, 8 files) is downloaded whole and held in memory before DuckDB
+  // reads it. Revisit if Gold grows past tens of MB.
+  const goldBytes = gold.reduce((n, f) => n + f.bytes, 0);
+  let receivedBytes = 0;
+  const hex = (hash) => [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  // Returns the bytes, or why there are none. The body is read chunk by chunk so the bar moves
+  // inside one large file.
+  const download = async (f, i) => {
+    let response;
+    try { response = await fetch(`data/${f.path}?v=${f.sha256}`); }
+    catch (e) { return { reason: `not received, ${e.message || e}` }; }
+    if (!response.ok) return { reason: `not received, HTTP ${response.status}` };
+    const reader = response.body.getReader();
+    const chunks = [];
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      receivedBytes += value.length;
+      advance("files", receivedBytes, goldBytes);
+      say(`Step 2 of 4: verifying Gold file ${i + 1} of ${gold.length}, ${mib(receivedBytes)} of ${mib(goldBytes)} MiB`);
+    }
+    return { bytes: new Uint8Array(await new Blob(chunks).arrayBuffer()) };
+  };
+  const files = [];
+  const verified = new Set();
+  for (const f of manifest.files) {
+    const row = { path: f.path, bytes: f.bytes, sha256: f.sha256, digest: "not read" };
+    files.push(row);
+    if (!f.path.startsWith("gold/")) continue;
+    const { bytes, reason } = await download(f, gold.indexOf(f));
+    const received = bytes && hex(await crypto.subtle.digest("SHA-256", bytes));
+    if (received === f.sha256) {
+      await db.registerFileBuffer(f.path, bytes);
+      verified.add(f.path);
+      row.digest = "match";
+    } else {
+      row.digest = `MISMATCH, ${reason || `received ${received}`}`;
+    }
   }
+  table("files", ["path", "bytes", "sha256", "digest"], files,
+    (r) => r.digest === "match" ? "pass" : r.digest === "not read" ? "" : "fail");
+  // A dataset is verified only if every one of its files matched. What reads an unverified
+  // dataset is withheld: no view, no check, no table.
+  const datasetOf = (path) => path.split("/")[1];
+  const unverified = new Set(gold.filter((f) => !verified.has(f.path)).map((f) => datasetOf(f.path)));
+  const unverifiedNames = new Intl.ListFormat("en").format([...unverified].map((d) => `gold/${d}`));
+  const withheld = (c) => [...unverified].some(
+    (d) => c.dataset === `gold/${d}` || new RegExp(`\\bgold_${d}\\b`).test(c.sql));
+  const notShown = (id, d) => {
+    document.getElementById(id).textContent =
+      `Not shown: a file of gold/${d} did not match its published digest, so the page did not read it.`;
+  };
+
   const conn = await db.connect();
-  const datasets = [...new Set(gold.map((f) => f.path.split("/")[1]))];
-  for (const [i, d] of datasets.entries()) {
-    advance("files", i, datasets.length);
-    const files = gold.filter((f) => f.path.split("/")[1] === d).map((f) => `'${f.path}'`).join(", ");
-    await conn.query(`CREATE VIEW gold_${d} AS SELECT * FROM read_parquet([${files}], hive_partitioning = true)`);
+  const datasets = [...new Set(gold.map((f) => datasetOf(f.path)))].filter((d) => !unverified.has(d));
+  for (const d of datasets) {
+    const paths = gold.filter((f) => datasetOf(f.path) === d).map((f) => `'${f.path}'`).join(", ");
+    await conn.query(`CREATE VIEW gold_${d} AS SELECT * FROM read_parquet([${paths}], hive_partitioning = true)`);
   }
   const lid = await (await fetch("data/lid.sql")).text();
   for (const statement of lid.split(/;\s*\n/)) if (statement.trim()) await conn.query(statement);
@@ -169,10 +224,12 @@ try {
   const checks = await (await fetch(`data/checks.json?v=${Date.now()}`)).json();
   const results = [];
   for (const [i, c] of checks.entries()) {
-    say(`Step 3 of 5: rerunning check ${i + 1} of ${checks.length}`);
+    say(`Step 3 of 4: rerunning check ${i + 1} of ${checks.length}`);
     advance("checks", i, checks.length);
     let observed, result;
-    try {
+    if (withheld(c)) {
+      observed = "file not verified"; result = "not run";
+    } else try {
       observed = Object.values((await query(conn, c.sql)).rows[0])[0];
       result = holds(c, observed) ? "pass" : c.severity === "flag" ? "flag" : "fail";
     } catch (e) {
@@ -188,9 +245,12 @@ try {
   }
   const counts = results.reduce((a, r) => ((a[r.result] = (a[r.result] || 0) + 1), a), {});
   const checksSummary = document.getElementById("checks-summary");
+  const notRun = counts["not run"] || 0;
   checksSummary.textContent =
-    `${results.length} checks rerun here: ${counts.pass || 0} pass, ${counts.fail || 0} fail, ` +
-    `${counts.flag || 0} flagged, ${counts.error || 0} error. A flag is a plausibility range the ` +
+    `${notRun ? `${results.length - notRun} of ${results.length}` : results.length} checks rerun here: ` +
+    `${counts.pass || 0} pass, ${counts.fail || 0} fail, ${counts.flag || 0} flagged, ${counts.error || 0} error. ` +
+    (notRun ? `${notRun} checks were not run because ${unverifiedNames} did not verify. ` : "") +
+    `A flag is a plausibility range the ` +
     `recordings fall outside; it is recorded and does not stop the build. `;
   const link = (href, text) => Object.assign(document.createElement("a"), { href, textContent: text });
   checksSummary.append(
@@ -198,63 +258,49 @@ try {
     " and their ", link("data/checks.json", "respective SQL statements"), ".");
   checksTable("checks", results);
 
-  say("Step 4 of 5: reading the summary tables");
+  say("Step 4 of 4: reading the summary tables");
   advance("tables", 0, 1);
-  const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
-  table("summary", summary.columns, summary.rows);
-
-  const total = (await query(conn, "SELECT count(*) AS n FROM gold_channel_quality")).rows[0].n;
-  const quality = await query(conn,
-    "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, " +
-    "rms_uv AS \"rms_uv µV\", clipped_pct AS \"clipped_pct %\", clipped_own_pct AS \"clipped_own_pct %\", line_noise_ratio, scale_basis, " +
-    "lid_text(lid_from_uuid(lid)) AS lid " +
-    "FROM gold_channel_quality ORDER BY line_noise_ratio DESC NULLS LAST LIMIT 100");
-  document.getElementById("quality-note").textContent = `${cell(total, "total")} records in gold/channel_quality; the 100 with the highest line noise ratio:`;
-  table("quality", quality.columns, quality.rows);
-
-  const latest = "(SELECT max(run_id) FROM gold_evidence)";
-  const ran = (await query(conn, "SELECT count(*) AS total, count(*) FILTER (WHERE dataset NOT LIKE 'gold/%') AS elsewhere FROM gold_evidence WHERE run_id = " + latest)).rows[0];
-  document.getElementById("coverage").textContent =
-    `The pipeline's own run covered ${cell(ran.total, "total")} checks. ${cell(ran.elsewhere, "elsewhere")} of them ran on Bronze, ` +
-    `Silver and the published copy, which this page cannot read, so they are reported here rather than rerun:`;
-  const byFramework = await query(conn, "SELECT framework, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass FROM gold_evidence WHERE run_id = " + latest + " GROUP BY 1 ORDER BY 1");
-  table("frameworks", byFramework.columns, byFramework.rows.map((r) => ({ ...r, framework: named(r.framework) })));
-
-  const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
-  table("runs", evidence.columns, evidence.rows);
-
-  // Every Gold file the page read is fetched once more in full and hashed here; the digest
-  // column says whether the bytes match manifest.json. Fault files are listed, not read.
-  const goldBytes = gold.reduce((n, f) => n + f.bytes, 0);
-  let hashedFiles = 0, hashedBytes = 0;
-  // The body is read chunk by chunk so the bar moves inside one large file.
-  const digestOf = async (url) => {
-    const reader = (await fetch(url)).body.getReader();
-    const chunks = [];
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      hashedBytes += value.length;
-      advance("hashes", hashedBytes, goldBytes);
-      say(`Step 5 of 5: hashing file ${hashedFiles} of ${gold.length}, ${mib(hashedBytes)} of ${mib(goldBytes)} MiB`);
-    }
-    const hash = await crypto.subtle.digest("SHA-256", await new Blob(chunks).arrayBuffer());
-    return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  };
-  const files = [];
-  for (const f of manifest.files) {
-    const read = f.path.startsWith("gold/");
-    if (read) hashedFiles++;
-    const digest = read ? await digestOf(new URL(`data/${f.path}`, location.href).href) : null;
-    files.push({ path: f.path, bytes: f.bytes, sha256: f.sha256, digest: read ? (digest === f.sha256 ? "match" : "MISMATCH") : "not read" });
+  if (unverified.has("experiment_summary")) notShown("summary", "experiment_summary");
+  else {
+    const summary = await query(conn, "SELECT experiment, subject_pid, n_runs, n_channels, duration_s, n_events FROM gold_experiment_summary ORDER BY 1, 2");
+    table("summary", summary.columns, summary.rows);
   }
-  table("files", ["path", "bytes", "sha256", "digest"], files, (r) => r.digest === "MISMATCH" ? "fail" : r.digest === "match" ? "pass" : "");
-  const matched = files.filter((f) => f.digest === "match").length;
-  const mismatched = files.filter((f) => f.digest === "MISMATCH").length;
+
+  if (unverified.has("channel_quality")) notShown("quality-note", "channel_quality");
+  else {
+    const total = (await query(conn, "SELECT count(*) AS n FROM gold_channel_quality")).rows[0].n;
+    const quality = await query(conn,
+      "SELECT experiment, subject_pid, run, channel_idx, n_samples, missing_samples, " +
+      "rms_uv AS \"rms_uv µV\", clipped_pct AS \"clipped_pct %\", clipped_own_pct AS \"clipped_own_pct %\", line_noise_ratio, scale_basis, " +
+      "lid_text(lid_from_uuid(lid)) AS lid " +
+      "FROM gold_channel_quality ORDER BY line_noise_ratio DESC NULLS LAST LIMIT 100");
+    document.getElementById("quality-note").textContent = `${cell(total, "total")} records in gold/channel_quality; the 100 with the highest line noise ratio:`;
+    table("quality", quality.columns, quality.rows);
+  }
+
+  if (unverified.has("evidence")) { notShown("coverage", "evidence"); notShown("runs", "evidence"); }
+  else {
+    const latest = "(SELECT max(run_id) FROM gold_evidence)";
+    const ran = (await query(conn, "SELECT count(*) AS total, count(*) FILTER (WHERE dataset NOT LIKE 'gold/%') AS elsewhere FROM gold_evidence WHERE run_id = " + latest)).rows[0];
+    document.getElementById("coverage").textContent =
+      `The pipeline's own run covered ${cell(ran.total, "total")} checks. ${cell(ran.elsewhere, "elsewhere")} of them ran on Bronze, ` +
+      `Silver and the published copy, which this page cannot read, so they are reported here rather than rerun:`;
+    const byFramework = await query(conn, "SELECT framework, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass FROM gold_evidence WHERE run_id = " + latest + " GROUP BY 1 ORDER BY 1");
+    table("frameworks", byFramework.columns, byFramework.rows.map((r) => ({ ...r, framework: named(r.framework) })));
+
+    const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
+    table("runs", evidence.columns, evidence.rows);
+  }
 
   finish();
-  say(`Ready. ${gold.length} Gold files, ${cell(manifest.bytes, "bytes")} bytes published, DuckDB-WASM 1.32.0. ${matched} Gold files hashed in this browser, ${mismatched} mismatch.`);
+  const engine = `${cell(manifest.bytes, "bytes")} bytes published, DuckDB-WASM 1.32.0.`;
+  if (unverified.size) {
+    status.className = "fail";
+    say(`Not all files verified. ${verified.size} of ${gold.length} Gold files match their digests and ` +
+      `${gold.length - verified.size} do not, so nothing read from ${unverifiedNames} is shown. ${engine}`);
+  } else {
+    say(`Ready. ${gold.length} Gold files, ${engine} All ${verified.size} Gold files match their digests, checked in this browser before any query.`);
+  }
 } catch (e) {
   finish();
   say(`Failed: ${e.message || e}`);
