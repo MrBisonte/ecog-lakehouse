@@ -184,7 +184,7 @@ Not part of any layer. Contains two tables.
 
 #### silver/recording
 
-Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `lid, sample_idx`, which is file, run, channel and time order (section 12.2). Row groups of at most 200,000 rows; the writer asks for 198,656, the largest multiple of DuckDB's 2,048 row vector under the limit, because DuckDB rounds the requested size up.
+Partition: `experiment=<experiment>/subject_pid=<pid>/`. Sorted within each file by `lid, sample_idx`, which is file, run, channel and time order (section 12.2). Row groups of at most 200,000 rows; the writer asks for 198,656, the largest multiple of DuckDB's 2,048 row vector under the limit, because DuckDB rounds the requested size up. Every Silver dataset is written as Parquet version 2 (ADR-0007), so `ts_ms` and `sample_idx` are stored as deltas and never plain; a test enforces it.
 
 | Column name | Column type |
 |---|---|
