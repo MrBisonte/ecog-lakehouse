@@ -4,6 +4,8 @@ An adapter turns one source file into a `Source`. The registry maps the director
 under `raw/` to the adapter; a directory without one is skipped with a logged reason.
 Each converted file appends one `bronze/ingest_audit` row. A file whose sha256 is already
 in the audit is skipped, so a rerun is a no-op and Bronze partitions are never rewritten.
+The audit row is written last and commits the ingest. Files of an ingest that failed before
+it are moved to quarantine/ when the next run starts, and that file is ingested again.
 """
 
 import hashlib
@@ -311,9 +313,42 @@ def convert(con, path: Path, adapter) -> int:
     return audit["rows_written"]
 
 
+def quarantine(con) -> int:
+    """Move every Bronze data file whose ingest_id has no audit row, left by an ingest that
+    failed before writing it, to quarantine/<ingest_id>/<its path below DATA_DIR>. Nothing is
+    deleted. Returns the number of ingest_ids moved."""
+    root = db.data_dir()
+    folders = [root / "bronze" / n for n in ("recording", "electrode", "event")]
+    globs = [f"'{f.as_posix()}/**/*.parquet'" for f in folders if any(f.rglob("*.parquet"))]
+    if not globs:
+        return 0
+    # One COPY of one ingest writes each file, so its footer statistics name its ingest_id
+    # without reading the rows.
+    files = con.execute(
+        f"SELECT DISTINCT stats_min_value, file_name FROM parquet_metadata([{', '.join(globs)}]) "
+        "WHERE path_in_schema = 'ingest_id' "
+        "AND stats_min_value NOT IN (SELECT ingest_id FROM bronze_ingest_audit) ORDER BY ALL"
+    ).fetchall()
+    moved = {}
+    for ingest_id, name in files:
+        path = Path(name)
+        target = root / "quarantine" / ingest_id / path.relative_to(root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        path.rename(target)
+        if path.parent.name == f"ingest_id={ingest_id}" and not any(path.parent.iterdir()):
+            path.parent.rmdir()
+        moved[ingest_id] = moved.get(ingest_id, 0) + 1
+    for ingest_id, n in moved.items():
+        print(f"convert: quarantined {ingest_id}, {n} files without an audit row, "
+              f"moved to {root / 'quarantine' / ingest_id}")
+    return len(moved)
+
+
 def main(argv=None) -> int:
     raw = db.data_dir() / "raw"
     con = db.connect()
+    if quarantine(con):
+        db.views(con)
     total = 0
     for directory in sorted(p for p in raw.iterdir() if p.is_dir()) if raw.exists() else []:
         if directory.name not in ADAPTERS:
