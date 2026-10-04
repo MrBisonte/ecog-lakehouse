@@ -50,16 +50,16 @@ Checks, evidence run `01M3WTDATJYQ57CY5YHT2D54NR` of 2026-10-01, queried from `g
 
 The three flags are plausibility checks under ALCOA+ Accurate. Two are on `gold/channel_quality`, 101 and 48 of 2241 records. One is on `gold/experiment_summary`, 1 of 42 rows. A flag reports records and lets the build continue.
 
-Faults, copied from `docs/bench.md`, run of 2026-10-03 over GitHub Pages; Fault A times are the median of three:
+Faults, copied from `docs/bench.md`, run of 2026-10-04 over GitHub Pages; Fault A times are the median of three:
 
 | Fault | Mistake | Fix | Before | After |
 |---|---|---|---|---|
-| A | One row group, 49.55 MiB | 2 files, 38 sorted row groups, 72.74 MiB | One record 1.14 s, aggregate 0.89 s | One record 0.37 s, aggregate 1.07 s |
-| D | A Python loop downloads 10 files one at a time | One `read_parquet` over every URL | 7.84 s | 0.37 s |
+| A | One row group, 49.55 MiB | 2 files, 37 sorted row groups, Parquet version 2, 17.45 MiB | One record 1.05 s, aggregate 1.43 s | One record 0.38 s, aggregate 1.00 s |
+| D | A Python loop downloads 11 files one at a time | One `read_parquet` over every URL | 6.60 s | 0.64 s |
 | F | 503 on one range request in ten, `http_retries = 0` | `http_retries = 8`, backoff 2 | 0/10 reads succeed | 10/10 |
 | G | Generated SQL nests 512 `OR`s | An `IN` list | `EXPLAIN` 0.08 s | `EXPLAIN` 0.04 s |
 
-For Fault A the fixed layout wins the lookup it was built for, 985.7 KiB received against 16.3 MiB, and costs the aggregate no bytes, 16.5 MiB against 16.3 MiB. An earlier alpha build received 72.7 MiB for that aggregate. `docs/lessons-learned.md` section 8 traces it to that build's file cache.
+For Fault A the fixed layout wins the lookup it was built for, 487.8 KiB received against 16.3 MiB, and costs the aggregate no bytes, 16.1 MiB against 16.3 MiB. An earlier alpha build received 72.7 MiB for that aggregate. `docs/lessons-learned.md` section 8 traces it to that build's file cache.
 
 ## Limits
 

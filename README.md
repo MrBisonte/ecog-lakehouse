@@ -101,8 +101,8 @@ Each fault is a mistake built on purpose, beside its fix. Times are measured aga
 
 | Fault | The mistake | The fix | Measured |
 |---|---|---|---|
-| A | One giant row group | 38 sorted row groups | Fetching one record: 1.14 s to 0.37 s, 16.3 MiB to 985.7 KiB. Aggregating every row: 0.89 s to 1.07 s, the same bytes |
-| D | A Python loop downloads one file at a time | One `read_parquet` over all the URLs | 7.84 s to 0.37 s for 10 files |
+| A | One giant row group | 37 sorted row groups | Fetching one record: 1.05 s to 0.38 s, 16.3 MiB to 487.8 KiB. Aggregating every row: 1.43 s to 1.00 s, the same bytes |
+| D | A Python loop downloads one file at a time | One `read_parquet` over all the URLs | 6.60 s to 0.64 s for 11 files |
 | F | A 503 from the server kills the read | `http_retries` with backoff | 0 of 10 reads succeed, then 10 of 10 |
 | G | Generated SQL nests 512 `OR`s | An `IN` list | Planning: 0.08 s to 0.04 s. The generator now refuses the nested form |
 

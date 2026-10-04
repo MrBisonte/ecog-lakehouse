@@ -334,17 +334,18 @@ Each fault lives under `faults/<letter>/` with `plant.*`, `fix.*` and `bench.sh`
 COPY silver.recording TO 'docs/data/faults/a/good'
 (
     FORMAT parquet,
+    PARQUET_VERSION v2,
     PARTITION BY (experiment, subject_pid),
     ORDER BY (lid, sample_idx),
     ROW_GROUP_SIZE 198656
 );
 ```
 
-- Fix, v1.x compatible form used by the pipeline: one `COPY (SELECT ... WHERE experiment = ... AND subject_pid = ... ORDER BY lid, sample_idx) TO '<partition directory>/data_0.parquet' (FORMAT parquet, ROW_GROUP_SIZE 198656);` per partition. DuckDB 1.5's partitioned `COPY` does not keep the `ORDER BY` across its buffer flushes, a plain `COPY` does.
+- Fix, v1.x compatible form used by the pipeline: one `COPY (SELECT ... WHERE experiment = ... AND subject_pid = ... ORDER BY lid, sample_idx) TO '<partition directory>/data_0.parquet' (FORMAT parquet, PARQUET_VERSION v2, ROW_GROUP_SIZE 198656);` per partition. DuckDB 1.5's partitioned `COPY` does not keep the `ORDER BY` across its buffer flushes, a plain `COPY` does.
 - Bench: the same aggregate over both layouts, remote URL, with `SET read_ahead_depth = 0;` and with the default. Four timings.
 - Result, measured over GitHub Pages and recorded in the last Fault A section of `docs/bench.md`:
-  - Aggregate: the single row group fetched 16.3 MiB in 11 GETs, the partitioned layout 16.5 MiB in 78 GETs.
-  - One record by `lid`: the partitioned layout fetched 985.7 KiB in 6 GETs, the single row group 16.3 MiB in 11 GETs.
+  - Aggregate: the single row group fetched 16.3 MiB in 11 GETs, the partitioned layout 16.1 MiB in 39 GETs.
+  - One record by `lid`: the partitioned layout fetched 487.8 KiB in 5 GETs, the single row group 16.3 MiB in 11 GETs.
   - Partitioning pays when a filter skips row groups. An earlier alpha build fetched 72.7 MiB for the aggregate; `docs/lessons-learned.md` section 8 says why.
 
 ### Fault D: synchronous one-file-at-a-time loop
