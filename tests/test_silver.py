@@ -65,6 +65,19 @@ def test_files_are_sorted_by_lid_then_sample_idx_in_row_groups_under_the_limit(s
         assert groups[0] >= 2 and groups[1] <= 200000, (f, groups)
 
 
+def test_silver_is_parquet_version_2_and_no_sample_position_is_stored_plain(silver, built):
+    """ADR-0007: ts_ms and sample_idx rise by a constant step inside a record. The version 2
+    writer stores them as deltas, or as a dictionary where a row group holds few values;
+    version 1 stored them plain, four bytes a value."""
+    glob = (built / "silver").as_posix() + "/**/*.parquet"
+    assert silver.execute(f"SELECT DISTINCT format_version FROM parquet_file_metadata('{glob}')").fetchall() == [(2,)]
+    recording = (built / "silver" / "recording").as_posix() + "/*/*/*.parquet"
+    encodings = {e for (e,) in silver.execute(
+        f"SELECT DISTINCT encodings FROM parquet_metadata('{recording}') WHERE path_in_schema IN ('ts_ms', 'sample_idx')"
+    ).fetchall()}
+    assert "DELTA_BINARY_PACKED" in encodings and "PLAIN" not in encodings, encodings
+
+
 def test_scale_basis_says_whether_the_unit_scale_is_documented(silver):
     assert set(convert_mat.SCALE_BASIS) == set(convert_mat.UV_PER_UNIT)
     assert set(convert_mat.SCALE_BASIS.values()) <= {"documented", "assumed"}

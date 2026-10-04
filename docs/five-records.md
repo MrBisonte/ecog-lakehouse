@@ -316,7 +316,7 @@ COPY (
         ON u.experiment = r.experiment
     GROUP BY ALL
     ORDER BY 1
-) TO '{{data_dir}}/silver/record/data_0.parquet' (FORMAT parquet);
+) TO '{{data_dir}}/silver/record/data_0.parquet' (FORMAT parquet, PARQUET_VERSION v2);
 ```
 
 </details>
@@ -363,6 +363,8 @@ The same two samples in `silver/recording`: microvolts, milliseconds, the record
 -- partitioned COPY does not keep the ORDER BY across its buffer flushes, a plain COPY does.
 -- Sorted by lid, sample_idx inside the file. Row groups of at most 200,000 rows: DuckDB
 -- rounds the size up to a multiple of 2048, so 198,656 is the largest value under the limit.
+-- Parquet version 2, ADR-0007: ts_ms and sample_idx rise by a constant step inside a record and
+-- are stored as deltas; version 1 stored them plain, 78 percent of the layer's bytes.
 COPY (
     SELECT
         r.experiment,
@@ -382,7 +384,7 @@ COPY (
       AND r.value_raw IS NOT NULL AND NOT isnan(r.value_raw)
     ORDER BY s.lid, r.sample_idx
 ) TO '{{data_dir}}/silver/recording/experiment={{experiment}}/subject_pid={{subject_pid}}/data_0.parquet'
-(FORMAT parquet, ROW_GROUP_SIZE 198656);
+(FORMAT parquet, PARQUET_VERSION v2, ROW_GROUP_SIZE 198656);
 ```
 
 </details>
@@ -421,7 +423,7 @@ COPY (
     JOIN keyring.key_map k USING (subject_src)
     ORDER BY lid
 ) TO '{{data_dir}}/silver/electrode'
-(FORMAT parquet, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
+(FORMAT parquet, PARQUET_VERSION v2, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
 
 -- silver/event, spec 3.2: Bronze with subject_pid for subject_src, ts_ms for sample_idx,
 -- ingest_id removed.
@@ -439,7 +441,7 @@ COPY (
     JOIN bronze_ingest_audit a USING (ingest_id)
     ORDER BY lid, ts_ms
 ) TO '{{data_dir}}/silver/event'
-(FORMAT parquet, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
+(FORMAT parquet, PARQUET_VERSION v2, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
 ```
 
 </details>

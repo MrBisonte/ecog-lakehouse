@@ -14,4 +14,4 @@ COPY (
     JOIN bronze_ingest_audit a USING (ingest_id)
     ORDER BY lid, ts_ms
 ) TO '{{data_dir}}/silver/event'
-(FORMAT parquet, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
+(FORMAT parquet, PARQUET_VERSION v2, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);

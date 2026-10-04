@@ -22,6 +22,7 @@ One entry per phase. What was checked, what failed, what changed.
 | 2026-10-03 | [Documentation audit](#documentation-audit-2026-10-03) | `integration/docs-audit` | Thirty findings in three areas, three agent branches, paper, glossary, lock file |
 | 2026-10-03 | [Fault A, issues 28 and 29](#fault-a-issues-28-and-29-2026-10-03) | `integration/fault-a-issues` | The alpha's file cache fetches 2 MiB blocks; Parquet version 2 deltas measured, not adopted |
 | 2026-10-03 | [Benches on the fixed alpha](#benches-on-the-fixed-alpha-2026-10-03) | `feat/bench-on-fixed-alpha` | The cache finding was known and fixed upstream; benches rerun on the build with the fix |
+| 2026-10-04 | [Parquet version 2 for Silver](#parquet-version-2-for-silver-2026-10-04) | `feat/silver-parquet-v2` | Silver written as Parquet version 2, rebuilt in place, Fault A's fixed layout republished |
 
 ## Phase 0, skeleton
 
@@ -702,3 +703,30 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - The sweep and the encodings over GitHub Pages; loopback only.
 - Why the bytes vary between runs at small row groups.
 - A release of DuckDB 2.0; both builds are alphas from a staged channel that keeps no archive this project controls.
+
+## Parquet version 2 for Silver, 2026-10-04
+
+- Status: branch `feat/silver-parquet-v2`, cut from master `18134c0`. Decision in ADR-0007. Alex chose: Silver only, snappy, rebuilt in place, Fault A's fixed layout follows.
+
+### Changed
+
+- The five Silver writers in `sql/silver/` take `PARQUET_VERSION v2`. `faults/a/fix.sql` too.
+- `tests/test_silver.py`: every Silver file is format version 2 and no `ts_ms` or `sample_idx` chunk is PLAIN. Written first, seen to fail, then the writers changed.
+- `docs/five-records.md`: the folded SQL blocks follow the files.
+- The real `DATA_DIR` rebuilt in place: `make silver` 191.04 s, `make gold` 82.20 s, `make checks` 55.55 s. Fault A replanted, `make publish`, the Build table and the encodings section of `docs/bench.md` rewritten.
+
+### Checked
+
+- Bronze before and after: 5,913,482,399 bytes in 180 Parquet files, the newest written 2026-09-25. Not touched.
+- Silver, `du` of the directory: 9,074,132,793 bytes before, 2,075,528,454 after.
+- Checks run `01M436SQ0ZQGZJH1V2BZSC0BEE`: 108 pass, 3 fail, 0 error, 0 blocking, the counts of the run before it.
+- The published copies of `gold/channel_quality`, `gold/experiment_summary` and `gold/feature_window` did not change by one byte, so Gold from the new Silver equals Gold from the old. `gold/dataset_manifest` changed, as it holds the dataset versions.
+- Publish: 11 files, 81,182,417 bytes. Fault A good layout 12,802,999 and 5,497,814 bytes in 37 row groups; the bad file 51,960,393 bytes, replanted by the newer CLI.
+- The page over a local server: 8 Gold files hashed, 0 mismatch, 67 checks rerun, 64 pass, 3 flagged, four evidence runs listed.
+- `make lint` 20 pages pass, `make test` 112 passed.
+
+### Not checked
+
+- The fault benches over GitHub Pages on the new files. They need the deploy; the Fault A, D, F and G sections of `docs/bench.md` and the numbers in the README, the paper and the spec still describe the files published before this change, until that run.
+- A row by row comparison of old and new Silver. The old files are gone; the unchanged Gold marts and the unchanged check results stand in for it.
+- Gold and the published files as version 2, zstd, a fresh `DATA_DIR`: on the list, not in this change.

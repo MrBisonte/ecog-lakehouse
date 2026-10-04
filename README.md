@@ -123,7 +123,7 @@ Run them with `make bench`. This needs a DuckDB CLI; see `faults/lib.sh`.
 | [docs/lessons-learned.md](docs/lessons-learned.md) | The out of memory incident: cause, proof, and what we got wrong |
 | [docs/bench.md](docs/bench.md) | Row counts and every fault measurement |
 | [doc/spec.md](doc/spec.md) | The contract: every dataset, column and rule |
-| [adr/](adr/README.md) | Six decisions, each with the options rejected |
+| [adr/](adr/README.md) | Seven decisions, each with the options rejected |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to propose a change |
 
 ## Limits

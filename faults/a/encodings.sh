@@ -22,7 +22,7 @@ PORT=${ENCODINGS_PORT:-8765}
 SILVER="$DATA_DIR/silver/recording/*/*/*.parquet"
 PARTITION="$DATA_DIR/silver/recording/experiment=$FAULT_EXPERIMENT/subject_pid=$FAULT_SUBJECT/*.parquet"
 VARIANTS="v1_snappy v2_snappy v1_zstd v2_zstd"  # <parquet version>_<compression>
-REF=$DIR/v1_snappy.parquet                      # today's encoding
+REF=$DIR/v1_snappy.parquet                      # what Silver held before ADR-0007
 
 mkdir -p "$DIR"
 for v in $VARIANTS; do
@@ -79,7 +79,7 @@ section() {
   echo "|---|---|---|---|---|---|---|"
   py "$(sql columns "$SILVER")"
   echo
-  echo "Subject partition \`experiment=$FAULT_EXPERIMENT/subject_pid=$FAULT_SUBJECT\`, the smallest non canary one, $(py "$(sql files "$PARTITION")") in Silver, written once per variant into one file under ENCODINGS_DIR by \`$(py "$(sql writer "$DIR/*.parquet")")\`, sorted by lid, sample_idx, row groups of 198,656 rows, the columns of \`faults/a/fix.sql\`'s output. Variant names are Parquet writer version and compression; v1 snappy is today's. \`same\` means the row count and sum match v1 snappy read by DuckDB Python, $READ."
+  echo "Subject partition \`experiment=$FAULT_EXPERIMENT/subject_pid=$FAULT_SUBJECT\`, the smallest non canary one, $(py "$(sql files "$PARTITION")") in Silver, written once per variant into one file under ENCODINGS_DIR by \`$(py "$(sql writer "$DIR/*.parquet")")\`, sorted by lid, sample_idx, row groups of 198,656 rows, the columns of \`faults/a/fix.sql\`'s output. Variant names are Parquet writer version and compression; v2 snappy is what Silver holds since ADR-0007, v1 snappy what it held before. \`same\` means the row count and sum match v1 snappy read by DuckDB Python, $READ."
   echo
   echo "| variant | file bytes | row groups | ts_ms bytes | sample_idx bytes | value_uv bytes | ts_ms encodings | sample_idx encodings | value_uv encodings | DuckDB Python read | CLI read |"
   echo "|---|---|---|---|---|---|---|---|---|---|---|"
