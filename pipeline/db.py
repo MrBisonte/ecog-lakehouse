@@ -135,10 +135,16 @@ def connect(database: str = ":memory:"):
     return con
 
 
+def sha256(path: Path) -> str:
+    """Hex digest of a file, read in chunks so a large file is never held in memory."""
+    with path.open("rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
 def dataset_version(dataset: str) -> str:
     """sha256 of the sorted list of the dataset's Parquet file digests, spec 5.3."""
     files = (data_dir() / dataset).rglob("*.parquet")
-    digests = sorted(hashlib.sha256(p.read_bytes()).hexdigest() for p in files)
+    digests = sorted(sha256(p) for p in files)
     return hashlib.sha256("\n".join(digests).encode()).hexdigest()
 
 
