@@ -24,6 +24,7 @@ One entry per phase. What was checked, what failed, what changed.
 | 2026-10-03 | [Benches on the fixed alpha](#benches-on-the-fixed-alpha-2026-10-03) | `feat/bench-on-fixed-alpha` | The cache finding was known and fixed upstream; benches rerun on the build with the fix |
 | 2026-10-04 | [Parquet version 2 for Silver](#parquet-version-2-for-silver-2026-10-04) | `feat/silver-parquet-v2` | Silver written as Parquet version 2, rebuilt in place, Fault A's fixed layout republished |
 | 2026-10-04 | [Benches over Pages after ADR-0007](#benches-over-pages-after-adr-0007-2026-10-04) | `docs/bench-pages-after-v2` | The fault benches rerun on the files published by the Parquet version 2 change |
+| 2026-10-04 | [Three review findings](#three-review-findings-2026-10-04) | `integration/review-first-three` | The audit row commits a Bronze ingest, the page verifies each file before it reads it, a dataset is hashed once per run |
 
 ## Phase 0, skeleton
 
@@ -752,3 +753,39 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 ### Not checked
 
 - The sweep and the encodings sections were not rerun; they are loopback measurements of scratch files and did not change with the deploy.
+
+## Three review findings, 2026-10-04
+
+- Status: branch `integration/review-first-three`, cut from master `ae6d25a`. Two agent branches, `fix/bronze-committed-view` and `fix/page-verify-first`, merged here; the third finding was fixed on this branch.
+- Source: an architecture review and a ponytail review of master `4357e4a`, 15 and 14 findings. The three marked first were verified against the code and the real build before any change. The rest stay queued.
+
+### Checked
+
+- A3, the dataset version cache: `versions.setdefault(dataset, db.dataset_version(dataset))` evaluated its argument on every check. Measured on the real build: 111 checks over 12 datasets, 14 of them on `silver/recording`, 29,220,068,118 bytes hashed per run against 2,086,588,280 for one hash per dataset. One streamed pass over `silver/recording` took 1.95 s, so the saving is about 25 s per run.
+- A1, Bronze commit: the real build holds 45 audit rows, 45 ingest folders, 0 files without an audit row, and 0 files whose lid file bits differ from `lineage_dim.ingest_ord`. The finding was latent. Five readers ignored the audit, two more than the review listed: `sql/silver/010_subject.sql` and the pseudonym step in `pipeline/run.py`.
+- A1, cost of the committed view on the real build, median of three: `count(*)` 0.04 s before and 1.03 s after, the per record group by 0.33 s before and 1.35 s after, 871,160,120 rows either way. A list of constants in the view measured 0.05 s and 0.32 s; the join was kept because it reads the audit as it is, not as it was when the view was made. The quarantine scan took 0.08 s and moved nothing.
+- A2, the page, in a browser over a local server, three copies of `docs/`: every file intact, 67 checks rerun and 8 files matched, each Gold file requested once with its digest in the URL; one byte flipped in `gold/channel_quality`, 49 of 67 rerun, 18 not run, that table withheld, the others shown; one evidence file removed, 54 of 67 rerun, 13 not run, the evidence notes withheld.
+- zstd against snappy, the open item: all of `silver/recording` rewritten both ways under scratch with DuckDB 1.5.5, 45 files, 871,159,620 rows. Snappy 2,075,346,690 bytes, equal to Silver; zstd 2,036,292,905 bytes, 1.9 percent smaller. Write 20.7 s and 20.5 s. A full scan, median of five, 0.68 s and 0.73 s. Silver stays on snappy and the item is closed. The numbers come from a scratch script, not from a script in the repository.
+- Verifier, clean clone at `e3aef87`, fresh `DATA_DIR`: `make all SYNTH=1` exit 0 in 25.24 s, 111 checks pass, 0 blocking; `make lint` 20 pages pass; `make test` 119 passed; a second `make bronze` converted nothing and quarantined nothing.
+
+### Failed, then fixed
+
+- The progress bar never left the page: its `display` rule won over the `hidden` attribute. Present since the bar was added, seen only now. One CSS line.
+- A `not run` row had no colour, and the status line read "1 do not".
+- The first timing of the zstd scan took 0.16 s because the outer query needed only the row count and the engine skipped `value_uv`. The query was changed to sum the averages.
+
+### Changed
+
+- `pipeline/checks.py`, `pipeline/db.py`, `pipeline/fetch.py`: a dataset is hashed once per run, through one `sha256` helper that reads in chunks.
+- `pipeline/db.py`: the Bronze recording, electrode and event views show only rows whose `ingest_id` has an audit row.
+- `pipeline/convert_mat.py`: every audit input is computed before the first write; files without an audit row move to `quarantine/<ingest_id>/` when the next ingest starts. Nothing is deleted.
+- `docs/index.html`: each Gold file is downloaded once at a URL that carries its digest, hashed, and queried from those bytes. A file that does not verify withholds the checks and tables that read it. Four steps, not five.
+- `doc/spec.md` sections 3.1, 7 and 8, `docs/manual.md`, one README line.
+- Tests: 112 to 119.
+
+### Not checked
+
+- `make checks` on the real build with the fix. It appends an evidence run; the saving is computed from file sizes and one timed pass.
+- The page on GitHub Pages; it deploys on merge.
+- A Bronze file torn in the middle of a write, with no footer. The views and the quarantine scan would both fail on it, as the views did before.
+- The pre-commit hook that `CLAUDE.md` describes is not installed in this clone: lint and tests were run by hand before each commit.
