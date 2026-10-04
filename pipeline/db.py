@@ -91,10 +91,15 @@ def columns(dataset: str) -> str | None:
 # with NULL in it, rather than breaking the view or being rewritten.
 UNION_BY_NAME = {"gold/evidence"}
 
+# Bronze data written before its audit row, by an ingest that failed in between, is not
+# committed: the views show only ingest_ids the audit names, spec 3.1.
+COMMITTED = {"bronze/recording", "bronze/electrode", "bronze/event"}
+
 
 def views(con):
     """One view per dataset on disk; a typed empty view for a dataset with a known schema."""
-    for dataset in DATASETS:
+    # The audit view first, the committed Bronze views read it.
+    for dataset in sorted(DATASETS, key=lambda d: d != "bronze/ingest_audit"):
         root = data_dir() / dataset
         for aborted in (p for p in root.rglob("*.parquet") if p.stat().st_size == 0):
             print(f"db: removed {aborted}, an empty file left by an aborted write")
@@ -105,6 +110,8 @@ def views(con):
                 f"'{root.as_posix()}/**/*.parquet', hive_partitioning = true, "
                 "hive_types_autocast = false"
                 + (", union_by_name = true)" if dataset in UNION_BY_NAME else ")")
+                + (" WHERE ingest_id IN (SELECT ingest_id FROM bronze_ingest_audit)"
+                   if dataset in COMMITTED else "")
             )
         elif (schema := columns(dataset)) is not None:
             cols = ", ".join(f"NULL::{t} AS {c}" for c, t in (p.split() for p in schema.split(", ")))
@@ -135,10 +142,16 @@ def connect(database: str = ":memory:"):
     return con
 
 
+def sha256(path: Path) -> str:
+    """Hex digest of a file, read in chunks so a large file is never held in memory."""
+    with path.open("rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
 def dataset_version(dataset: str) -> str:
     """sha256 of the sorted list of the dataset's Parquet file digests, spec 5.3."""
     files = (data_dir() / dataset).rglob("*.parquet")
-    digests = sorted(hashlib.sha256(p.read_bytes()).hexdigest() for p in files)
+    digests = sorted(sha256(p) for p in files)
     return hashlib.sha256("\n".join(digests).encode()).hexdigest()
 
 

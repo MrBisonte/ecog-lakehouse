@@ -4,6 +4,8 @@ An adapter turns one source file into a `Source`. The registry maps the director
 under `raw/` to the adapter; a directory without one is skipped with a logged reason.
 Each converted file appends one `bronze/ingest_audit` row. A file whose sha256 is already
 in the audit is skipped, so a rerun is a no-op and Bronze partitions are never rewritten.
+The audit row is written last and commits the ingest. Files of an ingest that failed before
+it are moved to quarantine/ when the next run starts, and that file is ingested again.
 """
 
 import hashlib
@@ -248,6 +250,28 @@ def stage(con, src: Source):
     )
 
 
+def audit_values(con, path: Path, src: Source, sha256: str) -> dict:
+    """The ingest_audit row of a staged source. Computed before the first Bronze write, so a
+    failure here, the keyring held by another process or no git, leaves no file behind."""
+    # A source read from outside DATA_DIR has no path below it, so it keeps its absolute one
+    # and hash_match will not find it, which is the honest answer for a file that is not here.
+    root = db.data_dir()
+    below = path.relative_to(root) if path.is_relative_to(root) else path
+    return {
+        "data_root": root.as_posix(),
+        "source_path_rel": below.as_posix(),
+        "source_url": src.source_url,
+        "sha256": sha256,
+        "bytes": path.stat().st_size,
+        "sample_rate_hz": src.sample_rate_hz,
+        "rows_written": con.execute("SELECT count(*) FROM src_recording").fetchone()[0],
+        "tool": TOOL,
+        "tool_version": db.git_commit(),
+        "duckdb_version": duckdb.__version__,
+        "ingest_host": keyring.host(),
+    }
+
+
 def convert(con, path: Path, adapter) -> int:
     """Write one file to Bronze. Returns rows written to bronze/recording, 0 when skipped."""
     sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -266,6 +290,7 @@ def convert(con, path: Path, adapter) -> int:
         print(f"convert: skip {path}, experiment '{src.experiment}' has no lineage code")
         return 0
     stage(con, src)
+    audit = audit_values(con, path, src, sha256)
     for name in ("recording", "electrode", "event", "ingest_audit"):
         (db.data_dir() / "bronze" / name).mkdir(parents=True, exist_ok=True)
     values = {
@@ -281,35 +306,49 @@ def convert(con, path: Path, adapter) -> int:
     }
     for name in ("recording", "electrode", "event"):
         db.run_sql(con, db.SQL / "bronze" / f"{name}.sql", **values)
-    rows = con.execute("SELECT count(*) FROM src_recording").fetchone()[0]
-    # A source read from outside DATA_DIR has no path below it, so it keeps its absolute one
-    # and hash_match will not find it, which is the honest answer for a file that is not here.
-    root = db.data_dir()
-    below = path.relative_to(root) if path.is_relative_to(root) else path
-    db.run_sql(
-        con,
-        db.SQL / "bronze" / "ingest_audit.sql",
-        data_root=root.as_posix(),
-        source_path_rel=below.as_posix(),
-        source_url=src.source_url,
-        sha256=sha256,
-        bytes=path.stat().st_size,
-        sample_rate_hz=src.sample_rate_hz,
-        rows_written=rows,
-        tool=TOOL,
-        tool_version=db.git_commit(),
-        duckdb_version=duckdb.__version__,
-        ingest_host=keyring.host(),
-        **values,
-    )
+    # The audit row is the commit marker, written last, spec 3.1.
+    db.run_sql(con, db.SQL / "bronze" / "ingest_audit.sql", **audit, **values)
     db.views(con)
-    print(f"convert: wrote {path} as {values['ingest_id']}, {rows} rows")
-    return rows
+    print(f"convert: wrote {path} as {values['ingest_id']}, {audit['rows_written']} rows")
+    return audit["rows_written"]
+
+
+def quarantine(con) -> int:
+    """Move every Bronze data file whose ingest_id has no audit row, left by an ingest that
+    failed before writing it, to quarantine/<ingest_id>/<its path below DATA_DIR>. Nothing is
+    deleted. Returns the number of ingest_ids moved."""
+    root = db.data_dir()
+    folders = [root / "bronze" / n for n in ("recording", "electrode", "event")]
+    globs = [f"'{f.as_posix()}/**/*.parquet'" for f in folders if any(f.rglob("*.parquet"))]
+    if not globs:
+        return 0
+    # One COPY of one ingest writes each file, so its footer statistics name its ingest_id
+    # without reading the rows.
+    files = con.execute(
+        f"SELECT DISTINCT stats_min_value, file_name FROM parquet_metadata([{', '.join(globs)}]) "
+        "WHERE path_in_schema = 'ingest_id' "
+        "AND stats_min_value NOT IN (SELECT ingest_id FROM bronze_ingest_audit) ORDER BY ALL"
+    ).fetchall()
+    moved = {}
+    for ingest_id, name in files:
+        path = Path(name)
+        target = root / "quarantine" / ingest_id / path.relative_to(root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        path.rename(target)
+        if path.parent.name == f"ingest_id={ingest_id}" and not any(path.parent.iterdir()):
+            path.parent.rmdir()
+        moved[ingest_id] = moved.get(ingest_id, 0) + 1
+    for ingest_id, n in moved.items():
+        print(f"convert: quarantined {ingest_id}, {n} files without an audit row, "
+              f"moved to {root / 'quarantine' / ingest_id}")
+    return len(moved)
 
 
 def main(argv=None) -> int:
     raw = db.data_dir() / "raw"
     con = db.connect()
+    if quarantine(con):
+        db.views(con)
     total = 0
     for directory in sorted(p for p in raw.iterdir() if p.is_dir()) if raw.exists() else []:
         if directory.name not in ADAPTERS:

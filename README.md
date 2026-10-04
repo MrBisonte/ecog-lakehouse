@@ -14,7 +14,7 @@ It exists to try three ideas on real data.
 
 **See it running:** https://mrbisonte.github.io/ecog-lakehouse/
 
-The page is static. DuckDB-WASM loads the published files, reruns 67 checks in your browser and verifies the file digests there.
+The page is static. Your browser downloads the published Gold files, checks each digest, then DuckDB-WASM reruns 67 checks on those verified bytes.
 
 ## Try it
 

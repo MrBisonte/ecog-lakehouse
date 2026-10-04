@@ -216,7 +216,8 @@ def run(con, checks: list[Check]) -> list[dict]:
     versions = {}
     rows = []
     for c in checks:
-        version = versions.setdefault(c.dataset, db.dataset_version(c.dataset))
+        if c.dataset not in versions:
+            versions[c.dataset] = db.dataset_version(c.dataset)
         try:
             observed = str(con.execute(c.sql).fetchone()[0])
             expected = c.expected
@@ -231,7 +232,7 @@ def run(con, checks: list[Check]) -> list[dict]:
                 "requirement_id": c.requirement_id,
                 "framework": c.framework,
                 "dataset": c.dataset,
-                "dataset_version": version,
+                "dataset_version": versions[c.dataset],
                 "check_kind": c.check_kind,
                 "severity": c.severity,
                 "clause": c.clause,

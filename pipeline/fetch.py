@@ -7,7 +7,6 @@ runs; the exit code is the number of failed rows.
 """
 
 import csv
-import hashlib
 import shutil
 import sys
 import zipfile
@@ -19,16 +18,8 @@ from pipeline import db
 SOURCES = db.REPO / "governance" / "sources.csv"
 
 
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def verified(path: Path, row: dict) -> bool:
-    return path.exists() and path.stat().st_size == int(row["bytes"]) and sha256(path) == row["sha256"]
+    return path.exists() and path.stat().st_size == int(row["bytes"]) and db.sha256(path) == row["sha256"]
 
 
 def download(url: str, target: Path):
