@@ -3,12 +3,12 @@
   {
    "path": "gold/channel_quality/data_0.parquet",
    "bytes": 34972,
-   "sha256": "bad96cfe9e4ffb70d609e85dade00566f690ecd7c445c8f2c328d0631559be4b"
+   "sha256": "251ac2ee7e7dfb8d03246191f1599162ba1a877b32bfa5248ca73d3cac1c7f83"
   },
   {
    "path": "gold/dataset_manifest/data_0.parquet",
    "bytes": 8155,
-   "sha256": "2eda92bd63ba7d615d9fed78ef688e0f907dba87d9b41aa667ac45bf425ad1f5"
+   "sha256": "502e6388cdcdea9f5ec2f79c746e2644ee3f3d52cd998ddf4deec80d1b12cb0b"
   },
   {
    "path": "gold/evidence/run_id=01M3ASMJE3K0Z6SPQH2F7N6TJK/data_0.parquet",
@@ -31,14 +31,19 @@
    "sha256": "304f7081699495e0691f05eee657de3ecb71cd1ba2e6c19553937fbb3a51a0fb"
   },
   {
+   "path": "gold/evidence/run_id=01M44AVHADSBF6S1C1BHKPKCNP/data_0.parquet",
+   "bytes": 10796,
+   "sha256": "32c094f6f793bc23179c224a633b7e1e8e84b066485a86bc04609e31202f714d"
+  },
+  {
    "path": "gold/experiment_summary/data_0.parquet",
    "bytes": 1929,
-   "sha256": "6fce2b6d48c199967c5f113ef82a6ba466bf0fa7a80ae369c94465bfc9213825"
+   "sha256": "5548c48f777a97deaf7151e28790ef9045decd0f191400c450d950fd66f6cd32"
   },
   {
    "path": "gold/feature_window/data_0.parquet",
    "bytes": 10833604,
-   "sha256": "4bf91b62807d67dcdbf0a8890c5f3776fd9287d48c17ff28f46e0f701cf107b4"
+   "sha256": "dbe11f1fe9d7369b4fe86de564f616e3e75f1e602d837417bd927666ecbaf06f"
   },
   {
    "path": "faults/a/bad/recording.parquet",
@@ -56,5 +61,5 @@
    "sha256": "d9ed8012154ac5cc10c3bee8b00d2a5497f13122e4c2b7bab5aeabf2324fdb67"
   }
  ],
- "bytes": 81182417
+ "bytes": 81193213
 }
