@@ -121,6 +121,22 @@ def test_sql(write):
     assert outcome("sql", "silver/subject", {"sql": "SELECT 1 FROM silver_subject"}) == ("fail", "1", "0")
 
 
+def test_a_dataset_is_hashed_once_per_run(write, monkeypatch):
+    path = write("silver/subject", "SELECT 'a' AS subject_pid, now()::TIMESTAMP AS first_seen_at")
+    hashed = []
+    version = db.dataset_version
+    monkeypatch.setattr(db, "dataset_version", lambda d: hashed.append(d) or version(d))
+    generated = [
+        c for column in ("subject_pid", "first_seen_at")
+        for c in checks.generate("test", "T-1", "not_null", "silver/subject", {"column": column})
+    ]
+    rows = checks.run(db.connect(), generated)
+    assert hashed == ["silver/subject"]
+    # spec 5.3: the digest of the sorted list of file digests, here a list of one.
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert {r["dataset_version"] for r in rows} == {hashlib.sha256(digest.encode()).hexdigest()}
+
+
 def test_generator_rejects_malformed_and_deeply_nested_sql(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     with pytest.raises(ValueError, match="malformed"):
