@@ -2,6 +2,7 @@
 -- 198,656 rows (DuckDB rounds the size up to a multiple of 2048; this is the largest value
 -- under the 200,000 limit of the partition_layout check). Same subject as plant.sql.
 -- The pipeline itself writes this layout with one plain COPY per partition, the v1.x form.
+-- Parquet version 2 as in Silver, ADR-0007.
 COPY (
     SELECT *
     FROM read_parquet(
@@ -11,6 +12,7 @@ COPY (
 ) TO 'docs/data/faults/a/good'
 (
     FORMAT parquet,
+    PARQUET_VERSION v2,
     PARTITION_BY (experiment, subject_pid),
     ORDER BY (lid, sample_idx),
     ROW_GROUP_SIZE 198656
