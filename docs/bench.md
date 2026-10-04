@@ -7,23 +7,23 @@ Read by `pipeline/bench_doc.py` when this file was written.
 | setting | value |
 |---|---|
 | CPU count | 12 |
-| RAM | 15,544.64 MiB |
+| RAM | 15,544.63 MiB |
 | Python | 3.14.4 |
 | DuckDB Python | 1.5.5 |
 | DuckDB CLI | v2.0.0-alpha43763 (Cyanoptera) 96063b9e39 |
 | DuckDB CLI sha256 | 8e3d17e36ebfb868c020787f60dffe2457f3b43ab7013adf40e9cb2c1be449e8 |
-| git commit | 16d9959415e280493c66fe90e31cfe3823335def |
+| git commit | 4832d84b0c46a19bbf4fd130fe5df2dcee4ac818 |
 | Network location | https://mrbisonte.github.io/ecog-lakehouse/data |
 
 ## Build
 
-Counts of the build in `DATA_DIR`, built at commit `5cec32a1a8bce3b9c5d1101894a2ccd25cb94835` with DuckDB 1.5.5. Canary subjects are left out. Bytes are the recording Parquet files of each layer.
+Counts of the build in `DATA_DIR`, built at commit `4832d84b0c46a19bbf4fd130fe5df2dcee4ac818` with DuckDB 1.5.5. Canary subjects are left out. Bytes are the recording Parquet files of each layer.
 
 | experiment | subjects | runs | channels | samples | bronze_bytes | silver_bytes |
 |---|---|---|---|---|---|---|
-| faces_basic | 14 | 14 | 714 | 189,253,080 | 1,297.11 MiB | 1,973.40 MiB |
-| fingerflex | 9 | 9 | 484 | 258,340,520 | 1,637.66 MiB | 2,563.62 MiB |
-| motor_basic | 19 | 19 | 1,043 | 412,046,520 | 2,704.42 MiB | 4,116.54 MiB |
+| faces_basic | 14 | 14 | 714 | 189,253,080 | 1,297.11 MiB | 478.15 MiB |
+| fingerflex | 9 | 9 | 484 | 258,340,520 | 1,637.66 MiB | 561.70 MiB |
+| motor_basic | 19 | 19 | 1,043 | 412,046,520 | 2,704.42 MiB | 939.36 MiB |
 
 Files ingested: 45. Build wall clock, first ingestion to the end of the first evidence run: 355.59 seconds.
 
@@ -136,16 +136,16 @@ Issue 29, measured by `faults/a/encodings.sh`. DuckDB Python v1.5.5, the pipelin
 
 | column | encodings | row groups with a dictionary | compressed bytes | uncompressed bytes | compressed bytes per value | share of compressed bytes, percent |
 |---|---|---|---|---|---|---|
-| sample_idx | PLAIN | 0 of 4,408 | 3,484,958,980 | 3,484,775,124 | 4.00 | 39.0 |
-| ts_ms | PLAIN | 0 of 4,408 | 3,484,958,980 | 3,484,775,124 | 4.00 | 39.0 |
-| value_uv | PLAIN, PLAIN_DICTIONARY | 4,154 of 4,408 | 1,969,591,200 | 1,969,569,507 | 2.26 | 22.0 |
-| lid | PLAIN_DICTIONARY | 4,408 of 4,408 | 315,482 | 316,512 | 0.00 | 0.0 |
-| subject_pid | PLAIN_DICTIONARY | 4,408 of 4,408 | 304,149 | 286,517 | 0.00 | 0.0 |
-| experiment | PLAIN_DICTIONARY | 4,408 of 4,408 | 280,783 | 263,151 | 0.00 | 0.0 |
-| channel_idx | PLAIN_DICTIONARY | 4,408 of 4,408 | 252,535 | 234,903 | 0.00 | 0.0 |
-| run | PLAIN_DICTIONARY | 4,408 of 4,408 | 233,621 | 215,989 | 0.00 | 0.0 |
+| value_uv | BYTE_STREAM_SPLIT, RLE_DICTIONARY | 4,154 of 4,408 | 1,939,034,911 | 1,969,569,507 | 2.23 | 99.8 |
+| sample_idx | DELTA_BINARY_PACKED | 0 of 4,408 | 992,414 | 15,531,674 | 0.00 | 0.1 |
+| ts_ms | DELTA_BINARY_PACKED | 0 of 4,408 | 992,414 | 15,531,674 | 0.00 | 0.1 |
+| lid | RLE_DICTIONARY | 4,408 of 4,408 | 315,482 | 316,512 | 0.00 | 0.0 |
+| subject_pid | RLE_DICTIONARY | 4,408 of 4,408 | 304,149 | 286,517 | 0.00 | 0.0 |
+| experiment | RLE_DICTIONARY | 4,408 of 4,408 | 280,783 | 263,151 | 0.00 | 0.0 |
+| channel_idx | RLE_DICTIONARY | 4,408 of 4,408 | 252,535 | 234,903 | 0.00 | 0.0 |
+| run | RLE_DICTIONARY | 4,408 of 4,408 | 233,621 | 215,989 | 0.00 | 0.0 |
 
-Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one, 1 file, 37 row groups, 7,236,800 rows in Silver, written once per variant into one file under ENCODINGS_DIR by `DuckDB version v1.5.5 (build d8cdaa33fd)`, sorted by lid, sample_idx, row groups of 198,656 rows, the columns of `faults/a/fix.sql`'s output. Variant names are Parquet writer version and compression; v1 snappy is today's. `same` means the row count and sum match v1 snappy read by DuckDB Python, 7,236,800 rows, sum(value_uv) -1873984.021144.
+Subject partition `experiment=faces_basic/subject_pid=72d88db77f3716bb`, the smallest non canary one, 1 file, 37 row groups, 7,236,800 rows in Silver, written once per variant into one file under ENCODINGS_DIR by `DuckDB version v1.5.5 (build d8cdaa33fd)`, sorted by lid, sample_idx, row groups of 198,656 rows, the columns of `faults/a/fix.sql`'s output. Variant names are Parquet writer version and compression; v2 snappy is what Silver holds since ADR-0007, v1 snappy what it held before. `same` means the row count and sum match v1 snappy read by DuckDB Python, 7,236,800 rows, sum(value_uv) -1873984.021144.
 
 | variant | file bytes | row groups | ts_ms bytes | sample_idx bytes | value_uv bytes | ts_ms encodings | sample_idx encodings | value_uv encodings | DuckDB Python read | CLI read |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -158,7 +158,7 @@ The same files over `http://127.0.0.1:8765`, `faults/serve.py` on loopback, with
 
 | variant | aggregate GETs | aggregate received | aggregate, s min / median / max | one record GETs | one record received | one record, s min / median / max |
 |---|---|---|---|---|---|---|
-| v1 snappy | 75 | 16.4 MiB | 1.59 / 2.12 / 3.73 | 5 | 1019.0 KiB | 0.05 / 0.05 / 0.05 |
-| v2 snappy | 38 | 16.0 MiB | 1.29 / 1.91 / 1.91 | 5 | 920.5 KiB | 0.05 / 0.05 / 0.05 |
-| v1 zstd | 75 | 16.1 MiB | 1.32 / 1.89 / 2.04 | 5 | 941.1 KiB | 0.05 / 0.05 / 0.06 |
-| v2 zstd | 38 | 15.8 MiB | 1.29 / 1.48 / 1.55 | 5 | 909.7 KiB | 0.05 / 0.05 / 0.05 |
+| v1 snappy | 56 | 30.3 MiB | 1.50 / 1.51 / 2.13 | 5 | 1019.0 KiB | 0.05 / 0.05 / 0.05 |
+| v2 snappy | 38 | 16.0 MiB | 1.49 / 1.51 / 2.10 | 5 | 920.5 KiB | 0.05 / 0.05 / 0.05 |
+| v1 zstd | 75 | 16.1 MiB | 1.29 / 1.48 / 2.20 | 5 | 941.1 KiB | 0.05 / 0.05 / 0.05 |
+| v2 zstd | 38 | 15.8 MiB | 1.09 / 1.92 / 2.11 | 5 | 909.7 KiB | 0.05 / 0.05 / 0.05 |
