@@ -122,6 +122,20 @@ def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
     assert not (out / "manifest.json").exists()
 
 
+def test_publish_refuses_evidence_from_a_commit_outside_the_history(tmp_path, monkeypatch):
+    """The page lists the commit of every run; one the repository does not hold leads nowhere."""
+    run = tmp_path / "data" / "gold" / "evidence" / "run_id=01M00000000000000000000000"
+    run.mkdir(parents=True)
+    duckdb.connect().execute(
+        f"COPY (SELECT 'fake' AS check_id, '{'0' * 40}' AS git_commit) "
+        f"TO '{(run / 'data_0.parquet').as_posix()}' (FORMAT parquet)"
+    )
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    out = tmp_path / "out"
+    assert publish.main(["--out", str(out)]) == 1
+    assert not (out / "manifest.json").exists()
+
+
 def test_dataset_version_in_manifest_equals_the_one_evidence_recorded(gold, built):
     rows = gold.execute(
         "SELECT m.dataset, m.dataset_version, e.dataset_version "
@@ -147,6 +161,8 @@ def test_publish_default_out_follows_the_working_directory(built, tmp_path, monk
     install = tmp_path / "install"
     (install / "docs" / "data").mkdir(parents=True)
     monkeypatch.setattr(db, "REPO", install)
+    # The install is not a git checkout; the commit guard has its own test.
+    monkeypatch.setattr(publish, "unknown_commits", lambda con: [])
     monkeypatch.chdir(tmp_path)
     assert publish.main([]) == 0
     assert json.loads((tmp_path / "docs" / "data" / "manifest.json").read_text())["files"]

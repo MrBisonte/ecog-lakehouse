@@ -1,14 +1,17 @@
 """Copy Gold to docs/data/gold and write docs/data/manifest.json, within the limits of spec 9.
 
 A file holding a canary record (radioactive bit, spec 12.5) is refused before anything is
-copied. Gold is copied from DATA_DIR; fault files under docs/data/faults are listed as found.
-checks.json and lid.sql let docs/index.html rerun the Gold checks in the browser (spec 8).
+copied, and so is a commit recorded in Gold that is not in the history of HEAD. Gold is copied
+from DATA_DIR; fault files under docs/data/faults are listed as found. checks.json and lid.sql
+let docs/index.html rerun the Gold checks in the browser (spec 8).
 """
 
 import argparse
 import hashlib
 import json
+import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -30,6 +33,23 @@ def radioactive_rows(con, path: Path) -> int:
         f"SELECT count(*) FROM read_parquet('{path.as_posix()}') "
         "WHERE lid IS NOT NULL AND lid_radioactive(lid_from_uuid(lid)) = 1"
     ).fetchone()[0]
+
+
+def unknown_commits(con) -> list[str]:
+    """Commits recorded in gold/evidence and gold/dataset_manifest that are neither HEAD nor an
+    ancestor of it. The page shows the commit of every run, and each must open in the repository."""
+    recorded = con.execute(
+        "SELECT git_commit FROM gold_evidence UNION SELECT git_commit FROM gold_dataset_manifest"
+    ).fetchall()
+    return sorted(
+        str(c) for (c,) in recorded
+        # Recorded text is never passed to git unless it is a hash, so it cannot be read as an option.
+        if not re.fullmatch(r"[0-9a-f]{7,40}", str(c))
+        or subprocess.run(
+            ["git", "-C", str(db.REPO), "merge-base", "--is-ancestor", c, "HEAD"],
+            capture_output=True, check=False,
+        ).returncode != 0
+    )
 
 
 def entry(rel: str, path: Path) -> dict:
@@ -55,6 +75,12 @@ def publish(out: Path) -> int:
     leaks = {p.relative_to(db.data_dir()).as_posix(): radioactive_rows(con, p) for p in sources}
     if any(leaks.values()):
         print(f"publish: refused, canary records in {[p for p, n in leaks.items() if n]}")
+        return 1
+    if unknown := unknown_commits(con):
+        print(
+            f"publish: refused, commits not in the history of HEAD: {unknown}. Move the evidence "
+            "runs that record them to DATA_DIR/quarantine/evidence; make gold rewrites the manifest"
+        )
         return 1
     shutil.rmtree(out / "gold", ignore_errors=True)
     files = []
