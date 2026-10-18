@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 import duckdb
@@ -99,12 +100,34 @@ def test_dataset_manifest_has_one_row_per_dataset_of_the_build(gold, built):
 def test_publish_writes_manifest_within_limits(built, tmp_path, monkeypatch):
     assert publish.main(["--out", str(tmp_path)]) == 0
     manifest = json.loads((tmp_path / "manifest.json").read_text())
-    assert {f["path"].split("/")[1] for f in manifest["files"]} == {
+    gold = [f for f in manifest["files"] if f["path"].startswith("gold/")]
+    assert {f["path"].split("/")[1] for f in gold} == {
         "channel_quality", "experiment_summary", "feature_window", "evidence", "dataset_manifest",
     }
-    assert all(f["path"].startswith("gold/") and len(f["sha256"]) == 64 for f in manifest["files"])
+    assert [f["path"] for f in manifest["files"] if f not in gold] == ["summary.json"]
+    assert all(len(f["sha256"]) == 64 for f in manifest["files"])
     monkeypatch.setattr(publish, "FILE_LIMIT", 1)
     assert publish.main(["--out", str(tmp_path)]) == 1
+
+
+def test_publish_summary_is_the_result_of_its_own_statement(built, tmp_path):
+    """The strip on the page: the values are the row of the published statement, verified by the
+    digest in the manifest, and the browser can run that statement again over the same files."""
+    assert publish.main(["--out", str(tmp_path)]) == 0
+    summary = json.loads((tmp_path / "summary.json").read_text())
+    [listed] = [f for f in json.loads((tmp_path / "manifest.json").read_text())["files"] if f["path"] == "summary.json"]
+    assert listed["sha256"] == hashlib.sha256((tmp_path / "summary.json").read_bytes()).hexdigest()
+    con = db.connect()
+    con.execute(summary["sql"])
+    assert dict(zip([d[0] for d in con.description], con.fetchone())) == summary["values"]
+    latest = con.execute(
+        "SELECT count(*), count(*) FILTER (WHERE result = 'pass') FROM gold_evidence "
+        "WHERE run_id = (SELECT max(run_id) FROM gold_evidence)"
+    ).fetchone()
+    assert (summary["values"]["checks"], summary["values"]["pass"]) == latest
+    assert summary["values"]["gold_datasets"] == 5
+    assert summary["values"]["samples"] == con.execute("SELECT count(*) FROM silver_recording").fetchone()[0]
+    assert len(summary["values"]["git_commit"]) == 7
 
 
 def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
@@ -115,6 +138,20 @@ def test_publish_refuses_a_canary_record(built, tmp_path, monkeypatch):
     ).fetchone()[0]
     duckdb.connect().execute(
         f"COPY (SELECT '{canary}'::UUID AS lid, 1 AS n) TO '{(leak / 'data_0.parquet').as_posix()}' (FORMAT parquet)"
+    )
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    out = tmp_path / "out"
+    assert publish.main(["--out", str(out)]) == 1
+    assert not (out / "manifest.json").exists()
+
+
+def test_publish_refuses_evidence_from_a_commit_outside_the_history(tmp_path, monkeypatch):
+    """The page lists the commit of every run; one the repository does not hold leads nowhere."""
+    run = tmp_path / "data" / "gold" / "evidence" / "run_id=01M00000000000000000000000"
+    run.mkdir(parents=True)
+    duckdb.connect().execute(
+        f"COPY (SELECT 'fake' AS check_id, '{'0' * 40}' AS git_commit) "
+        f"TO '{(run / 'data_0.parquet').as_posix()}' (FORMAT parquet)"
     )
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     out = tmp_path / "out"
@@ -147,6 +184,8 @@ def test_publish_default_out_follows_the_working_directory(built, tmp_path, monk
     install = tmp_path / "install"
     (install / "docs" / "data").mkdir(parents=True)
     monkeypatch.setattr(db, "REPO", install)
+    # The install is not a git checkout; the commit guard has its own test.
+    monkeypatch.setattr(publish, "unknown_commits", lambda con: [])
     monkeypatch.chdir(tmp_path)
     assert publish.main([]) == 0
     assert json.loads((tmp_path / "docs" / "data" / "manifest.json").read_text())["files"]

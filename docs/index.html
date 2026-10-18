@@ -25,10 +25,14 @@
   #bar { display: block; width: 100%; max-width: 90ch; height: 1rem; }
   /* display above would otherwise win over the hidden attribute and keep the bar on screen. */
   #bar[hidden] { display: none; }
+  #strip { border: 1px solid #8884; padding: 6px 10px; }
+  #strip:empty { display: none; }
 </style>
 </head>
 <body>
 <h1>ecog-lakehouse, governance evidence</h1>
+<p><a href="https://github.com/MrBisonte/ecog-lakehouse">github.com/MrBisonte/ecog-lakehouse</a> holds the code, the SQL, the contracts and the data this page reads.</p>
+<p id="strip" aria-live="polite"></p>
 <p>Every number on this page is a query result computed in your browser by DuckDB-WASM over the published Gold Parquet files. Each file is downloaded once from this site and its digest checked against the published one before any query reads it. The checks are the same SQL the pipeline ran; <code>lid.sql</code> holds the lineage identifier macros they use.</p>
 <p id="status" aria-live="polite">Step 1 of 4: downloading the DuckDB engine</p>
 <progress id="bar" aria-labelledby="status"></progress>
@@ -45,14 +49,14 @@
 <div id="quality"></div>
 <h2>Evidence runs recorded by the pipeline</h2>
 <div id="runs"></div>
-<p>Commit ids of the first four runs do not resolve in this repository.</p>
 <h2>Published files, digests checked in this browser</h2>
 <div id="files"></div>
 
 <script type="module">
-import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/+esm";
+const ENGINE = "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/+esm";
 
 const status = document.getElementById("status");
+const strip = document.getElementById("strip");
 const say = (text) => { status.textContent = text; };
 // One bar for four steps. Without a value the bar is indeterminate and the browser animates it.
 // ponytail: the share of each step is a guess, not yet timed since each file became one
@@ -75,6 +79,11 @@ const escape = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", 
 // A control sentence comes from governance/requirements.csv as its author wrote it, so the
 // page tidies the first letter and the full stop rather than the file doing it.
 const sentence = (t) => !t ? "" : t[0].toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".");
+const hex = (hash) => [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+// The strip under the heading, from the values publish computed. ran_at is already text.
+const summaryText = (v) => `${cell(v.gold_datasets, "")} Gold datasets, ${cell(v.bronze_rows, "")} Bronze rows, ` +
+  `${cell(v.samples, "")} samples, ${cell(v.checks, "")} checks run: ${cell(v.pass, "")} pass, ` +
+  `${cell(v.fail, "")} fail, ${cell(v.flag, "")} flagged. Last run ${v.ran_at} UTC, commit ${v.git_commit}.`;
 
 function table(id, columns, rows, klass, wrap = []) {
   const html = ["<table><thead><tr>", ...columns.map((c) => `<th>${escape(c)}</th>`), "</tr></thead><tbody>"];
@@ -143,6 +152,25 @@ const rank = (r) => r.result !== "pass" ? 0 : r.framework === "GDPR-Art9" ? 1
   : r.severity === "flag" ? 3 : r.framework === "contract" ? 5 : 4;
 
 try {
+  // The strip first, from two small files of this origin, so a visitor reads the numbers before
+  // the engine downloads: manifest.json, then summary.json verified against it.
+  const manifest = await (await fetch(`data/manifest.json?v=${Date.now()}`)).json();
+  const summaryFile = manifest.files.find((f) => f.path === "summary.json");
+  let summary = null, summaryDigest = "not published";
+  if (summaryFile) {
+    const bytes = new Uint8Array(await (await fetch(`data/summary.json?v=${summaryFile.sha256}`)).arrayBuffer());
+    const received = hex(await crypto.subtle.digest("SHA-256", bytes));
+    if (received === summaryFile.sha256) {
+      summary = JSON.parse(new TextDecoder().decode(bytes));
+      summaryDigest = "match";
+      strip.textContent = `${summaryText(summary.values)} The same numbers are recomputed live below.`;
+    } else {
+      summaryDigest = `MISMATCH, received ${received}`;
+      strip.className = "fail";
+      strip.textContent = "The published summary did not verify against its digest, so it is not shown.";
+    }
+  }
+  const duckdb = await import(ENGINE);
   const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
   const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
   const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
@@ -155,7 +183,6 @@ try {
 
   say("Step 2 of 4: verifying the Gold files");
   advance("files", 0, 1);
-  const manifest = await (await fetch(`data/manifest.json?v=${Date.now()}`)).json();
   const gold = manifest.files.filter((f) => f.path.startsWith("gold/"));
   // Each Gold file is downloaded once, hashed, and only bytes that match manifest.json are
   // handed to DuckDB, so every query reads verified bytes. The digest in the URL makes a changed
@@ -165,7 +192,6 @@ try {
   // reads it. Revisit if Gold grows past tens of MB.
   const goldBytes = gold.reduce((n, f) => n + f.bytes, 0);
   let receivedBytes = 0;
-  const hex = (hash) => [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
   // Returns the bytes, or why there are none. The body is read chunk by chunk so the bar moves
   // inside one large file.
   const download = async (f, i) => {
@@ -188,7 +214,8 @@ try {
   const files = [];
   const verified = new Set();
   for (const f of manifest.files) {
-    const row = { path: f.path, bytes: f.bytes, sha256: f.sha256, digest: "not read" };
+    const row = { path: f.path, bytes: f.bytes, sha256: f.sha256,
+                  digest: f.path === "summary.json" ? summaryDigest : "not read" };
     files.push(row);
     if (!f.path.startsWith("gold/")) continue;
     const { bytes, reason } = await download(f, gold.indexOf(f));
@@ -293,6 +320,18 @@ try {
 
     const evidence = await query(conn, "SELECT run_id, count(*) AS checks, count(*) FILTER (WHERE result = 'pass') AS pass, count(*) FILTER (WHERE result <> 'pass') AS not_pass, min(ran_at) AS ran_at, any_value(git_commit) AS git_commit FROM gold_evidence GROUP BY 1 ORDER BY 1 DESC");
     table("runs", evidence.columns, evidence.rows);
+  }
+
+  // The strip's own statement, over the files verified above. A value that differs is named.
+  if (summary && !unverified.has("evidence") && !unverified.has("dataset_manifest")) {
+    const live = (await query(conn, summary.sql)).rows[0];
+    const differ = Object.keys(summary.values).filter((k) => String(summary.values[k]) !== String(live[k]));
+    strip.append(" ", Object.assign(document.createElement("span"), {
+      className: differ.length ? "fail" : "pass",
+      textContent: differ.length
+        ? `Recomputed in this browser, ${differ.map((k) => `${k} ${cell(live[k], "")}`).join(", ")} differ from the published values.`
+        : "Recomputed in this browser from the verified files: identical.",
+    }));
   }
 
   finish();

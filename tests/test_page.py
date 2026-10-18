@@ -10,7 +10,15 @@ def test_page_queries_the_bytes_it_verified():
     assert "registerFileURL" not in PAGE
     assert "db.registerFileBuffer(f.path, bytes)" in PAGE
     assert "fetch(`data/${f.path}?v=${f.sha256}`)" in PAGE
-    assert PAGE.count("fetch(") == 4, "manifest, Gold files, lid.sql, checks.json, nothing else"
+    assert PAGE.count("fetch(") == 5, "manifest, summary.json, Gold files, lid.sql, checks.json, nothing else"
+
+
+def test_page_paints_the_summary_before_the_engine_downloads():
+    """summary.json is fetched, verified and painted before the engine module is imported, and
+    the repository link is static HTML, so both are there whatever the CDN does."""
+    assert "import * as duckdb" not in PAGE
+    assert PAGE.index("fetch(`data/summary.json?v=${summaryFile.sha256}`)") < PAGE.index("await import(ENGINE)")
+    assert 'href="https://github.com/MrBisonte/ecog-lakehouse"' in PAGE
 
 
 def test_page_counts_four_steps():

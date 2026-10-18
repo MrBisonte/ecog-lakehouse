@@ -3,32 +3,12 @@
   {
    "path": "gold/channel_quality/data_0.parquet",
    "bytes": 34972,
-   "sha256": "251ac2ee7e7dfb8d03246191f1599162ba1a877b32bfa5248ca73d3cac1c7f83"
+   "sha256": "bad96cfe9e4ffb70d609e85dade00566f690ecd7c445c8f2c328d0631559be4b"
   },
   {
    "path": "gold/dataset_manifest/data_0.parquet",
-   "bytes": 8155,
-   "sha256": "502e6388cdcdea9f5ec2f79c746e2644ee3f3d52cd998ddf4deec80d1b12cb0b"
-  },
-  {
-   "path": "gold/evidence/run_id=01M3ASMJE3K0Z6SPQH2F7N6TJK/data_0.parquet",
-   "bytes": 10430,
-   "sha256": "3fd17e30c94f1852117a1cc2be848fd778b3828bd47a9cfe44a07ce7d9a4ad14"
-  },
-  {
-   "path": "gold/evidence/run_id=01M3ATXEH51KEY8V5DR5M1J71T/data_0.parquet",
-   "bytes": 10529,
-   "sha256": "8968ac1ac545331540ad4f14c6f8352196246781b0be945eceeaa5b3d40ab03a"
-  },
-  {
-   "path": "gold/evidence/run_id=01M3WTDATJYQ57CY5YHT2D54NR/data_0.parquet",
-   "bytes": 10796,
-   "sha256": "df7d91508e75659b34e62c15bde9e33827b5a38e81586091c5bdbd8044c7876f"
-  },
-  {
-   "path": "gold/evidence/run_id=01M436SQ0ZQGZJH1V2BZSC0BEE/data_0.parquet",
-   "bytes": 10796,
-   "sha256": "304f7081699495e0691f05eee657de3ecb71cd1ba2e6c19553937fbb3a51a0fb"
+   "bytes": 8154,
+   "sha256": "fa69b32b75e643542061889ca5062d8f55c65782820ebaa22a0a07f1744431b1"
   },
   {
    "path": "gold/evidence/run_id=01M44AVHADSBF6S1C1BHKPKCNP/data_0.parquet",
@@ -36,14 +16,19 @@
    "sha256": "32c094f6f793bc23179c224a633b7e1e8e84b066485a86bc04609e31202f714d"
   },
   {
+   "path": "gold/evidence/run_id=01M586TTETJFYTDQEJFBDGV6ZH/data_0.parquet",
+   "bytes": 10796,
+   "sha256": "48fe925cdaf1ae51d485d5d2b447c517fe85a26656a53c3037cd513a4c53df2e"
+  },
+  {
    "path": "gold/experiment_summary/data_0.parquet",
    "bytes": 1929,
-   "sha256": "5548c48f777a97deaf7151e28790ef9045decd0f191400c450d950fd66f6cd32"
+   "sha256": "6fce2b6d48c199967c5f113ef82a6ba466bf0fa7a80ae369c94465bfc9213825"
   },
   {
    "path": "gold/feature_window/data_0.parquet",
    "bytes": 10833604,
-   "sha256": "dbe11f1fe9d7369b4fe86de564f616e3e75f1e602d837417bd927666ecbaf06f"
+   "sha256": "4bf91b62807d67dcdbf0a8890c5f3776fd9287d48c17ff28f46e0f701cf107b4"
   },
   {
    "path": "faults/a/bad/recording.parquet",
@@ -59,7 +44,12 @@
    "path": "faults/a/good/experiment=faces_basic/subject_pid=72d88db77f3716bb/data_1.parquet",
    "bytes": 5497814,
    "sha256": "d9ed8012154ac5cc10c3bee8b00d2a5497f13122e4c2b7bab5aeabf2324fdb67"
+  },
+  {
+   "path": "summary.json",
+   "bytes": 997,
+   "sha256": "67567850c4c98f244b03d9ac7965a115dbc7e018693d788239b9eab7e40a16a7"
   }
  ],
- "bytes": 81193213
+ "bytes": 81162454
 }

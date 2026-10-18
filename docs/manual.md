@@ -132,7 +132,7 @@ One row per dataset. `dataset_version` is the digest the evidence rows carry, so
 | `make silver` | the pseudonymised, typed layer, and the keyring | `DATA_DIR/silver/`, `keyring.duckdb` |
 | `make gold` | quality, summary, windows, dataset manifest | `DATA_DIR/gold/` |
 | `make checks` | one evidence file per run, never rewritten | `DATA_DIR/gold/evidence/run_id=<id>/` |
-| `make publish` | copies of Gold, `manifest.json`, `checks.json`, `lid.sql` | `docs/data/` |
+| `make publish` | copies of Gold, `manifest.json`, `checks.json`, `lid.sql`, `summary.json` | `docs/data/` |
 | `make bench` | row counts and the four fault measurements | `docs/bench.md` |
 | `make sbom` | the bill of materials | `sbom.cdx.json` |
 
@@ -216,6 +216,7 @@ The first line deletes every built layer, the downloads and the keyring. The sec
 | `checks: fail block ...` | a blocking rule is violated | read the printed check id, then section 4.2 |
 | `checks: fail flag ...` | a plausibility range is exceeded | nothing; it is recorded |
 | `publish: refused, canary records in ...` | a Gold file holds a canary `lid` | a mart SQL lost its `lid_radioactive` filter; fix `sql/gold/`, then `make gold publish` |
+| `publish: refused, commits not in the history of HEAD: ...` | an evidence run or the dataset manifest records a commit this checkout does not hold | move those runs from `DATA_DIR/gold/evidence/` to `DATA_DIR/quarantine/evidence/`, then `make gold publish` |
 | `sha256 already ingested` for every file | expected on a rerun | nothing |
 | `lid_relayer: layer bits do not match` | a loader read the wrong layer | fix the layer argument in that `sql/silver/` or `sql/gold/` file |
 | `Cannot allocate memory` writing a spill file | `DATA_DIR` is on a Windows mount | put `DATA_DIR` on a Linux file system; see [lessons-learned.md](lessons-learned.md) |

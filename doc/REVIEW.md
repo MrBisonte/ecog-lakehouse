@@ -789,3 +789,46 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - The page on GitHub Pages; it deploys on merge.
 - A Bronze file torn in the middle of a write, with no footer. The views and the quarantine scan would both fail on it, as the views did before.
 - The pre-commit hook that `CLAUDE.md` describes is not installed in this clone: lint and tests were run by hand before each commit.
+
+## Parked, 2026-10-16
+
+- Branch `chore/lid-parse-guards`, last commit `635346a`, `wip: parked for launch fixes`, one commit above master `19a5a02`.
+- In flight: `sql/lineage/lid_generated.sql` copied from arch-standards as `make lineage` does. `lid_parse` refuses text outside the Crockford base32 alphabet and a first character above 7. Same macros and same bit layout, so no data was rebuilt for it. Still to do: a real build, `make publish`, a review entry.
+- Resume: `git switch chore/lid-parse-guards`, `git rebase master`, then `make test`, `make all` on the real `DATA_DIR`, `make publish`, and the review entry.
+
+## Evidence page launch fixes, 2026-10-18
+
+- Status: branch `fix/evidence-page-launch`, cut from master `19a5a02` in the clone of the public repository. Three commits, one per phase: the Parked entry above, the publish guard with the republished copy, the summary strip with the repository link.
+- Source: the brief of 2026-10-16. A cold visit showed only the status line and two paragraphs, the published runs table named four commits a visitor cannot open, and nothing above the fold linked the repository.
+
+### Checked
+
+- Publish guard: `pipeline/publish.py` refuses when `gold/evidence` or `gold/dataset_manifest` records a commit that is neither HEAD nor an ancestor of it. The test writes one fake run with commit `0` times 40 and publish returns 1 with no manifest written. The five runs that were in `DATA_DIR/gold/evidence/` on 2026-10-16 with such commits sit in `DATA_DIR/quarantine/evidence/`, nothing deleted.
+- `make checks` on the real `DATA_DIR` at `19a5a02`: 40 s, run `01M586TTETJFYTDQEJFBDGV6ZH`, 111 checks, 108 pass, 3 flags, 0 blocking, as in every run since 2026-10-01. The run records `19a5a02`, which is master, so it resolves whatever a merge does to the branch commits.
+- `make publish`: 10 files, 81,162,454 bytes. Published runs: `01M44AVHADSBF6S1C1BHKPKCNP` at `07de296` and `01M586TTETJFYTDQEJFBDGV6ZH` at `19a5a02`. Both commits are in `git log master`, checked with `git merge-base --is-ancestor`.
+- The three republished marts differ from the committed copies only in the Parquet writer tag, DuckDB 1.5.6 before and 1.5.5 now: 2,241, 42 and 860,889 rows, `EXCEPT ALL` empty both ways. The dataset versions in `gold/dataset_manifest` changed for Silver and Gold because the digests are over the bytes.
+- Cold load over `python -m http.server` on a port the browser had not visited: the document, `manifest.json` and `summary.json` came over the wire, 20,382, 2,044 and 1,297 bytes transferred. `summary.json` finished 812 ms after navigation start and the strip paints from it; the engine import started at 817 ms, after the strip. Read from the browser's resource timing, not by eye. The engine modules were in the browser cache, which the strip does not wait for.
+- The whole page on that load: strip, "Recomputed in this browser from the verified files: identical", 6 Gold files matched, 67 checks rerun with 64 pass and 3 flagged, 2 runs in the runs table, no console messages.
+- `ruff check .` clean, `lint_doc` 0 dashes and 0 filler on `doc/spec.md`, `docs/manual.md` and this file, `make test` 120 passed after phase 1 and 122 after phase 2.
+- Verifier, clean clone at `9a7ef6e`, fresh `DATA_DIR`: `make lint` 20 pages pass, `make test` 122 passed in 24 s, `make all SYNTH=1` exit 0 in 24 s, 111 checks pass, 0 blocking, `publish` 9 files. Its `summary.json` reads 5 Gold datasets, 30,720,760 Bronze rows, 30,718,000 samples, 111 checks with 111 pass, commit `9a7ef6e`. The two bytes restored in `docs/index.html` below came after that clone; `make test` was run again on the final tree.
+
+### Failed, then fixed
+
+- The first timing was warm: the tab had loaded the page once when the server opened, so every file came back as `304`. A second server on another port gave the cold figures above.
+- The Parked entry was appended with LF line endings into a CRLF file; its lines are CRLF again in this commit.
+- `docs/index.html` is LF apart from two CRLF lines, and the phase 1 edit with `sed` flattened those two; this commit puts the two bytes back, so the page differs from master only where it was meant to.
+
+### Changed
+
+- `pipeline/publish.py`: the commit guard; `summary.json` from one statement over the Gold views, published with the statement and listed in `manifest.json`.
+- `docs/index.html`: the repository link and the strip under the heading, painted after `manifest.json` and a digest check on `summary.json` and before the engine is imported; the import is dynamic now; the summary statement runs again over the verified files at the end; the sentence under the runs table is gone.
+- `docs/data`: the two runs, `summary.json`, `manifest.json`, and Gold from the build of 2026-10-16 at `19a5a02`.
+- `doc/spec.md` sections 7 and 8, `docs/manual.md` sections 5 and 10: changed to follow the code.
+- Tests: 119 to 122.
+- `.gitignore` unchanged: `!/docs/data/**/*.json` already allows `summary.json`.
+
+### Not checked
+
+- The page on GitHub Pages; it deploys on merge.
+- A cold engine download: the CDN modules were cached in the browser used for the timing. The strip does not depend on them.
+- The pre-commit hook that `CLAUDE.md` describes is not installed in this clone: ruff, lint_doc and the tests were run by hand before each commit.

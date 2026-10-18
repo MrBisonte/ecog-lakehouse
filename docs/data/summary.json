@@ -1,0 +1,14 @@
+{
+ "sql": "WITH latest AS (SELECT * FROM gold_evidence WHERE run_id = (SELECT max(run_id) FROM gold_evidence))\nSELECT (SELECT count(DISTINCT dataset) FROM latest WHERE dataset LIKE 'gold/%') AS gold_datasets,\n       (SELECT sum(n_records)::BIGINT FROM gold_dataset_manifest WHERE layer = 1) AS bronze_rows,\n       (SELECT n_records FROM gold_dataset_manifest WHERE dataset = 'silver/recording') AS samples,\n       count(*) AS checks,\n       count(*) FILTER (WHERE result = 'pass') AS pass,\n       count(*) FILTER (WHERE result <> 'pass' AND severity = 'block') AS fail,\n       count(*) FILTER (WHERE result <> 'pass' AND severity = 'flag') AS flag,\n       strftime(min(ran_at), '%Y-%m-%d %H:%M:%S') AS ran_at,\n       left(any_value(git_commit), 7) AS git_commit\nFROM latest",
+ "values": {
+  "gold_datasets": 5,
+  "bronze_rows": 871169084,
+  "samples": 871159620,
+  "checks": 111,
+  "pass": 108,
+  "fail": 0,
+  "flag": 3,
+  "ran_at": "2026-10-18 19:11:50",
+  "git_commit": "19a5a02"
+ }
+}
