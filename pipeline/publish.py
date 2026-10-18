@@ -3,7 +3,8 @@
 A file holding a canary record (radioactive bit, spec 12.5) is refused before anything is
 copied, and so is a commit recorded in Gold that is not in the history of HEAD. Gold is copied
 from DATA_DIR; fault files under docs/data/faults are listed as found. checks.json and lid.sql
-let docs/index.html rerun the Gold checks in the browser (spec 8).
+let docs/index.html rerun the Gold checks in the browser, and summary.json holds the numbers it
+paints before the engine loads, with the statement that produced them (spec 8).
 """
 
 import argparse
@@ -22,6 +23,20 @@ TOTAL_LIMIT = 500 * 1024**2
 # Check kinds whose SQL needs only the Gold views, so the browser page (spec 8) can rerun them
 # over the published files. The others read DATA_DIR or the source files.
 BROWSER_KINDS = {"not_null", "unique", "row_count_min", "no_direct_identifier", "sql"}
+# The numbers the page paints before the engine loads, spec 8: one statement over the Gold
+# views, published with its result so the page can run it again over the verified files.
+SUMMARY_SQL = """\
+WITH latest AS (SELECT * FROM gold_evidence WHERE run_id = (SELECT max(run_id) FROM gold_evidence))
+SELECT (SELECT count(DISTINCT dataset) FROM latest WHERE dataset LIKE 'gold/%') AS gold_datasets,
+       (SELECT sum(n_records)::BIGINT FROM gold_dataset_manifest WHERE layer = 1) AS bronze_rows,
+       (SELECT n_records FROM gold_dataset_manifest WHERE dataset = 'silver/recording') AS samples,
+       count(*) AS checks,
+       count(*) FILTER (WHERE result = 'pass') AS pass,
+       count(*) FILTER (WHERE result <> 'pass' AND severity = 'block') AS fail,
+       count(*) FILTER (WHERE result <> 'pass' AND severity = 'flag') AS flag,
+       strftime(min(ran_at), '%Y-%m-%d %H:%M:%S') AS ran_at,
+       left(any_value(git_commit), 7) AS git_commit
+FROM latest"""
 
 
 def radioactive_rows(con, path: Path) -> int:
@@ -50,6 +65,12 @@ def unknown_commits(con) -> list[str]:
             capture_output=True, check=False,
         ).returncode != 0
     )
+
+
+def summary(con) -> dict:
+    """SUMMARY_SQL and its one row, as summary.json carries them."""
+    con.execute(SUMMARY_SQL)
+    return {"sql": SUMMARY_SQL, "values": dict(zip([d[0] for d in con.description], con.fetchone()))}
 
 
 def entry(rel: str, path: Path) -> dict:
@@ -93,6 +114,8 @@ def publish(out: Path) -> int:
     # from DATA_DIR; they count against the same limits and enter the manifest when present.
     for path in sorted((out / "faults").rglob("*.parquet")):
         files.append(entry(path.relative_to(out).as_posix(), path))
+    (out / "summary.json").write_text(json.dumps(summary(con), indent=1) + "\n")
+    files.append(entry("summary.json", out / "summary.json"))
     total = sum(f["bytes"] for f in files)
     over = [f["path"] for f in files if f["bytes"] > FILE_LIMIT]
     if over or total > TOTAL_LIMIT:

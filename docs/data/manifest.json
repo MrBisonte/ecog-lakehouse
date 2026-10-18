@@ -44,7 +44,12 @@
    "path": "faults/a/good/experiment=faces_basic/subject_pid=72d88db77f3716bb/data_1.parquet",
    "bytes": 5497814,
    "sha256": "d9ed8012154ac5cc10c3bee8b00d2a5497f13122e4c2b7bab5aeabf2324fdb67"
+  },
+  {
+   "path": "summary.json",
+   "bytes": 997,
+   "sha256": "67567850c4c98f244b03d9ac7965a115dbc7e018693d788239b9eab7e40a16a7"
   }
  ],
- "bytes": 81161457
+ "bytes": 81162454
 }

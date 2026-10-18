@@ -394,7 +394,7 @@ Targets:
 | `synth` | Generates synthetic files with the Bronze schema into `data/raw/synthetic/` (used when `data/raw/` is empty or `SYNTH=1`) |
 | `bronze`, `silver`, `gold` | Run the SQL in `sql/<layer>/` in order |
 | `checks` | Generate checks from contracts and requirements, run them, append to `gold/evidence` |
-| `publish` | Copy size-limited slices of Gold and the fault files to `docs/data/`, write `docs/data/manifest.json` |
+| `publish` | Copy size-limited slices of Gold and the fault files to `docs/data/`, write `docs/data/manifest.json` and `docs/data/summary.json`. Refuses a Gold file that holds a canary record (12.5), and a commit recorded in `gold/evidence` or `gold/dataset_manifest` that is not in the history of HEAD, because the page shows it |
 | `bench` | Run all `faults/*/bench.sh` and write `docs/bench.md` |
 | `all` | `bronze silver gold checks publish` |
 
@@ -402,12 +402,12 @@ Every SQL file is plain DuckDB SQL with `{{var}}` placeholders resolved by a 20-
 
 ## 8. Browser page
 
-`docs/index.html`, one file, DuckDB-WASM loaded from `cdn.jsdelivr.net` at a pinned version. On load it:
+`docs/index.html`, one file, DuckDB-WASM loaded from `cdn.jsdelivr.net` at a pinned version. Under the heading, a link to the repository. On load it:
 
-1. Reads `docs/data/manifest.json`.
+1. Reads `docs/data/manifest.json`, then `docs/data/summary.json`, hashes it and compares the digest with the manifest. A summary that matches is painted as one line under the heading before the engine downloads: Gold datasets, Bronze rows, samples, the checks of the latest run with its pass, fail and flagged counts, its time and its short commit. `publish` writes the file from one statement over the Gold views and publishes the statement with its values.
 2. Downloads each Gold Parquet file once, at a URL that carries its sha256 from the manifest, hashes the bytes and compares the digest with `manifest.json`. Only bytes that match are handed to DuckDB, so every query reads verified bytes.
 3. Runs the same check SQL the pipeline ran, from `docs/data/checks.json`.
-4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables.
+4. Renders the evidence table and the `experiment_summary` and `channel_quality` tables, then runs the published summary statement over the verified files and appends to the line whether the values are identical.
 
 While it loads, a progress bar and a status line name the step, 1 to 4: the engine download, verifying the Gold files, the checks, the summary tables. The engine step shows the bytes DuckDB-WASM reports and the bar stays indeterminate, because the total it reports is the compressed size. The Gold step advances by bytes received, the checks by count. Both disappear when the page is ready or has failed.
 
