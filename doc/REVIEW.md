@@ -789,3 +789,9 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 - The page on GitHub Pages; it deploys on merge.
 - A Bronze file torn in the middle of a write, with no footer. The views and the quarantine scan would both fail on it, as the views did before.
 - The pre-commit hook that `CLAUDE.md` describes is not installed in this clone: lint and tests were run by hand before each commit.
+
+## Parked, 2026-10-16
+
+- Branch `chore/lid-parse-guards`, last commit `635346a`, `wip: parked for launch fixes`, one commit above master `19a5a02`.
+- In flight: `sql/lineage/lid_generated.sql` copied from arch-standards as `make lineage` does. `lid_parse` refuses text outside the Crockford base32 alphabet and a first character above 7. Same macros and same bit layout, so no data was rebuilt for it. Still to do: a real build, `make publish`, a review entry.
+- Resume: `git switch chore/lid-parse-guards`, `git rebase master`, then `make test`, `make all` on the real `DATA_DIR`, `make publish`, and the review entry.
