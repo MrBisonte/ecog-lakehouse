@@ -1,0 +1,35 @@
+# The data flow SqlStoryLine draws of sql/, `make storyline`: Bronze, Silver, Gold and the lineage macros.
+# Views are named <layer>_<object> and files are written under {{data_dir}}/<layer>/<object>/, per
+# pipeline/db.py. The first mapping that matches wins.
+dialect: duckdb
+sources: ["sql/bronze/*.sql", "sql/silver/*.sql", "sql/gold/*.sql", "sql/lineage/*.sql"]
+placeholders:
+  - open: "{{"
+    close: "}}"
+    # Whole rows of a VALUES list, which a sentinel cannot stand for, SqlStoryLine ADR-0049.
+    values:
+      unit_scale_values: "('x', 1.0, 'y')"
+names:
+  # Temporary tables the Python steps below hand to SQL, DuckDB's own names for them.
+  - { match: "line_noise", name: "temp.main.line_noise" }
+  - { match: "src_<object>", name: "temp.main.src_<object>" }
+  # The key store, attached by pipeline/keyring.py as the database `keyring`.
+  - { match: "keyring.key_map", name: "keyring.main.key_map" }
+  - { match: "{{data_dir}}/<layer>/<object>/*", name: "dev_ecog.<layer>.<object>" }
+  - { match: "{{data_dir}}/<layer>/<object>", name: "dev_ecog.<layer>.<object>" }
+  - { match: "bronze_<object>", name: "dev_ecog.bronze.<object>" }
+  - { match: "silver_<object>", name: "dev_ecog.silver.<object>" }
+  - { match: "gold_<object>", name: "dev_ecog.gold.<object>" }
+  - { match: "lineage_<object>", name: "dev_ecog.lineage.<object>" }
+steps:
+  # Python reads each .mat file and registers its arrays as tables for the Bronze SQL.
+  - name: convert_mat
+    file: pipeline/convert_mat.py
+    operation: PARSE
+    writes: [src_recording, src_event, src_label, src_electrode]
+  # Python computes line_noise_ratio per Silver record and hands it to SQL as a table.
+  - name: line_noise
+    file: pipeline/line_noise.py
+    operation: INSERT
+    reads: [silver_record, silver_recording]
+    writes: [line_noise]
