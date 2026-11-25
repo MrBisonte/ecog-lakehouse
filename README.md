@@ -4,7 +4,7 @@
 
 The data flow of `sql/`, drawn by [SqlStoryLine](https://github.com/MrBisonte/sqlstoryline) and redrawn by `make storyline`:
 
-![The data flow of sql/ at overview zoom, left to right. Drawn by SqlStoryLine](docs/storyline.svg)
+[![The data flow of sql/ at overview zoom, left to right. Drawn by SqlStoryLine](docs/storyline.svg)](https://mrbisonte.github.io/ecog-lakehouse/storyline.svg)
 
 A lakehouse over public brain recordings: 42 files from the Stanford ECoG (electrocorticography) library, 2,241 channels, 860 million samples, stored as Parquet and built with DuckDB.
 
