@@ -41,7 +41,7 @@ def bronze(use_synth: bool) -> int:
 def silver() -> int:
     con = db.connect()
     codes = [r[0] for r in con.execute("SELECT DISTINCT subject_src FROM bronze_recording").fetchall()]
-    print(f"run: keyring, {keyring.pseudonymise(codes)} new pseudonyms")
+    print(f"run: keyring, {keyring.pseudonymise(codes, clock.utc_now)} new pseudonyms")
     con.execute(f"ATTACH '{keyring.path().as_posix()}' AS keyring (READ_ONLY)")
     units = ", ".join(
         f"('{e}', {u}, '{convert_mat.SCALE_BASIS[e]}')" for e, u in convert_mat.UV_PER_UNIT.items()

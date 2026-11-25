@@ -1,8 +1,8 @@
 import duckdb
 import pytest
 
-from pipeline import convert_mat, db, keyring, synth
-from tests.conftest import CHANNELS, FILES, SECONDS
+from pipeline import clock, convert_mat, db, keyring, synth
+from tests.conftest import CHANNELS, FILES, FIXED_TIME, SECONDS
 
 SPEC_RECORDING = [
     ("experiment", "VARCHAR"),
@@ -113,15 +113,29 @@ def test_canary_subject_is_in_silver_with_the_radioactive_bit(silver):
     ).fetchone()[0] > 0
 
 
+def test_the_keyring_stamps_its_rows_with_the_clock_it_is_handed(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    assert keyring.pseudonymise(["aa"], lambda: FIXED_TIME) == 1
+    keyring.host(lambda: FIXED_TIME)
+    keyring.reidentify("0000000000000000", "pytest", "unit test", lambda: FIXED_TIME)
+    con = keyring.open_keyring()
+    stamps = con.execute(
+        "SELECT created_at FROM key_map UNION ALL SELECT created_at FROM host_map "
+        "UNION ALL SELECT accessed_at FROM access_log"
+    ).fetchall()
+    con.close()
+    assert stamps == [(FIXED_TIME,)] * 3
+
+
 def test_reidentification_is_logged_before_it_answers(built):
     con = keyring.open_keyring()
     src, pid = con.execute("SELECT subject_src, subject_pid FROM key_map LIMIT 1").fetchone()
     assert con.execute("SELECT count(*) FROM secret").fetchone()[0] == 1
     con.close()
-    assert keyring.pseudonymise(synth.SUBJECTS) == 0, "a rerun adds no pseudonym"
-    assert keyring.pseudonymise([*synth.SUBJECTS, "zz"]) == 1
-    assert keyring.reidentify(pid, "pytest", "unit test") == src
-    assert keyring.reidentify("0000000000000000", "pytest", "unknown pid") is None
+    assert keyring.pseudonymise(synth.SUBJECTS, clock.utc_now) == 0, "a rerun adds no pseudonym"
+    assert keyring.pseudonymise([*synth.SUBJECTS, "zz"], clock.utc_now) == 1
+    assert keyring.reidentify(pid, "pytest", "unit test", clock.utc_now) == src
+    assert keyring.reidentify("0000000000000000", "pytest", "unknown pid", clock.utc_now) is None
     log = duckdb.connect(str(keyring.path()), read_only=True).execute(
         "SELECT actor, purpose, subject_pid FROM access_log ORDER BY accessed_at"
     ).fetchall()

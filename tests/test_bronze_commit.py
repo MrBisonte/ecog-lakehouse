@@ -76,7 +76,7 @@ def test_rerun_after_a_failure_ingests_once_and_quarantines_the_orphan(one_file,
 
 
 def test_a_keyring_failure_writes_nothing_to_bronze(one_file, monkeypatch):
-    def host():
+    def host(utc_now):
         raise RuntimeError("keyring.duckdb is held by another process")
 
     monkeypatch.setattr(keyring, "host", host)
