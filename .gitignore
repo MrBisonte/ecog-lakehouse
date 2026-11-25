@@ -2,6 +2,7 @@
 *
 !*/
 !.gitignore
+!.design.yaml
 !README.md
 !CONTRIBUTING.md
 !LICENSE
