@@ -124,6 +124,21 @@ def test_a_retention_check_is_refused_without_a_clock(write):
         checks.generate("test", "T-1", "retention", "silver/subject", {"max_age_days": 1})
 
 
+def test_a_retention_row_of_the_requirements_table_is_aged_by_the_clock_handed_in(write, tmp_path):
+    """A retention row needs no change to the code: the table reader always hands the clock on."""
+    path = write("silver/subject", "SELECT 'a' AS subject_pid, now()::TIMESTAMP AS first_seen_at")
+    written = datetime.fromtimestamp(path.stat().st_mtime, UTC).replace(tzinfo=None)
+    table = tmp_path / "requirements.csv"
+    table.write_text(
+        "framework,requirement_id,clause,control,check_kind,dataset,params,severity\n"
+        'T,T-1,a clause,a control,retention,silver/subject,"{""max_age_days"": 5}",block\n',
+        encoding="utf-8",
+    )
+    [check] = checks.from_requirements(lambda: written + timedelta(days=10), path=table)
+    [row] = checks.run(db.connect(), [check], ulid, clock.utc_now)
+    assert (row["result"], float(row["observed"]), row["expected"]) == ("fail", 10.0, "5")
+
+
 def test_a_run_carries_the_id_and_the_time_it_is_handed(write):
     write("silver/subject", "SELECT 'a' AS subject_pid, now()::TIMESTAMP AS first_seen_at")
     [check] = checks.generate("test", "T-1", "row_count_min", "silver/subject", {"min": 1})
