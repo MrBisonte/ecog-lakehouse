@@ -8,7 +8,7 @@ import argparse
 import shutil
 import sys
 
-from pipeline import clock, convert_mat, db, keyring, line_noise, manifest, synth
+from pipeline import clock, convert_mat, db, keyring, line_noise, manifest, settings, synth
 
 
 def run_files(con, paths, **values):
@@ -46,9 +46,15 @@ def silver() -> int:
     units = ", ".join(
         f"('{e}', {u}, '{convert_mat.SCALE_BASIS[e]}')" for e, u in convert_mat.UV_PER_UNIT.items()
     )
+    # What every Silver statement is handed: the unit scale, and the tuning values of settings.py.
+    values = {
+        "unit_scale_values": units,
+        "parquet_version": settings.PARQUET_VERSION,
+        "row_group_size": settings.ROW_GROUP_SIZE,
+    }
     files = layer_files("silver")
     recording = db.SQL / "silver" / "030_recording.sql"
-    run_files(con, [f for f in files if f < recording], unit_scale_values=units)
+    run_files(con, [f for f in files if f < recording], **values)
     # One plain COPY per partition keeps the sort order, see the note in 030_recording.sql.
     target = db.data_dir() / "silver" / "recording"
     shutil.rmtree(target)
@@ -61,13 +67,13 @@ def silver() -> int:
             con,
             recording,
             data_dir=db.data_dir().as_posix(),
-            unit_scale_values=units,
             experiment=experiment,
             subject_pid=subject_pid,
+            **values,
         )
     print(f"run: silver/{recording.name}, {len(partitions)} partitions")
     db.views(con)
-    run_files(con, [f for f in files if f > recording], unit_scale_values=units)
+    run_files(con, [f for f in files if f > recording], **values)
     return 0
 
 

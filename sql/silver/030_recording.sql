@@ -25,4 +25,4 @@ COPY (
       AND r.value_raw IS NOT NULL AND NOT isnan(r.value_raw)
     ORDER BY s.lid, r.sample_idx
 ) TO '{{data_dir}}/silver/recording/experiment={{experiment}}/subject_pid={{subject_pid}}/data_0.parquet'
-(FORMAT parquet, PARQUET_VERSION v2, ROW_GROUP_SIZE 198656);
+(FORMAT parquet, PARQUET_VERSION {{parquet_version}}, ROW_GROUP_SIZE {{row_group_size}});
