@@ -25,6 +25,7 @@ One entry per phase. What was checked, what failed, what changed.
 | 2026-10-04 | [Parquet version 2 for Silver](#parquet-version-2-for-silver-2026-10-04) | `feat/silver-parquet-v2` | Silver written as Parquet version 2, rebuilt in place, Fault A's fixed layout republished |
 | 2026-10-04 | [Benches over Pages after ADR-0007](#benches-over-pages-after-adr-0007-2026-10-04) | `docs/bench-pages-after-v2` | The fault benches rerun on the files published by the Parquet version 2 change |
 | 2026-10-04 | [Three review findings](#three-review-findings-2026-10-04) | `integration/review-first-three` | The audit row commits a Bronze ingest, the page verifies each file before it reads it, a dataset is hashed once per run |
+| 2026-11-25 | [Design gate](#design-gate-2026-11-25) | `feat/design-gate` | Design scan of arch-standards adopted: 33 findings, 23 fixed, 10 excepted |
 
 ## Phase 0, skeleton
 
@@ -831,4 +832,62 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 - The page on GitHub Pages; it deploys on merge.
 - A cold engine download: the CDN modules were cached in the browser used for the timing. The strip does not depend on them.
+- The pre-commit hook that `CLAUDE.md` describes is not installed in this clone: ruff, lint_doc and the tests were run by hand before each commit.
+
+## Design gate, 2026-11-25
+
+- Status: branch `feat/design-gate`, cut from master `513d285`. Fourteen commits, one for each change, then this entry.
+- Source: the design rules of arch-standards, `code/design/SPEC.md`. A text scan of that repository checks rules 1, 2, 9 and 10 against `.design.yaml`. It ran from a checkout at `c3dfcc6`. No file of that repository is in this one.
+- Alex chose: the Silver writers are fixed on this branch, and the four lines `docs/five-records.md` quotes from them follow.
+
+### Found
+
+The first run of the scan, before any change, with no settings home and no exception declared: 33 findings, exit 1.
+
+| Rule | Findings | Where |
+|---|---|---|
+| 1, a tuning value outside the settings home | 14 | `sql/silver/` 6, `pipeline/fetch.py` 1, `faults/` 7 |
+| 2, an engine named where a result is decided | 0 | |
+| 9, a write with no column list | 12 | `pipeline/` 11, `sql/lineage/lid_extras.sql` 1 |
+| 10, a connection, a clock or an id source read in place | 7 | `pipeline/` 5, `faults/` 2 |
+
+### Changed
+
+- Rule 9, 12 of 12 fixed. Every insert names its columns. The evidence run and the manifest write through one helper, `db.stage_rows`: each value lands under the name of its key, and a row whose keys are not exactly the columns of its contract is refused.
+- Rule 10, 4 of 7 fixed. `pipeline/clock.py` reads the wall clock that stamps a row. `checks.run`, `convert_mat.convert`, `manifest.write` and the check generator take it as the argument `utc_now`, handed in by their entry points. `checks.run` and `convert_mat.convert` take the id source the same way, as `new_id`.
+- The keyring takes the clock too, which the scan did not ask for: `key_map.created_at` is what Silver reads as `first_seen_at`. `pipeline/lid.py`, the id source, is the one other reader of the clock, for the time bits of a ULID.
+- The generator needs the clock for the `retention` kind only and refuses a retention check without one. `from_requirements` and `from_contracts` always take it, so spec 5.1 holds: a retention row added to `governance/requirements.csv` needs no change to the code.
+- Rule 10, 3 excepted: the engine in memory that `checks.validate` opens to parse generated SQL, and two bench scripts under `faults/` that open the engine they measure.
+- Rule 1, 7 of 14 fixed. `pipeline/settings.py` is the settings home. The five Silver writers take `PARQUET_VERSION` and `ROW_GROUP_SIZE` as the placeholders `parquet_version` and `row_group_size`, handed in by `run.silver`. The download timeout is `FETCH_TIMEOUT_S`. Two values the scan does not see moved as well: the bytes a download copies at a time, and DuckDB's `preserve_insertion_order`.
+- Rule 1, 7 excepted, all under `faults/`: the row group size Fault A plants, the two values of its fix as spec 6 prints them, the encodings measurement of that layout, and three timeouts in the plants of Faults D and F. A planted fault is never fixed.
+- `.design.yaml`, with nine exceptions that each name their text and their reason. `.gitignore` allows it. README, "Design rules": the four rules checked, and how the scan runs from a checkout, reached through `ARCH_STANDARDS`.
+- `docs/five-records.md`: the four lines it quotes from `sql/silver/020_record.sql`, `030_recording.sql`, `040_electrode.sql` and `050_event.sql`.
+- Tests: 122 to 129. The retention test hands in a fixed clock in place of ageing a file. New: a retention check with no clock is refused, a retention row of a requirements table is aged by the clock handed in, an evidence run, an ingest, the manifest and the keyring each carry the time they are handed, and a row that differs from its contract is refused.
+
+### Checked
+
+- The scan on the final tree: `design: pass, 0 findings, 0 stale exceptions`, exit 0.
+- The five Silver statements, rendered from the files before and after the change with the values of `pipeline/settings.py`: 5 of 5 are the same text.
+- Verifier, clean clone at `6846c03` in WSL, fresh `DATA_DIR`, Python 3.14.4, DuckDB 1.5.5: `make lint` exit 0, ruff clean, 20 pages pass; `make test` 129 passed in 21.36 s; `make all SYNTH=1` exit 0 in 20.08 s, run `01M8918F0V5TFXGBD87T4G00X1`, 111 checks pass, 0 blocking, `publish` 9 files, 70,572,494 bytes; the scan on the clone passes. Its `summary.json` reads 5 Gold datasets, 30,720,760 Bronze rows, 30,718,000 samples, 111 checks with 111 pass, commit `6846c03`.
+- Master `513d285` from a clean clone in the same environment: 122 passed.
+- The diff against `origin/master`: 0 absolute paths, 0 lines with the private marker of arch-standards, 0 files that also exist under its `scripts/`. The checkout of arch-standards was clean after the runs.
+- An independent review of the branch against the design rules, the spec and `CLAUDE.md`. Its findings in the diff are the next section.
+
+### Failed, then fixed
+
+- Naming the columns of the evidence and manifest inserts removed a guard the positional form had by accident: a column added to the contract and not to the row no longer failed on the value count, it was written as NULL. `db.stage_rows` refuses it.
+- The keyring still stamped its rows from the clock in place, so a converter handed a fixed time stamped a new host from the wall clock. The keyring takes `utc_now`.
+- `publish` took a clock that nothing on its path read, and no test drove it. The parameter is gone, and `browser_checks` hands the generator its clock.
+- Comments that were not true of their code: `pipeline/clock.py` said no other module read the clock, `pipeline/settings.py` said a value there never changes a result when it changes the bytes of a file and so the `dataset_version`, the README said the pipeline follows the design rules when four are checked, and three comments of `.design.yaml` misdescribed the lines under them.
+- `bench_doc.main` and `checks.run` had grown past forty lines. Each lost one responsibility to a function of its own.
+- The scan reads a bare `now()` as a clock read, and it read the parameter that carries the clock the same way: four findings on the lines the fix had written. The parameter is named `utc_now`, as the function handed to it.
+- Ruff refused a fixed time built without a zone in three tests, DTZ001. One constant in `tests/conftest.py`, `FIXED_TIME`, is built from UTC as `pipeline/clock.py` reads it.
+
+### Not checked
+
+- `make test` passes from a clone only. In a git worktree made on Windows and read from WSL, git cannot resolve the worktree, the commit reads `unknown`, and four publish tests fail on the guard against a commit outside the history, on master as on this branch.
+- `make all` on the real `DATA_DIR`, `make publish` and `make bench`. No fault file changed, and the Silver statements are the same text.
+- The rules the scan does not check: 3 to 8 and 11 to 13. Nothing was changed for them.
+- No ADR records the adoption, and `CLAUDE.md` carries no line for the design rules. Both wait for a decision.
+- The scan in CI: it runs only on a machine that holds a checkout of arch-standards.
 - The pre-commit hook that `CLAUDE.md` describes is not installed in this clone: ruff, lint_doc and the tests were run by hand before each commit.
