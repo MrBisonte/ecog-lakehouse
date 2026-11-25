@@ -29,7 +29,7 @@ def download(url: str, target: Path):
     with urlopen(request, timeout=settings.FETCH_TIMEOUT_S) as response:
         resume = have > 0 and response.status == 206
         with target.open("ab" if resume else "wb") as f:
-            shutil.copyfileobj(response, f, 1 << 20)
+            shutil.copyfileobj(response, f, settings.FETCH_CHUNK_BYTES)
 
 
 def extract(archive: Path):
