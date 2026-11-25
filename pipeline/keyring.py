@@ -48,7 +48,7 @@ def open_keyring():
         "(accessed_at TIMESTAMP, actor VARCHAR, purpose VARCHAR, subject_pid VARCHAR)"
     )
     if not con.execute("SELECT count(*) FROM secret").fetchone()[0]:
-        con.execute("INSERT INTO secret VALUES (?)", [secrets.token_hex(32)])
+        con.execute("INSERT INTO secret (hex) VALUES (?)", [secrets.token_hex(32)])
     return con
 
 
@@ -64,7 +64,8 @@ def pseudonymise(codes) -> int:
     new = sorted(set(codes) - known)
     if new:
         con.executemany(
-            "INSERT INTO key_map VALUES (?, ?, ?)", [(c, pid(secret, c), now()) for c in new]
+            "INSERT INTO key_map (subject_src, subject_pid, created_at) VALUES (?, ?, ?)",
+            [(c, pid(secret, c), now()) for c in new],
         )
     con.close()
     return len(new)
@@ -88,7 +89,10 @@ def host() -> str:
     src = host_source()
     pseudonym = pid(secret, src)
     if not con.execute("SELECT count(*) FROM host_map WHERE host_src = ?", [src]).fetchone()[0]:
-        con.execute("INSERT INTO host_map VALUES (?, ?, ?)", [src, pseudonym, now()])
+        con.execute(
+            "INSERT INTO host_map (host_src, host_pid, created_at) VALUES (?, ?, ?)",
+            [src, pseudonym, now()],
+        )
     con.close()
     return pseudonym
 
@@ -96,7 +100,10 @@ def host() -> str:
 def reidentify(subject_pid: str, actor: str, purpose: str) -> str | None:
     """Log first, then answer. The log row exists even when the pseudonym is unknown."""
     con = open_keyring()
-    con.execute("INSERT INTO access_log VALUES (?, ?, ?, ?)", [now(), actor, purpose, subject_pid])
+    con.execute(
+        "INSERT INTO access_log (accessed_at, actor, purpose, subject_pid) VALUES (?, ?, ?, ?)",
+        [now(), actor, purpose, subject_pid],
+    )
     row = con.execute(
         "SELECT subject_src FROM key_map WHERE subject_pid = ?", [subject_pid]
     ).fetchone()

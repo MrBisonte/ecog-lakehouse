@@ -39,7 +39,11 @@ def write(con) -> int:
         if d != DATASET and any((db.data_dir() / d).rglob("*.parquet"))
     ]
     con.execute(f"CREATE OR REPLACE TEMP TABLE manifest_build ({db.columns(DATASET)})")
-    con.executemany("INSERT INTO manifest_build VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    con.executemany(
+        "INSERT INTO manifest_build (dataset_version, dataset, layer, lid_lo, lid_hi, n_records, "
+        "file_digests, produced_at, git_commit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
     target = db.data_dir() / DATASET / "data_0.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
     con.execute(f"COPY (SELECT * FROM manifest_build ORDER BY dataset) TO '{target.as_posix()}' (FORMAT parquet)")

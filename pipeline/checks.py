@@ -249,9 +249,11 @@ def run(con, checks: list[Check]) -> list[dict]:
     target = db.data_dir() / "gold" / "evidence" / f"run_id={run_id}"
     target.mkdir(parents=True)
     con.execute(f"CREATE OR REPLACE TEMP TABLE evidence_run ({db.columns('gold/evidence')})")
+    # Each value lands under the name of its key, whatever the column order of the contract.
+    columns = list(rows[0])
     con.executemany(
-        f"INSERT INTO evidence_run VALUES ({', '.join('?' * len(rows[0]))})",
-        [tuple(r.values()) for r in rows],
+        f"INSERT INTO evidence_run ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})",
+        [tuple(r[c] for c in columns) for r in rows],
     )
     con.execute(f"COPY evidence_run TO '{(target / 'data_0.parquet').as_posix()}' (FORMAT parquet)")
     db.views(con)

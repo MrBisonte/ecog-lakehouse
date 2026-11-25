@@ -232,13 +232,16 @@ def stage(con, src: Source):
         {"sample_idx": onsets.astype(np.int32), "event_code": src.stim[onsets].astype(np.int16)},
     )
     con.execute("CREATE OR REPLACE TEMP TABLE src_label (event_code SMALLINT, event_label VARCHAR)")
-    con.executemany("INSERT INTO src_label VALUES (?, ?)", list(src.labels.items()) or [(None, None)])
+    con.executemany(
+        "INSERT INTO src_label (event_code, event_label) VALUES (?, ?)",
+        list(src.labels.items()) or [(None, None)],
+    )
     con.execute(
         "CREATE OR REPLACE TEMP TABLE src_electrode "
         "(channel_idx SMALLINT, x_mm FLOAT, y_mm FLOAT, z_mm FLOAT, brain_area VARCHAR)"
     )
     con.executemany(
-        "INSERT INTO src_electrode VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO src_electrode (channel_idx, x_mm, y_mm, z_mm, brain_area) VALUES (?, ?, ?, ?, ?)",
         [
             (
                 c,
