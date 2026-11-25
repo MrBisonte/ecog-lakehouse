@@ -8,7 +8,6 @@ The generator refuses SQL that does not parse and predicates nested deeper than 
 import csv
 import json
 import sys
-import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from fnmatch import fnmatch
@@ -16,7 +15,7 @@ from fnmatch import fnmatch
 import duckdb
 import yaml
 
-from pipeline import db
+from pipeline import clock, db
 from pipeline.lid import ulid
 
 REQUIREMENTS = db.REPO / "governance" / "requirements.csv"
@@ -73,9 +72,13 @@ class Check:
     compare: str
 
 
-def oldest_age_days(dataset: str) -> float:
+def oldest_age_days(dataset: str, utc_now) -> float:
+    """Days from the oldest Parquet file of the dataset to the clock handed in, 0 with no file."""
     files = list((db.data_dir() / dataset).rglob("*.parquet"))
-    return (time.time() - min(p.stat().st_mtime for p in files)) / 86400 if files else 0.0
+    if not files:
+        return 0.0
+    oldest = datetime.fromtimestamp(min(p.stat().st_mtime for p in files), UTC).replace(tzinfo=None)
+    return (utc_now() - oldest).total_seconds() / 86400
 
 
 def template_name(kind: str, severity: str) -> str:
@@ -83,8 +86,9 @@ def template_name(kind: str, severity: str) -> str:
     return "sql_flag" if kind == "sql" and severity == "flag" else kind
 
 
-def template_values(kind: str, dataset: str, params: dict, severity: str = "block"):
-    """Placeholder values for the kind's template, and the expected value."""
+def template_values(kind: str, dataset: str, params: dict, severity: str = "block", utc_now=None):
+    """Placeholder values for the kind's template, and the expected value. `utc_now` is the clock a
+    retention check ages its files against; no other kind reads it."""
     values = {
         "view": db.view_name(dataset),
         "dataset": dataset,
@@ -106,7 +110,12 @@ def template_values(kind: str, dataset: str, params: dict, severity: str = "bloc
             values["max_rows_per_row_group"] = params["max_rows_per_row_group"]
             values["min_row_groups"] = params["min_row_groups"]
         case "retention":
-            values["oldest_age_days"] = round(oldest_age_days(dataset), 3)
+            if utc_now is None:
+                raise ValueError(
+                    "a retention check ages a file against a clock and none was handed in, "
+                    "pass utc_now=clock.utc_now to the generator, see pipeline/clock.py"
+                )
+            values["oldest_age_days"] = round(oldest_age_days(dataset, utc_now), 3)
             expected = params["max_age_days"]
         case "sql":
             # Thresholds live in the requirement row beside the query, never in this file.
@@ -140,20 +149,21 @@ def validate(sql: str) -> str:
 
 
 def generate(framework, requirement_id, check_kind, dataset, params, clause=None,
-             control=None, severity="block") -> list[Check]:
+             control=None, severity="block", utc_now=None) -> list[Check]:
     """One check per dataset matching the pattern; `gold/*` expands to every Gold dataset.
 
     `clause` and `control` are the regulation text and the plain sentence of a requirement row.
     A contract rule has no clause, and its sentence comes from CONTROL. A threshold is written
     once, in `params`, and both the query and the sentence read it from there.
     `severity` is `block` or `flag`; a flag check reports its offending records instead of a count.
+    `utc_now` is the clock of the run. Only a retention check needs it, and is refused without it.
     """
     if severity not in ("block", "flag"):
         raise ValueError(f"severity is 'block' or 'flag', not '{severity}', see doc/spec.md 5.3")
     names = [d for d in db.DATASETS if fnmatch(d, dataset)] or [dataset]
     checks = []
     for name in names:
-        values, expected = template_values(check_kind, name, params, severity)
+        values, expected = template_values(check_kind, name, params, severity, utc_now)
         template = (db.SQL / "checks" / f"{template_name(check_kind, severity)}.sql").read_text(
             encoding="utf-8")
         sql = validate(db.render(template, **values))
@@ -167,7 +177,8 @@ def generate(framework, requirement_id, check_kind, dataset, params, clause=None
     return checks
 
 
-def from_requirements(path=REQUIREMENTS) -> list[Check]:
+def from_requirements(utc_now, path=REQUIREMENTS) -> list[Check]:
+    """Every requirement row as its checks. `utc_now` is the clock a retention row is aged against."""
     with path.open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     return [
@@ -175,13 +186,14 @@ def from_requirements(path=REQUIREMENTS) -> list[Check]:
         for row in rows
         for c in generate(
             row["framework"], row["requirement_id"], row["check_kind"], row["dataset"],
-            json.loads(row["params"]), row["clause"], row["control"], row["severity"],
+            json.loads(row["params"]), row["clause"], row["control"], row["severity"], utc_now,
         )
     ]
 
 
-def from_contracts(folder=CONTRACTS) -> list[Check]:
-    """required and unique properties, and every ecog-lakehouse quality rule, become checks."""
+def from_contracts(utc_now, folder=CONTRACTS) -> list[Check]:
+    """required and unique properties, and every ecog-lakehouse quality rule, become checks.
+    `utc_now` is the clock a retention rule is aged against."""
     checks = []
     for path in sorted(folder.glob("*.yaml")):
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -196,7 +208,7 @@ def from_contracts(folder=CONTRACTS) -> list[Check]:
             if rule.get("engine") == "ecog-lakehouse":
                 rules.append((rule["implementation"]["check_kind"], rule["implementation"]["params"]))
         for kind, params in rules:
-            checks += generate("contract", doc["id"], kind, doc["name"], params)
+            checks += generate("contract", doc["id"], kind, doc["name"], params, utc_now=utc_now)
     return checks
 
 
@@ -209,10 +221,11 @@ def passes(compare: str, observed: str, expected: str) -> bool:
     return {"eq": o == e, "ge": o >= e, "le": o <= e}[compare]
 
 
-def run(con, checks: list[Check]) -> list[dict]:
-    """Run every check, append one evidence file for this run, return the evidence rows."""
-    run_id = ulid()
-    ran_at = datetime.now(UTC).replace(tzinfo=None)
+def run(con, checks: list[Check], new_id, utc_now) -> list[dict]:
+    """Run every check, append one evidence file for this run, return the evidence rows.
+    `new_id` mints the run_id and `utc_now` stamps ran_at; the entry point hands both in."""
+    run_id = new_id()
+    ran_at = utc_now()
     versions = {}
     rows = []
     for c in checks:
@@ -262,7 +275,8 @@ def run(con, checks: list[Check]) -> list[dict]:
 
 def main(argv=None) -> int:
     con = db.connect()
-    rows = run(con, from_requirements() + from_contracts())
+    generated = from_requirements(clock.utc_now) + from_contracts(clock.utc_now)
+    rows = run(con, generated, ulid, clock.utc_now)
     for r in rows:
         if r["result"] != "pass":
             print(f"checks: {r['result']} {r['severity']} {r['check_id']} "

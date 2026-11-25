@@ -1,13 +1,14 @@
 """One unit test per check kind of spec 5.2, on tiny datasets in a temporary DATA_DIR."""
 
 import hashlib
-import os
-import time
+from datetime import UTC, datetime, timedelta
 
 import duckdb
 import pytest
 
-from pipeline import checks, db
+from pipeline import checks, clock, db
+from pipeline.lid import ulid
+from tests.conftest import FIXED_TIME
 
 
 @pytest.fixture
@@ -24,9 +25,9 @@ def write(tmp_path, monkeypatch):
     return _write
 
 
-def outcome(kind, dataset, params, severity="block"):
-    [check] = checks.generate("test", "T-1", kind, dataset, params, severity=severity)
-    [row] = checks.run(db.connect(), [check])
+def outcome(kind, dataset, params, severity="block", utc_now=clock.utc_now):
+    [check] = checks.generate("test", "T-1", kind, dataset, params, severity=severity, utc_now=utc_now)
+    [row] = checks.run(db.connect(), [check], ulid, utc_now)
     return row["result"], row["observed"], row["expected"]
 
 
@@ -107,12 +108,30 @@ def test_partition_layout(write):
 
 
 def test_retention(write):
+    """The age is measured against the clock the generator is handed, so no file is aged."""
     path = write("silver/subject", "SELECT 'a' AS subject_pid, now()::TIMESTAMP AS first_seen_at")
-    assert outcome("retention", "silver/subject", {"max_age_days": 1})[0] == "pass"
-    old = time.time() - 10 * 86400
-    os.utime(path, (old, old))
-    result, observed, expected = outcome("retention", "silver/subject", {"max_age_days": 5})
-    assert result == "fail" and float(observed) > 9.9 and expected == "5"
+    written = datetime.fromtimestamp(path.stat().st_mtime, UTC).replace(tzinfo=None)
+    assert outcome("retention", "silver/subject", {"max_age_days": 1}, utc_now=lambda: written)[0] == "pass"
+    result, observed, expected = outcome(
+        "retention", "silver/subject", {"max_age_days": 5}, utc_now=lambda: written + timedelta(days=10)
+    )
+    assert result == "fail" and float(observed) == 10.0 and expected == "5"
+
+
+def test_a_retention_check_is_refused_without_a_clock(write):
+    write("silver/subject", "SELECT 'a' AS subject_pid, now()::TIMESTAMP AS first_seen_at")
+    with pytest.raises(ValueError, match="pass utc_now=clock.utc_now"):
+        checks.generate("test", "T-1", "retention", "silver/subject", {"max_age_days": 1})
+
+
+def test_a_run_carries_the_id_and_the_time_it_is_handed(write):
+    write("silver/subject", "SELECT 'a' AS subject_pid, now()::TIMESTAMP AS first_seen_at")
+    [check] = checks.generate("test", "T-1", "row_count_min", "silver/subject", {"min": 1})
+    run_id = "01TESTRVN00000000000000000"
+    [row] = checks.run(db.connect(), [check], lambda: run_id, lambda: FIXED_TIME)
+    assert (row["run_id"], row["ran_at"]) == (run_id, FIXED_TIME)
+    stored = db.connect().execute("SELECT run_id, ran_at FROM gold_evidence").fetchall()
+    assert stored == [(run_id, FIXED_TIME)]
 
 
 def test_sql(write):
@@ -130,7 +149,7 @@ def test_a_dataset_is_hashed_once_per_run(write, monkeypatch):
         c for column in ("subject_pid", "first_seen_at")
         for c in checks.generate("test", "T-1", "not_null", "silver/subject", {"column": column})
     ]
-    rows = checks.run(db.connect(), generated)
+    rows = checks.run(db.connect(), generated, ulid, clock.utc_now)
     assert hashed == ["silver/subject"]
     # spec 5.3: the digest of the sorted list of file digests, here a list of one.
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -156,14 +175,14 @@ def test_gold_star_expands_to_every_gold_dataset_and_error_is_recorded(tmp_path,
     assert [c.dataset for c in generated] == [d for d in db.DATASETS if d.startswith("gold/")]
     assert len({c.check_id for c in generated}) == len(generated)
     [bad] = checks.generate("g", "G", "sql", "silver/subject", {"sql": "SELECT 1 FROM no_such_view"})
-    [row] = checks.run(db.connect(), [bad])
+    [row] = checks.run(db.connect(), [bad], ulid, clock.utc_now)
     assert (row["result"], row["observed"], row["expected"]) == ("error", None, None)
 
 
 def test_every_check_carries_one_plain_sentence():
     """A reader who does not read SQL still learns what each check asserts."""
-    from_csv = checks.from_requirements()
-    from_yaml = checks.from_contracts()
+    from_csv = checks.from_requirements(clock.utc_now)
+    from_yaml = checks.from_contracts(clock.utc_now)
     assert all(c.control for c in from_csv + from_yaml)
     # a requirement row's own words, verbatim, clause and all
     gdpr = next(c for c in from_csv if c.framework == "GDPR-Art9")
@@ -208,4 +227,6 @@ def test_every_check_declares_whether_a_failure_blocks(built):
         "WHERE run_id = (SELECT max(run_id) FROM gold_evidence) ORDER BY 1"
     ).fetchall()
     assert kinds and all(k[0] in ("block", "flag") for k in kinds)
-    assert all(c.severity == "block" for c in checks.from_contracts()), "a contract rule blocks"
+    assert all(
+        c.severity == "block" for c in checks.from_contracts(clock.utc_now)
+    ), "a contract rule blocks"

@@ -14,20 +14,15 @@ import hmac
 import platform
 import secrets
 import socket
-from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
 
-from pipeline import db
+from pipeline import clock, db
 
 
 def path():
     return db.data_dir() / "keyring.duckdb"
-
-
-def now():
-    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def open_keyring():
@@ -65,7 +60,7 @@ def pseudonymise(codes) -> int:
     if new:
         con.executemany(
             "INSERT INTO key_map (subject_src, subject_pid, created_at) VALUES (?, ?, ?)",
-            [(c, pid(secret, c), now()) for c in new],
+            [(c, pid(secret, c), clock.utc_now()) for c in new],
         )
     con.close()
     return len(new)
@@ -91,7 +86,7 @@ def host() -> str:
     if not con.execute("SELECT count(*) FROM host_map WHERE host_src = ?", [src]).fetchone()[0]:
         con.execute(
             "INSERT INTO host_map (host_src, host_pid, created_at) VALUES (?, ?, ?)",
-            [src, pseudonym, now()],
+            [src, pseudonym, clock.utc_now()],
         )
     con.close()
     return pseudonym
@@ -102,7 +97,7 @@ def reidentify(subject_pid: str, actor: str, purpose: str) -> str | None:
     con = open_keyring()
     con.execute(
         "INSERT INTO access_log (accessed_at, actor, purpose, subject_pid) VALUES (?, ?, ?, ?)",
-        [now(), actor, purpose, subject_pid],
+        [clock.utc_now(), actor, purpose, subject_pid],
     )
     row = con.execute(
         "SELECT subject_src FROM key_map WHERE subject_pid = ?", [subject_pid]

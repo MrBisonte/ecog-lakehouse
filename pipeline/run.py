@@ -8,7 +8,7 @@ import argparse
 import shutil
 import sys
 
-from pipeline import convert_mat, db, keyring, line_noise, manifest, synth
+from pipeline import clock, convert_mat, db, keyring, line_noise, manifest, synth
 
 
 def run_files(con, paths, **values):
@@ -75,7 +75,7 @@ def gold() -> int:
     con = db.connect()
     print(f"run: line noise on {line_noise.register(con)} records")
     run_files(con, layer_files("gold"))
-    print(f"run: gold/dataset_manifest, {manifest.write(con)} datasets")
+    print(f"run: gold/dataset_manifest, {manifest.write(con, clock.utc_now)} datasets")
     return 0
 
 

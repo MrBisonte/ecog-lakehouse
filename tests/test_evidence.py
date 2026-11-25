@@ -1,6 +1,7 @@
 import hashlib
 
-from pipeline import checks, db
+from pipeline import checks, clock, db
+from pipeline.lid import ulid
 
 
 def evidence_files(root):
@@ -45,9 +46,9 @@ def test_no_direct_identifier_fails_when_subject_src_leaks_into_silver(built, tm
     )
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     gdpr = [
-        c for c in checks.from_requirements()
+        c for c in checks.from_requirements(clock.utc_now)
         if c.check_kind == "no_direct_identifier" and c.dataset == "silver/recording"
     ]
     assert len(gdpr) == 1
-    [row] = checks.run(db.connect(), gdpr)
+    [row] = checks.run(db.connect(), gdpr, ulid, clock.utc_now)
     assert (row["result"], row["observed"], row["expected"]) == ("fail", "1", "0")

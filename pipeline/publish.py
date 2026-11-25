@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pipeline import checks, db
+from pipeline import checks, clock, db
 
 FILE_LIMIT = 95 * 1024**2
 TOTAL_LIMIT = 500 * 1024**2
@@ -77,19 +77,20 @@ def entry(rel: str, path: Path) -> dict:
     return {"path": rel, "bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
-def browser_checks() -> list[dict]:
-    """The checks the page reruns: Gold datasets, kinds that need only the views and lid.sql."""
+def browser_checks(utc_now) -> list[dict]:
+    """The checks the page reruns: Gold datasets, kinds that need only the views and lid.sql.
+    `utc_now` is the clock the generator is handed, see pipeline/checks.py."""
     return [
         {"check_id": c.check_id, "requirement_id": c.requirement_id, "framework": c.framework,
          "dataset": c.dataset, "check_kind": c.check_kind, "severity": c.severity,
          "clause": c.clause, "control": c.control, "sql": c.sql, "expected": c.expected,
          "compare": c.compare}
-        for c in checks.from_requirements() + checks.from_contracts()
+        for c in checks.from_requirements(utc_now) + checks.from_contracts(utc_now)
         if c.dataset.startswith("gold/") and c.check_kind in BROWSER_KINDS
     ]
 
 
-def publish(out: Path) -> int:
+def publish(out: Path, utc_now) -> int:
     gold = db.data_dir() / "gold"
     sources = sorted(gold.rglob("*.parquet"))
     con = db.connect()
@@ -122,7 +123,7 @@ def publish(out: Path) -> int:
         print(f"publish: refused, over the limit: files {over}, total {total} bytes")
         return 1
     (out / "manifest.json").write_text(json.dumps({"files": files, "bytes": total}, indent=1) + "\n")
-    (out / "checks.json").write_text(json.dumps(browser_checks(), indent=1) + "\n")
+    (out / "checks.json").write_text(json.dumps(browser_checks(utc_now), indent=1) + "\n")
     shutil.copyfile(db.SQL / "lineage" / "lid_generated.sql", out / "lid.sql")
     print(f"publish: {len(files)} files, {total} bytes, manifest at {out / 'manifest.json'}")
     return 0
@@ -137,7 +138,7 @@ def main(argv=None) -> int:
         "install can point at another checkout, which must not be written to",
     )
     args = parser.parse_args(argv)
-    return publish(Path(args.out))
+    return publish(Path(args.out), clock.utc_now)
 
 
 if __name__ == "__main__":

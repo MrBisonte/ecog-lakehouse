@@ -4,8 +4,6 @@ digest gold/evidence uses; lid_lo and lid_hi bound the records; file_digests lis
 of the source files those records came from.
 """
 
-from datetime import UTC, datetime
-
 from pipeline import db
 
 LAYER = {"bronze": 1, "silver": 2, "gold": 3}
@@ -29,9 +27,10 @@ def row(con, dataset: str, produced_at, commit: str) -> tuple:
             produced_at, commit)
 
 
-def write(con) -> int:
-    """One row per dataset that exists on disk, this dataset excluded. Returns rows written."""
-    produced_at = datetime.now(UTC).replace(tzinfo=None)
+def write(con, utc_now) -> int:
+    """One row per dataset that exists on disk, this dataset excluded. Returns rows written.
+    `utc_now` is the clock that stamps produced_at, handed in by the entry point."""
+    produced_at = utc_now()
     commit = db.git_commit()
     rows = [
         row(con, d, produced_at, commit)
