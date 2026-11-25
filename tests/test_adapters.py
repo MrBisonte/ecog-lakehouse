@@ -3,7 +3,7 @@
 import numpy as np
 from scipy.io import savemat
 
-from pipeline import clock, convert_mat, db
+from pipeline import clock, convert_mat, db, keyring
 from pipeline.lid import ulid
 from tests.conftest import FIXED_TIME
 
@@ -95,13 +95,7 @@ def test_faces_basic_converts_with_null_locations(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     path = write_faces_basic(tmp_path)
     con = db.connect()
-    ingest_id = "01TEST1NGEST00000000000000"
-    written = convert_mat.convert(
-        con, path, convert_mat.read_faces_basic, lambda: ingest_id, lambda: FIXED_TIME
-    )
-    assert written == 9000
-    audit = con.execute("SELECT ingest_id, ingested_at FROM bronze_ingest_audit").fetchall()
-    assert audit == [(ingest_id, FIXED_TIME)], "the id and the time the converter was handed"
+    assert convert_mat.convert(con, path, convert_mat.read_faces_basic, ulid, clock.utc_now) == 9000
     electrodes = con.execute(
         "SELECT channel_idx, x_mm, y_mm, z_mm, brain_area FROM bronze_electrode ORDER BY 1"
     ).fetchall()
@@ -109,6 +103,20 @@ def test_faces_basic_converts_with_null_locations(tmp_path, monkeypatch):
                           (2, None, None, None, "occipital pole")]
     events = con.execute("SELECT sample_idx, event_code, event_label FROM bronze_event ORDER BY 1").fetchall()
     assert events == [(400, 7, "house"), (1200, 63, "face")]
+
+
+def test_an_ingest_carries_the_id_and_the_time_the_converter_is_handed(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    path = write_faces_basic(tmp_path)
+    con = db.connect()
+    ingest_id = "01TEST1NGEST00000000000000"
+    convert_mat.convert(con, path, convert_mat.read_faces_basic, lambda: ingest_id, lambda: FIXED_TIME)
+    audit = con.execute("SELECT ingest_id, ingested_at FROM bronze_ingest_audit").fetchall()
+    assert audit == [(ingest_id, FIXED_TIME)]
+    keys = keyring.open_keyring()
+    hosts = keys.execute("SELECT created_at FROM host_map").fetchall()
+    keys.close()
+    assert hosts == [(FIXED_TIME,)], "the keyring is handed the same clock"
 
 
 def test_fingerflex_glob_takes_only_the_data_files(tmp_path):
