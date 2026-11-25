@@ -161,8 +161,8 @@ def connect(database: str = ":memory:"):
     # Spill files belong under DATA_DIR, spec 7; the default is the working directory, the repo.
     (data_dir() / "tmp").mkdir(parents=True, exist_ok=True)
     con.execute(f"SET temp_directory = '{(data_dir() / 'tmp').as_posix()}'")
-    # Every ORDER BY in sql/ is explicit, so arrival order is not kept. The value and the
-    # failure it answers are in pipeline/settings.py.
+    # Every ORDER BY in sql/ is explicit, so arrival order is not kept. The value is in
+    # pipeline/settings.py.
     con.execute(f"SET preserve_insertion_order = {settings.PRESERVE_INSERTION_ORDER}")
     views(con)
     run_sql(con, SQL / "lineage" / "lid_generated.sql")

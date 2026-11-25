@@ -13,8 +13,8 @@ FETCH_TIMEOUT_S = 120
 FETCH_CHUNK_BYTES = 1 << 20
 
 # DuckDB's preserve_insertion_order, as the text SET takes, pipeline/db.py. Every ORDER BY in
-# sql/ is explicit. Keeping arrival order across parallel joins held 12 GB of Silver in memory
-# on gold/channel_quality and failed on 871 million rows.
+# sql/ is explicit, so DuckDB is not asked to keep arrival order across parallel operators.
+# docs/lessons-learned.md section 7 says why the setting stayed.
 PRESERVE_INSERTION_ORDER = "false"
 
 # The Parquet format version of every Silver dataset, ADR-0007.
