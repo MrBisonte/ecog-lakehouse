@@ -166,8 +166,8 @@ def other_sections(existing: str) -> str:
     return ""
 
 
-def main(argv=None) -> int:
-    con = db.connect()
+def stage(con):
+    """The two temp tables TABLE reads: the recording files on disk and the canary subjects."""
     con.execute("CREATE TEMP TABLE build_files (layer VARCHAR, experiment VARCHAR, bytes BIGINT)")
     con.executemany(
         "INSERT INTO build_files (layer, experiment, bytes) VALUES (?, ?, ?)",
@@ -177,6 +177,11 @@ def main(argv=None) -> int:
     con.executemany(
         "INSERT INTO canary (subject_src) VALUES (?)", [(s,) for s in convert_mat.CANARY_SUBJECTS]
     )
+
+
+def main(argv=None) -> int:
+    con = db.connect()
+    stage(con)
     commit, duckdb_version, files, wall_clock = con.execute(BUILD).fetchone()
     text = "\n".join([
         "# Benchmarks",
