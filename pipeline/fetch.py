@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from pipeline import db
+from pipeline import db, settings
 
 SOURCES = db.REPO / "governance" / "sources.csv"
 
@@ -26,7 +26,7 @@ def download(url: str, target: Path):
     """Fetch url to target, appending to a partial file when the server honours Range."""
     have = target.stat().st_size if target.exists() else 0
     request = Request(url, headers={"Range": f"bytes={have}-"} if have else {})
-    with urlopen(request, timeout=120) as response:
+    with urlopen(request, timeout=settings.FETCH_TIMEOUT_S) as response:
         resume = have > 0 and response.status == 206
         with target.open("ab" if resume else "wb") as f:
             shutil.copyfileobj(response, f, 1 << 20)
