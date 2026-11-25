@@ -10,7 +10,8 @@ LAYER = {"bronze": 1, "silver": 2, "gold": 3}
 DATASET = "gold/dataset_manifest"
 
 
-def row(con, dataset: str, produced_at, commit: str) -> tuple:
+def row(con, dataset: str, produced_at, commit: str) -> dict:
+    """The manifest row of one dataset, keyed by the column names of the contract."""
     view = db.view_name(dataset)
     columns = {r[0] for r in con.execute(f"DESCRIBE {view}").fetchall()}
     if "lid" in columns:
@@ -22,9 +23,17 @@ def row(con, dataset: str, produced_at, commit: str) -> tuple:
     else:
         n, lo, hi = con.execute(f"SELECT count(*) FROM {view}").fetchone()[0], None, None
         digests = con.execute("SELECT sha256 FROM lineage_dim ORDER BY 1").fetchall()
-    layer = LAYER[dataset.split("/")[0]]
-    return (db.dataset_version(dataset), dataset, layer, lo, hi, n, [d[0] for d in digests],
-            produced_at, commit)
+    return {
+        "dataset_version": db.dataset_version(dataset),
+        "dataset": dataset,
+        "layer": LAYER[dataset.split("/")[0]],
+        "lid_lo": lo,
+        "lid_hi": hi,
+        "n_records": n,
+        "file_digests": [d[0] for d in digests],
+        "produced_at": produced_at,
+        "git_commit": commit,
+    }
 
 
 def write(con, utc_now) -> int:
@@ -37,12 +46,7 @@ def write(con, utc_now) -> int:
         for d in db.DATASETS
         if d != DATASET and any((db.data_dir() / d).rglob("*.parquet"))
     ]
-    con.execute(f"CREATE OR REPLACE TEMP TABLE manifest_build ({db.columns(DATASET)})")
-    con.executemany(
-        "INSERT INTO manifest_build (dataset_version, dataset, layer, lid_lo, lid_hi, n_records, "
-        "file_digests, produced_at, git_commit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        rows,
-    )
+    db.stage_rows(con, "manifest_build", DATASET, rows)
     target = db.data_dir() / DATASET / "data_0.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
     con.execute(f"COPY (SELECT * FROM manifest_build ORDER BY dataset) TO '{target.as_posix()}' (FORMAT parquet)")

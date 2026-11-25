@@ -14,6 +14,20 @@ def load(path):
     return doc["name"], obj
 
 
+def test_a_row_that_differs_from_its_contract_is_refused(tmp_path, monkeypatch):
+    """A column on one side only stops the write. It is never filled with NULL."""
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    con = db.connect()
+    row = dict.fromkeys(db.column_names("gold/dataset_manifest"))
+    db.stage_rows(con, "staged", "gold/dataset_manifest", [row])
+    assert con.execute("SELECT count(*) FROM staged").fetchone() == (1,)
+    short = {k: v for k, v in row.items() if k != "git_commit"}
+    with pytest.raises(ValueError, match="git_commit"):
+        db.stage_rows(con, "staged", "gold/dataset_manifest", [short])
+    with pytest.raises(ValueError, match="not_in_the_contract"):
+        db.stage_rows(con, "staged", "gold/dataset_manifest", [{**row, "not_in_the_contract": 1}])
+
+
 def test_one_contract_per_silver_and_gold_dataset():
     assert [load(p)[0] for p in CONTRACTS] == sorted(
         d for d in db.DATASETS if not d.startswith("bronze/")

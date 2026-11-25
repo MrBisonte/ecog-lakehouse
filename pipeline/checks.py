@@ -221,6 +221,15 @@ def passes(compare: str, observed: str, expected: str) -> bool:
     return {"eq": o == e, "ge": o >= e, "le": o <= e}[compare]
 
 
+def append_evidence(con, run_id: str, rows: list[dict]):
+    """Write the rows of one run as one new file of gold/evidence. No file there is rewritten."""
+    db.stage_rows(con, "evidence_run", "gold/evidence", rows)
+    target = db.data_dir() / "gold" / "evidence" / f"run_id={run_id}"
+    target.mkdir(parents=True)
+    con.execute(f"COPY evidence_run TO '{(target / 'data_0.parquet').as_posix()}' (FORMAT parquet)")
+    db.views(con)
+
+
 def run(con, checks: list[Check], new_id, utc_now) -> list[dict]:
     """Run every check, append one evidence file for this run, return the evidence rows.
     `new_id` mints the run_id and `utc_now` stamps ran_at; the entry point hands both in."""
@@ -259,17 +268,7 @@ def run(con, checks: list[Check], new_id, utc_now) -> list[dict]:
                 "lid": None,
             }
         )
-    target = db.data_dir() / "gold" / "evidence" / f"run_id={run_id}"
-    target.mkdir(parents=True)
-    con.execute(f"CREATE OR REPLACE TEMP TABLE evidence_run ({db.columns('gold/evidence')})")
-    # Each value lands under the name of its key, whatever the column order of the contract.
-    columns = list(rows[0])
-    con.executemany(
-        f"INSERT INTO evidence_run ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})",
-        [tuple(r[c] for c in columns) for r in rows],
-    )
-    con.execute(f"COPY evidence_run TO '{(target / 'data_0.parquet').as_posix()}' (FORMAT parquet)")
-    db.views(con)
+    append_evidence(con, run_id, rows)
     return rows
 
 

@@ -87,6 +87,32 @@ def columns(dataset: str) -> str | None:
     return ", ".join(f"{p['name']} {p['physicalType']}" for p in props)
 
 
+def column_names(dataset: str) -> list[str]:
+    """The column names of a dataset with a known schema, in the order `columns` gives them."""
+    return [c.split()[0] for c in columns(dataset).split(", ")]
+
+
+def stage_rows(con, table: str, dataset: str, rows: list[dict]):
+    """A temp table with the columns of the dataset, holding `rows`, one dict for each row.
+
+    Each value lands under the name of its key, whatever the column order of the contract. A row
+    whose keys are not exactly the columns of the dataset is refused: a column added to the
+    contract and not to the row would otherwise be written as NULL.
+    """
+    names = list(rows[0])
+    odd = sorted(set(names) ^ set(column_names(dataset)))
+    if odd:
+        raise ValueError(
+            f"a {dataset} row and its contract differ on {odd}, give the row exactly the "
+            f"properties of contracts/{view_name(dataset)}.yaml"
+        )
+    con.execute(f"CREATE OR REPLACE TEMP TABLE {table} ({columns(dataset)})")
+    con.executemany(
+        f"INSERT INTO {table} ({', '.join(names)}) VALUES ({', '.join('?' * len(names))})",
+        [tuple(r[c] for c in names) for r in rows],
+    )
+
+
 # Append-only datasets whose schema has grown: a file written before a column existed is read
 # with NULL in it, rather than breaking the view or being rewritten.
 UNION_BY_NAME = {"gold/evidence"}
