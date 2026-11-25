@@ -25,7 +25,7 @@ semantic:
 
 # db.py opens the connection every script is handed. keyring.py opens keyring.duckdb, the one
 # database outside the layers, and mints its secret. clock.py reads the wall clock. lid.py mints
-# the ULID of an ingest and of a checks run.
+# the ULID of an ingest and of a checks run, from the clock and random bits.
 edge:
   - pipeline/db.py
   - pipeline/keyring.py
@@ -33,14 +33,14 @@ edge:
   - pipeline/lid.py
 
 exceptions:
-  # The check generator parses a statement before any connection exists.
+  # The check generator takes no connection. It parses each statement on an engine of its own.
   - path: pipeline/checks.py
     rule: 10
     match: "duckdb.connect("
     reason: an engine in memory that holds no data, opened to parse generated SQL
 
-  # The planted faults, doc/spec.md section 6. A plant is never fixed. Its fix is the text the
-  # spec prints, run by the DuckDB CLI, which has no renderer to hand it a value.
+  # The planted faults, doc/spec.md section 6. A plant is never fixed. The fix of Fault A is the
+  # text the spec prints, run by the DuckDB CLI, which has no renderer to hand it a value.
   - path: faults/a/plant.sql
     rule: 1
     match: "ROW_GROUP_SIZE 100000000"
@@ -53,10 +53,6 @@ exceptions:
     rule: 1
     match: "ROW_GROUP_SIZE 198656"
     reason: the fix of Fault A as doc/spec.md section 6 prints it, run by the DuckDB CLI
-  - path: faults/a/encodings.py
-    rule: 1
-    match: "ROW_GROUP_SIZE 198656"
-    reason: a measurement of the fixed layout of Fault A, at the row group size of faults/a/fix.sql
   - path: faults/d/plant.py
     rule: 1
     match: "timeout=60"
@@ -65,6 +61,13 @@ exceptions:
     rule: 1
     match: "timeout=60"
     reason: the proxy that plants Fault F, a bench fixture outside the pipeline
+
+  # A measurement beside Fault A, not a plant. It writes the layout of faults/a/fix.sql again
+  # and keeps the row group size written there.
+  - path: faults/a/encodings.py
+    rule: 1
+    match: "ROW_GROUP_SIZE 198656"
+    reason: a measurement of the fixed layout of Fault A, at the row group size of faults/a/fix.sql
 
   # A bench measures an engine it opens itself.
   - path: faults/a/http_stats.py
