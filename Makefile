@@ -1,4 +1,4 @@
-.PHONY: all fetch synth bronze silver gold checks publish bench test lint lineage sbom
+.PHONY: all fetch synth bronze silver gold checks publish bench test lint lineage sbom storyline
 PY ?= python3
 SYNTH ?= 0
 ARCH_STANDARDS ?= ../arch-standards
@@ -43,3 +43,8 @@ lint:
 # CycloneDX 1.6 bill of materials of the installed environment, the project as root component.
 sbom:
 	cyclonedx-py environment --pyproject pyproject.toml --mc-type application --sv 1.6 --of JSON --output-reproducible -o sbom.cdx.json
+
+# The data flow of sql/ as a picture, drawn by SqlStoryLine from storyline.yaml. Run it after the SQL changes.
+# The build, the tests and CI never call it, so SqlStoryLine is not a dependency.
+storyline:
+	sqlstoryline export --format svg --out docs/storyline.svg .

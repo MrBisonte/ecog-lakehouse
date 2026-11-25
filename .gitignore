@@ -10,6 +10,7 @@
 !pyproject.toml
 !requirements.lock
 !CITATION.cff
+!storyline.yaml
 !REUSE.toml
 !LICENSES/*.txt
 !sbom.cdx.json
@@ -28,6 +29,7 @@
 !governance/*.csv
 !docs/index.html
 !docs/*.md
+!docs/storyline.svg
 !/docs/data/LICENSE.md
 # Bulk data never enters the repository, whatever the extension.
 /data/
