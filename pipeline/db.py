@@ -78,45 +78,74 @@ def run_sql(con, path: Path, **values):
     con.execute(render(path.read_text(encoding="utf-8"), **values))
 
 
+def contract_path(dataset: str) -> Path:
+    """`gold/evidence` is declared by `contracts/gold_evidence.yaml`. Bronze has no contract."""
+    return REPO / "contracts" / f"{view_name(dataset)}.yaml"
+
+
+def contract_columns(dataset: str) -> list[tuple[str, str]] | None:
+    """Name and physical type of each property of the dataset's contract, in the order of the
+    contract. None for a dataset with no contract."""
+    path = contract_path(dataset)
+    if not path.exists():
+        return None
+    props = yaml.safe_load(path.read_text(encoding="utf-8"))["schema"][0]["properties"]
+    return [(p["name"], p["physicalType"]) for p in props]
+
+
+def column_list(declared: list[tuple[str, str]]) -> str:
+    """`name TYPE, ...`, the text a CREATE TABLE takes between its brackets."""
+    return ", ".join(f"{name} {kind}" for name, kind in declared)
+
+
 def columns(dataset: str) -> str | None:
     """`name TYPE, ...` of a dataset: inline for Bronze, from its contract for Silver and Gold."""
     if dataset in EMPTY:
         return EMPTY[dataset]
-    contract = REPO / "contracts" / f"{view_name(dataset)}.yaml"
-    if not contract.exists():
-        return None
-    props = yaml.safe_load(contract.read_text(encoding="utf-8"))["schema"][0]["properties"]
-    return ", ".join(f"{p['name']} {p['physicalType']}" for p in props)
+    declared = contract_columns(dataset)
+    return None if declared is None else column_list(declared)
 
 
-def column_names(dataset: str) -> list[str]:
-    """The column names of a dataset with a known schema, in the order `columns` gives them."""
-    return [c.split()[0] for c in columns(dataset).split(", ")]
+def staging_columns(dataset: str, rows: list[dict]) -> list[tuple[str, str]]:
+    """The columns of the contract that `rows` are staged under.
 
-
-def stage_rows(con, table: str, dataset: str, rows: list[dict]):
-    """A temp table with the columns of the dataset, holding `rows`, one dict for each row.
-
-    Each value lands under the name of its key, whatever the column order of the contract. Every
-    row is held to the contract: the first one whose keys are not exactly the columns of the
-    dataset is refused by its position, since a column added to the contract and not to the row
-    would otherwise be written as NULL. No rows is refused as well: there is nothing to write.
+    Refused, each with the contract file named: a dataset with no contract, no rows, and the
+    first row whose keys are not exactly the properties of the contract.
     """
-    contract = f"contracts/{view_name(dataset)}.yaml"
+    contract = contract_path(dataset).relative_to(REPO).as_posix()
+    declared = contract_columns(dataset)
+    if declared is None:
+        raise ValueError(
+            f"{dataset} has no contract to stage rows by, {contract} does not exist, every "
+            "Silver and Gold dataset of db.DATASETS has one"
+        )
     if not rows:
         raise ValueError(
             f"no row to stage for {dataset}, hand in at least one row with the properties of "
             f"{contract}"
         )
-    names = column_names(dataset)
+    names = {name for name, _ in declared}
     for at, row in enumerate(rows, start=1):
-        odd = sorted(set(names) ^ set(row))
+        odd = sorted(names ^ set(row))
         if odd:
             raise ValueError(
                 f"row {at} of {len(rows)} for {dataset} and its contract differ on {odd}, give "
                 f"every row exactly the properties of {contract}"
             )
-    con.execute(f"CREATE OR REPLACE TEMP TABLE {table} ({columns(dataset)})")
+    return declared
+
+
+def stage_rows(con, table: str, dataset: str, rows: list[dict]):
+    """A temp table with the columns of the dataset's contract, holding `rows`, one dict for
+    each row.
+
+    Each value lands under the name of its key, whatever the column order of the contract.
+    `staging_columns` decides first whether the rows may be staged: a column added to the
+    contract and not to a row would otherwise be written as NULL.
+    """
+    declared = staging_columns(dataset, rows)
+    names = [name for name, _ in declared]
+    con.execute(f"CREATE OR REPLACE TEMP TABLE {table} ({column_list(declared)})")
     con.executemany(
         f"INSERT INTO {table} ({', '.join(names)}) VALUES ({', '.join('?' * len(names))})",
         [tuple(r[c] for c in names) for r in rows],
