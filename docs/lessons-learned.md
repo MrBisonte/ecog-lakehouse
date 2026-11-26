@@ -127,7 +127,7 @@ Sources: plans and scan count from commit `b0a3609`, 2026-10-02; 2,107 from comm
 | Piece | Where | Why |
 |---|---|---|
 | Spill files under `DATA_DIR/tmp` | `pipeline/db.py` | The Windows mount refused the spill file |
-| `preserve_insertion_order = false` | `pipeline/db.py` | Did not fix the failure; kept because every `ORDER BY` in `sql/` is explicit |
+| `preserve_insertion_order = false` | `pipeline/settings.py`, read by `pipeline/db.py` | Did not fix the failure; kept because every `ORDER BY` in `sql/` is explicit |
 | Zero byte Parquet removed at connect | `pipeline/db.py`, tested | An aborted write left an empty file that broke the next run |
 | Rails derived from the first pass | `sql/gold/010_*.sql`, `030_*.sql` | Section 1 |
 | Verifier runs under `$HOME` | `~/verify_phase1.sh` | `/tmp` is a 7.6 GB RAM disk in this WSL and filled up |
