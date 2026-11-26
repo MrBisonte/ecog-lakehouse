@@ -34,6 +34,18 @@ def test_a_row_that_differs_from_its_contract_is_refused():
         db.stage_rows(con, "staged", MANIFEST, [{**row, "not_in_the_contract": 1}])
 
 
+def test_every_row_is_held_to_its_contract():
+    """A later row is checked as the first is. The refusal names the row and the contract."""
+    con = duckdb.connect()
+    row = manifest_row()
+    short = {k: v for k, v in row.items() if k != "git_commit"}
+    named = r"row 2 of 2 .*{}.*contracts/gold_dataset_manifest\.yaml"
+    with pytest.raises(ValueError, match=named.format("git_commit")):
+        db.stage_rows(con, "staged", MANIFEST, [row, short])
+    with pytest.raises(ValueError, match=named.format("not_in_the_contract")):
+        db.stage_rows(con, "staged", MANIFEST, [row, {**row, "not_in_the_contract": 1}])
+
+
 def test_no_rows_to_stage_is_refused():
     """Nothing to write is a refusal that names the contract, not an index error."""
     with pytest.raises(ValueError, match=r"no row .*contracts/gold_dataset_manifest\.yaml"):

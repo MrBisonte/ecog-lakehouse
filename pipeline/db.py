@@ -97,10 +97,10 @@ def column_names(dataset: str) -> list[str]:
 def stage_rows(con, table: str, dataset: str, rows: list[dict]):
     """A temp table with the columns of the dataset, holding `rows`, one dict for each row.
 
-    Each value lands under the name of its key, whatever the column order of the contract. A row
-    whose keys are not exactly the columns of the dataset is refused: a column added to the
-    contract and not to the row would otherwise be written as NULL. No rows is refused as well:
-    there is nothing to write.
+    Each value lands under the name of its key, whatever the column order of the contract. Every
+    row is held to the contract: the first one whose keys are not exactly the columns of the
+    dataset is refused by its position, since a column added to the contract and not to the row
+    would otherwise be written as NULL. No rows is refused as well: there is nothing to write.
     """
     contract = f"contracts/{view_name(dataset)}.yaml"
     if not rows:
@@ -108,13 +108,14 @@ def stage_rows(con, table: str, dataset: str, rows: list[dict]):
             f"no row to stage for {dataset}, hand in at least one row with the properties of "
             f"{contract}"
         )
-    names = list(rows[0])
-    odd = sorted(set(names) ^ set(column_names(dataset)))
-    if odd:
-        raise ValueError(
-            f"a {dataset} row and its contract differ on {odd}, give the row exactly the "
-            f"properties of {contract}"
-        )
+    names = column_names(dataset)
+    for at, row in enumerate(rows, start=1):
+        odd = sorted(set(names) ^ set(row))
+        if odd:
+            raise ValueError(
+                f"row {at} of {len(rows)} for {dataset} and its contract differ on {odd}, give "
+                f"every row exactly the properties of {contract}"
+            )
     con.execute(f"CREATE OR REPLACE TEMP TABLE {table} ({columns(dataset)})")
     con.executemany(
         f"INSERT INTO {table} ({', '.join(names)}) VALUES ({', '.join('?' * len(names))})",
