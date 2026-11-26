@@ -836,7 +836,7 @@ Pages itself (Settings, Pages, source `master`, folder `/docs`; then "a stranger
 
 ## Design gate, 2026-11-25
 
-- Status: branch `feat/design-gate`, cut from master `513d285`. Fourteen commits, one for each change, then this entry. On 2026-11-26 a review of the pull request found three defects in `db.stage_rows`: three more commits, one for each, and this entry follows them.
+- Status: branch `feat/design-gate`, cut from master `513d285`. Fourteen commits, one for each change, then this entry. On 2026-11-26 a review of the pull request found three defects in `db.stage_rows` and two lines of the pages that did not follow the branch: five more commits, one for each, and this entry follows them.
 - Source: the design rules of arch-standards, `code/design/SPEC.md`. A text scan of that repository checks rules 1, 2, 9 and 10 against `.design.yaml`. It ran from a checkout at `c3dfcc6`. No file of that repository is in this one.
 - Alex chose: the Silver writers are fixed on this branch, and the four lines `docs/five-records.md` quotes from them follow.
 
@@ -862,6 +862,7 @@ The first run of the scan, before any change, with no settings home and no excep
 - Rule 1, 7 excepted, all under `faults/`: the row group size Fault A plants, the two values of its fix as spec 6 prints them, the encodings measurement of that layout, and three timeouts in the plants of Faults D and F. A planted fault is never fixed.
 - `.design.yaml`, with nine exceptions that each name their text and their reason. `.gitignore` allows it. README, "Design rules": the four rules checked, and how the scan runs from a checkout, reached through `ARCH_STANDARDS`.
 - `docs/five-records.md`: the four lines it quotes from `sql/silver/020_record.sql`, `030_recording.sql`, `040_electrode.sql` and `050_event.sql`.
+- `docs/lessons-learned.md`: one cell of section 7, the place of `preserve_insertion_order = false`.
 - Tests: 122 to 133. The retention test hands in a fixed clock in place of ageing a file. New: a retention check with no clock is refused, a retention row of a requirements table is aged by the clock handed in, an evidence run, an ingest, the manifest and the keyring each carry the time they are handed, and five tests of `db.stage_rows`: a row that differs from its contract is refused, in any position of the rows, no rows are refused, a dataset with no contract is refused, and a physical type that holds a comma is one column.
 
 ### Checked
@@ -872,8 +873,9 @@ The first run of the scan, before any change, with no settings home and no excep
 - Master `513d285` from a clean clone in the same environment: 122 passed.
 - The diff against `origin/master`: 0 absolute paths, 0 lines with the private marker of arch-standards, 0 files that also exist under its `scripts/`. The checkout of arch-standards was clean after the runs.
 - An independent review of the branch against the design rules, the spec and `CLAUDE.md`. Its findings in the diff are the next section.
-- A review of the pull request on 2026-11-26. Its three findings, all in `db.stage_rows`, close the next section.
+- A review of the pull request on 2026-11-26, six findings. Five close the next section. The sixth stays as it is: `checks.generate` takes the clock as optional, and refuses a retention check with none.
 - After those three fixes, clean clone at `c803ab4` in the same environment: `make lint` exit 0, ruff clean, 20 pages pass; `make test` 133 passed in 23.03 s; `make all SYNTH=1` exit 0 in 22 s, run `01M8CSSWSZBHHRFFT3ERJCK5WW`, 111 checks pass, 0 blocking, `publish` 9 files, 70,572,467 bytes. The scan on the tree: `design: pass, 0 findings, 0 stale exceptions`, exit 0.
+- After the two page fixes, clean clone at `3796dab`: `make lint` exit 0, 20 pages pass; `make test` 133 passed in 22.62 s.
 
 ### Failed, then fixed
 
@@ -887,6 +889,8 @@ The first run of the scan, before any change, with no settings home and no excep
 - Pull request review: `db.stage_rows` compared the first row only with the contract. A later row with a key the contract lacks was staged with that value dropped, and a later row that lacked a column ended in a `KeyError`. Every row is compared, and the refusal names the position of the row and the columns that differ.
 - Pull request review: `db.stage_rows` with no rows ended in an `IndexError`. It is a `ValueError` that names the dataset and its contract. The write is refused as before.
 - Pull request review: `db.column_names` split on `, ` the text `db.columns` had joined. A physical type that holds a comma would have given a false column, and a dataset with no contract ended in an `AttributeError`. No contract holds such a type. `db.contract_columns` reads the name and the type of each property, `db.staging_columns` holds the three refusals, and `column_names` is gone.
+- Pull request review: section 7 of `docs/lessons-learned.md` still named `pipeline/db.py` as the place of `preserve_insertion_order = false`. The cell reads `pipeline/settings.py`, read by `pipeline/db.py`.
+- Pull request review: the README gave the command of the scan with no word that arch-standards is a private repository. One sentence says so, and that the command records how the check was run.
 
 ### Not checked
 
