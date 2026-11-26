@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pipeline import checks, db
+from pipeline import checks, clock, db
 
 FILE_LIMIT = 95 * 1024**2
 TOTAL_LIMIT = 500 * 1024**2
@@ -78,13 +78,14 @@ def entry(rel: str, path: Path) -> dict:
 
 
 def browser_checks() -> list[dict]:
-    """The checks the page reruns: Gold datasets, kinds that need only the views and lid.sql."""
+    """The checks the page reruns: Gold datasets, kinds that need only the views and lid.sql.
+    The generator is handed the clock for the retention kind, which is not one of them."""
     return [
         {"check_id": c.check_id, "requirement_id": c.requirement_id, "framework": c.framework,
          "dataset": c.dataset, "check_kind": c.check_kind, "severity": c.severity,
          "clause": c.clause, "control": c.control, "sql": c.sql, "expected": c.expected,
          "compare": c.compare}
-        for c in checks.from_requirements() + checks.from_contracts()
+        for c in checks.from_requirements(clock.utc_now) + checks.from_contracts(clock.utc_now)
         if c.dataset.startswith("gold/") and c.check_kind in BROWSER_KINDS
     ]
 

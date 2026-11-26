@@ -110,6 +110,14 @@ Fault A read differently on an earlier DuckDB 2.0 alpha build: there the fixed l
 
 Run them with `make bench`. This needs a DuckDB CLI; see `faults/lib.sh`.
 
+## Design rules
+
+A text scan of arch-standards checks `pipeline/`, `sql/` and `faults/` against four of its design rules, `code/design/SPEC.md`: a tuning value has one home, no engine is named where a result is decided, a write names its columns, and a connection, a clock or an id source is read only in an edge module. [.design.yaml](.design.yaml) declares the files, their roles and each line allowed to break a rule, with its reason. The scan is not part of this repository and CI does not run it. arch-standards is a private repository of the author, so this command records how the check was run. It runs from a checkout of arch-standards, whose path is `ARCH_STANDARDS`:
+
+```bash
+python "$ARCH_STANDARDS/scripts/design_check.py" .   # exit 0 and "design: pass" when nothing is found
+```
+
 ## Docs
 
 `doc/` holds the design and the contract, `docs/` the published site.

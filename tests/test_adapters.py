@@ -3,7 +3,9 @@
 import numpy as np
 from scipy.io import savemat
 
-from pipeline import convert_mat, db
+from pipeline import clock, convert_mat, db, keyring
+from pipeline.lid import ulid
+from tests.conftest import FIXED_TIME
 
 
 def write_fingerflex(root, code="bp", samples=3000, channels=4):
@@ -93,7 +95,7 @@ def test_faces_basic_converts_with_null_locations(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     path = write_faces_basic(tmp_path)
     con = db.connect()
-    assert convert_mat.convert(con, path, convert_mat.read_faces_basic) == 9000
+    assert convert_mat.convert(con, path, convert_mat.read_faces_basic, ulid, clock.utc_now) == 9000
     electrodes = con.execute(
         "SELECT channel_idx, x_mm, y_mm, z_mm, brain_area FROM bronze_electrode ORDER BY 1"
     ).fetchall()
@@ -101,6 +103,20 @@ def test_faces_basic_converts_with_null_locations(tmp_path, monkeypatch):
                           (2, None, None, None, "occipital pole")]
     events = con.execute("SELECT sample_idx, event_code, event_label FROM bronze_event ORDER BY 1").fetchall()
     assert events == [(400, 7, "house"), (1200, 63, "face")]
+
+
+def test_an_ingest_carries_the_id_and_the_time_the_converter_is_handed(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    path = write_faces_basic(tmp_path)
+    con = db.connect()
+    ingest_id = "01TEST1NGEST00000000000000"
+    convert_mat.convert(con, path, convert_mat.read_faces_basic, lambda: ingest_id, lambda: FIXED_TIME)
+    audit = con.execute("SELECT ingest_id, ingested_at FROM bronze_ingest_audit").fetchall()
+    assert audit == [(ingest_id, FIXED_TIME)]
+    keys = keyring.open_keyring()
+    hosts = keys.execute("SELECT created_at FROM host_map").fetchall()
+    keys.close()
+    assert hosts == [(FIXED_TIME,)], "the keyring is handed the same clock"
 
 
 def test_fingerflex_glob_takes_only_the_data_files(tmp_path):
@@ -114,6 +130,6 @@ def test_v73_file_is_skipped_with_a_reason(tmp_path, monkeypatch, capsys):
     path = tmp_path / "hd_fingerflex.mat"
     path.write_bytes(b"MATLAB 7.3 MAT-file, Platform: GLNXA64".ljust(128) + b"\x89HDF\r\n\x1a\n")
     con = db.connect()
-    assert convert_mat.convert(con, path, convert_mat.read_fingerflex) == 0
+    assert convert_mat.convert(con, path, convert_mat.read_fingerflex, ulid, clock.utc_now) == 0
     assert "ADR-0005" in capsys.readouterr().out
     assert con.execute("SELECT count(*) FROM bronze_ingest_audit").fetchone()[0] == 0

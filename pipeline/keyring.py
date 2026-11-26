@@ -14,7 +14,6 @@ import hmac
 import platform
 import secrets
 import socket
-from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
@@ -24,10 +23,6 @@ from pipeline import db
 
 def path():
     return db.data_dir() / "keyring.duckdb"
-
-
-def now():
-    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def open_keyring():
@@ -48,7 +43,7 @@ def open_keyring():
         "(accessed_at TIMESTAMP, actor VARCHAR, purpose VARCHAR, subject_pid VARCHAR)"
     )
     if not con.execute("SELECT count(*) FROM secret").fetchone()[0]:
-        con.execute("INSERT INTO secret VALUES (?)", [secrets.token_hex(32)])
+        con.execute("INSERT INTO secret (hex) VALUES (?)", [secrets.token_hex(32)])
     return con
 
 
@@ -56,15 +51,17 @@ def pid(secret_hex: str, subject_src: str) -> str:
     return hmac.new(bytes.fromhex(secret_hex), subject_src.encode(), hashlib.sha256).hexdigest()[:16]
 
 
-def pseudonymise(codes) -> int:
-    """Add a key_map row for every source code not seen before. Returns rows added."""
+def pseudonymise(codes, utc_now) -> int:
+    """Add a key_map row for every source code not seen before. Returns rows added.
+    `utc_now` is the clock that stamps created_at, which Silver reads as first_seen_at."""
     con = open_keyring()
     secret = con.execute("SELECT hex FROM secret").fetchone()[0]
     known = {r[0] for r in con.execute("SELECT subject_src FROM key_map").fetchall()}
     new = sorted(set(codes) - known)
     if new:
         con.executemany(
-            "INSERT INTO key_map VALUES (?, ?, ?)", [(c, pid(secret, c), now()) for c in new]
+            "INSERT INTO key_map (subject_src, subject_pid, created_at) VALUES (?, ?, ?)",
+            [(c, pid(secret, c), utc_now()) for c in new],
         )
     con.close()
     return len(new)
@@ -77,8 +74,9 @@ def host_source() -> str:
     return f"{socket.gethostname()}/{machine}"
 
 
-def host() -> str:
-    """The pseudonym of the machine doing the ingest, ALCOA+ Attributable.
+def host(utc_now) -> str:
+    """The pseudonym of the machine doing the ingest, ALCOA+ Attributable. `utc_now` is the
+    clock that stamps the host_map row of a machine not seen before.
 
     Not cached in the process: the secret belongs to the keyring of the current DATA_DIR, so
     a cached answer would carry one lakehouse's pseudonym into another's audit rows.
@@ -88,15 +86,22 @@ def host() -> str:
     src = host_source()
     pseudonym = pid(secret, src)
     if not con.execute("SELECT count(*) FROM host_map WHERE host_src = ?", [src]).fetchone()[0]:
-        con.execute("INSERT INTO host_map VALUES (?, ?, ?)", [src, pseudonym, now()])
+        con.execute(
+            "INSERT INTO host_map (host_src, host_pid, created_at) VALUES (?, ?, ?)",
+            [src, pseudonym, utc_now()],
+        )
     con.close()
     return pseudonym
 
 
-def reidentify(subject_pid: str, actor: str, purpose: str) -> str | None:
-    """Log first, then answer. The log row exists even when the pseudonym is unknown."""
+def reidentify(subject_pid: str, actor: str, purpose: str, utc_now) -> str | None:
+    """Log first, then answer. The log row exists even when the pseudonym is unknown.
+    `utc_now` is the clock that stamps the log row."""
     con = open_keyring()
-    con.execute("INSERT INTO access_log VALUES (?, ?, ?, ?)", [now(), actor, purpose, subject_pid])
+    con.execute(
+        "INSERT INTO access_log (accessed_at, actor, purpose, subject_pid) VALUES (?, ?, ?, ?)",
+        [utc_now(), actor, purpose, subject_pid],
+    )
     row = con.execute(
         "SELECT subject_src FROM key_map WHERE subject_pid = ?", [subject_pid]
     ).fetchone()

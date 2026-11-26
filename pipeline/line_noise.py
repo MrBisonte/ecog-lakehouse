@@ -41,7 +41,7 @@ def register(con):
     con.execute("CREATE OR REPLACE TEMP TABLE line_noise (lid UUID, line_noise_ratio FLOAT)")
     rows = con.execute(EXCERPTS.format(excerpt_s=EXCERPT_S)).fetchall()
     con.executemany(
-        "INSERT INTO line_noise VALUES (?, ?)",
+        "INSERT INTO line_noise (lid, line_noise_ratio) VALUES (?, ?)",
         [(str(lid), ratio(excerpt, rate)) for lid, rate, excerpt in rows] or [(None, None)],
     )
     return len(rows)

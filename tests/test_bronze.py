@@ -119,16 +119,17 @@ def test_connect_removes_an_empty_parquet_left_by_an_aborted_write(tmp_path, mon
 
 def test_the_audit_names_the_machine_by_pseudonym_only(bronze):
     """ALCOA+ Attributable, without a device identifier in an append-only file."""
-    from pipeline import keyring
+    from pipeline import clock, keyring
 
     hosts = bronze.execute("SELECT DISTINCT ingest_host FROM bronze_ingest_audit").fetchall()
-    assert [h[0] for h in hosts] == [keyring.host()]
-    assert len(keyring.host()) == 16 and keyring.host() != keyring.host_source()
+    host = keyring.host(clock.utc_now)
+    assert [h[0] for h in hosts] == [host]
+    assert len(host) == 16 and host != keyring.host_source()
     raw = keyring.host_source()
     assert bronze.execute(
         "SELECT count(*) FROM bronze_ingest_audit WHERE ingest_host = ?", [raw]
     ).fetchone()[0] == 0
     kept = keyring.open_keyring().execute(
-        "SELECT host_src FROM host_map WHERE host_pid = ?", [keyring.host()]
+        "SELECT host_src FROM host_map WHERE host_pid = ?", [host]
     ).fetchone()
     assert kept[0] == raw, "the hostname stays in the keyring"

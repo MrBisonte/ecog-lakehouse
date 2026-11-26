@@ -316,7 +316,7 @@ COPY (
         ON u.experiment = r.experiment
     GROUP BY ALL
     ORDER BY 1
-) TO '{{data_dir}}/silver/record/data_0.parquet' (FORMAT parquet, PARQUET_VERSION v2);
+) TO '{{data_dir}}/silver/record/data_0.parquet' (FORMAT parquet, PARQUET_VERSION {{parquet_version}});
 ```
 
 </details>
@@ -384,7 +384,7 @@ COPY (
       AND r.value_raw IS NOT NULL AND NOT isnan(r.value_raw)
     ORDER BY s.lid, r.sample_idx
 ) TO '{{data_dir}}/silver/recording/experiment={{experiment}}/subject_pid={{subject_pid}}/data_0.parquet'
-(FORMAT parquet, PARQUET_VERSION v2, ROW_GROUP_SIZE 198656);
+(FORMAT parquet, PARQUET_VERSION {{parquet_version}}, ROW_GROUP_SIZE {{row_group_size}});
 ```
 
 </details>
@@ -423,7 +423,7 @@ COPY (
     JOIN keyring.key_map k USING (subject_src)
     ORDER BY lid
 ) TO '{{data_dir}}/silver/electrode'
-(FORMAT parquet, PARQUET_VERSION v2, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
+(FORMAT parquet, PARQUET_VERSION {{parquet_version}}, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
 
 -- silver/event, spec 3.2: Bronze with subject_pid for subject_src, ts_ms for sample_idx,
 -- ingest_id removed.
@@ -441,7 +441,7 @@ COPY (
     JOIN bronze_ingest_audit a USING (ingest_id)
     ORDER BY lid, ts_ms
 ) TO '{{data_dir}}/silver/event'
-(FORMAT parquet, PARQUET_VERSION v2, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
+(FORMAT parquet, PARQUET_VERSION {{parquet_version}}, PARTITION_BY (experiment, subject_pid), WRITE_PARTITION_COLUMNS, OVERWRITE);
 ```
 
 </details>

@@ -5,8 +5,8 @@ import duckdb
 import numpy as np
 import pytest
 
-from pipeline import checks, db, line_noise, publish, synth
-from tests.conftest import CHANNELS, MART_FILES, SECONDS
+from pipeline import checks, db, line_noise, manifest, publish, synth
+from tests.conftest import CHANNELS, FIXED_TIME, MART_FILES, SECONDS
 
 
 @pytest.fixture(scope="module")
@@ -95,6 +95,20 @@ def test_dataset_manifest_has_one_row_per_dataset_of_the_build(gold, built):
         "SELECT dataset_version FROM gold_dataset_manifest WHERE dataset = 'silver/recording'"
     ).fetchone()[0]
     assert silver_version == db.dataset_version("silver/recording")
+
+
+def test_the_manifest_carries_the_time_it_is_handed(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    folder = tmp_path / "silver" / "subject"
+    folder.mkdir(parents=True)
+    duckdb.connect().execute(
+        "COPY (SELECT 'a' AS subject_pid, TIMESTAMP '2026-01-01' AS first_seen_at) "
+        f"TO '{(folder / 'data_0.parquet').as_posix()}' (FORMAT parquet)"
+    )
+    con = db.connect()
+    assert manifest.write(con, lambda: FIXED_TIME) == 1
+    rows = con.execute("SELECT dataset, produced_at FROM gold_dataset_manifest").fetchall()
+    assert rows == [("silver/subject", FIXED_TIME)]
 
 
 def test_publish_writes_manifest_within_limits(built, tmp_path, monkeypatch):

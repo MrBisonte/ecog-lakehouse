@@ -1,9 +1,11 @@
+import duckdb
 import pytest
 import yaml
 
 from pipeline import db
 
 CONTRACTS = sorted((db.REPO / "contracts").glob("*.yaml"))
+MANIFEST = "gold/dataset_manifest"
 
 
 def load(path):
@@ -12,6 +14,65 @@ def load(path):
     [obj] = doc["schema"]
     assert obj["physicalName"] == doc["name"] and obj["physicalType"] == "parquet"
     return doc["name"], obj
+
+
+def manifest_row() -> dict:
+    """A row with exactly the properties of the manifest contract, every value NULL."""
+    return dict.fromkeys(name for name, _ in db.contract_columns(MANIFEST))
+
+
+def test_a_row_that_differs_from_its_contract_is_refused():
+    """A column on one side only stops the write. It is never filled with NULL."""
+    con = duckdb.connect()
+    row = manifest_row()
+    db.stage_rows(con, "staged", MANIFEST, [row])
+    assert con.execute("SELECT count(*) FROM staged").fetchone() == (1,)
+    short = {k: v for k, v in row.items() if k != "git_commit"}
+    with pytest.raises(ValueError, match="git_commit"):
+        db.stage_rows(con, "staged", MANIFEST, [short])
+    with pytest.raises(ValueError, match="not_in_the_contract"):
+        db.stage_rows(con, "staged", MANIFEST, [{**row, "not_in_the_contract": 1}])
+
+
+def test_every_row_is_held_to_its_contract():
+    """A later row is checked as the first is. The refusal names the row and the contract."""
+    con = duckdb.connect()
+    row = manifest_row()
+    short = {k: v for k, v in row.items() if k != "git_commit"}
+    named = r"row 2 of 2 .*{}.*contracts/gold_dataset_manifest\.yaml"
+    with pytest.raises(ValueError, match=named.format("git_commit")):
+        db.stage_rows(con, "staged", MANIFEST, [row, short])
+    with pytest.raises(ValueError, match=named.format("not_in_the_contract")):
+        db.stage_rows(con, "staged", MANIFEST, [row, {**row, "not_in_the_contract": 1}])
+
+
+def test_no_rows_to_stage_is_refused():
+    """Nothing to write is a refusal that names the contract, not an index error."""
+    with pytest.raises(ValueError, match=r"no row .*contracts/gold_dataset_manifest\.yaml"):
+        db.stage_rows(duckdb.connect(), "staged", MANIFEST, [])
+
+
+def test_a_type_that_holds_a_comma_is_one_column(tmp_path, monkeypatch):
+    """Names and types are the properties of the contract, never split out of a text."""
+    properties = [
+        {"name": "amount", "physicalType": "DECIMAL(10, 2)"},
+        {"name": "label", "physicalType": "VARCHAR"},
+    ]
+    (tmp_path / "contracts").mkdir()
+    (tmp_path / "contracts" / "gold_priced.yaml").write_text(
+        yaml.safe_dump({"schema": [{"properties": properties}]}), encoding="utf-8"
+    )
+    monkeypatch.setattr(db, "REPO", tmp_path)
+    con = duckdb.connect()
+    db.stage_rows(con, "staged", "gold/priced", [{"amount": 1, "label": "a"}])
+    staged = [(r[0], r[1]) for r in con.execute("DESCRIBE staged").fetchall()]
+    assert staged == [("amount", "DECIMAL(10,2)"), ("label", "VARCHAR")]
+
+
+def test_a_dataset_with_no_contract_is_refused():
+    """Bronze has no contract, so there is nothing to stage its rows by."""
+    with pytest.raises(ValueError, match=r"no contract.*contracts/bronze_event\.yaml"):
+        db.stage_rows(duckdb.connect(), "staged", "bronze/event", [{"experiment": "x"}])
 
 
 def test_one_contract_per_silver_and_gold_dataset():

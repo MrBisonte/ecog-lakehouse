@@ -11,14 +11,13 @@ it are moved to quarantine/ when the next run starts, and that file is ingested 
 import hashlib
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
 import numpy as np
 from scipy.io import loadmat
 
-from pipeline import db, keyring
+from pipeline import clock, db, keyring
 from pipeline.lid import ulid
 
 TOOL = "convert_mat.py"
@@ -232,13 +231,16 @@ def stage(con, src: Source):
         {"sample_idx": onsets.astype(np.int32), "event_code": src.stim[onsets].astype(np.int16)},
     )
     con.execute("CREATE OR REPLACE TEMP TABLE src_label (event_code SMALLINT, event_label VARCHAR)")
-    con.executemany("INSERT INTO src_label VALUES (?, ?)", list(src.labels.items()) or [(None, None)])
+    con.executemany(
+        "INSERT INTO src_label (event_code, event_label) VALUES (?, ?)",
+        list(src.labels.items()) or [(None, None)],
+    )
     con.execute(
         "CREATE OR REPLACE TEMP TABLE src_electrode "
         "(channel_idx SMALLINT, x_mm FLOAT, y_mm FLOAT, z_mm FLOAT, brain_area VARCHAR)"
     )
     con.executemany(
-        "INSERT INTO src_electrode VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO src_electrode (channel_idx, x_mm, y_mm, z_mm, brain_area) VALUES (?, ?, ?, ?, ?)",
         [
             (
                 c,
@@ -250,9 +252,10 @@ def stage(con, src: Source):
     )
 
 
-def audit_values(con, path: Path, src: Source, sha256: str) -> dict:
+def audit_values(con, path: Path, src: Source, sha256: str, utc_now) -> dict:
     """The ingest_audit row of a staged source. Computed before the first Bronze write, so a
-    failure here, the keyring held by another process or no git, leaves no file behind."""
+    failure here, the keyring held by another process or no git, leaves no file behind.
+    `utc_now` is the clock the keyring stamps a new host with."""
     # A source read from outside DATA_DIR has no path below it, so it keeps its absolute one
     # and hash_match will not find it, which is the honest answer for a file that is not here.
     root = db.data_dir()
@@ -268,12 +271,13 @@ def audit_values(con, path: Path, src: Source, sha256: str) -> dict:
         "tool": TOOL,
         "tool_version": db.git_commit(),
         "duckdb_version": duckdb.__version__,
-        "ingest_host": keyring.host(),
+        "ingest_host": keyring.host(utc_now),
     }
 
 
-def convert(con, path: Path, adapter) -> int:
-    """Write one file to Bronze. Returns rows written to bronze/recording, 0 when skipped."""
+def convert(con, path: Path, adapter, new_id, utc_now) -> int:
+    """Write one file to Bronze. Returns rows written to bronze/recording, 0 when skipped.
+    `new_id` mints the ingest_id and `utc_now` stamps ingested_at; the entry point hands both in."""
     sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     if con.execute("SELECT count(*) FROM bronze_ingest_audit WHERE sha256 = ?", [sha256]).fetchone()[0]:
         print(f"convert: skip {path}, sha256 already ingested")
@@ -290,7 +294,7 @@ def convert(con, path: Path, adapter) -> int:
         print(f"convert: skip {path}, experiment '{src.experiment}' has no lineage code")
         return 0
     stage(con, src)
-    audit = audit_values(con, path, src, sha256)
+    audit = audit_values(con, path, src, sha256, utc_now)
     for name in ("recording", "electrode", "event", "ingest_audit"):
         (db.data_dir() / "bronze" / name).mkdir(parents=True, exist_ok=True)
     values = {
@@ -300,9 +304,9 @@ def convert(con, path: Path, adapter) -> int:
         "subject_src": src.subject_src,
         "run": src.run,
         "radioactive": int(src.subject_src in CANARY_SUBJECTS),
-        "ingest_id": ulid(),
+        "ingest_id": new_id(),
         "ingest_ord": 1 + con.execute("SELECT count(*) FROM bronze_ingest_audit").fetchone()[0],
-        "ingested_at": datetime.now(UTC).replace(tzinfo=None).isoformat(sep=" "),
+        "ingested_at": utc_now().isoformat(sep=" "),
     }
     for name in ("recording", "electrode", "event"):
         db.run_sql(con, db.SQL / "bronze" / f"{name}.sql", **values)
@@ -356,7 +360,7 @@ def main(argv=None) -> int:
             continue
         adapter, pattern = ADAPTERS[directory.name]
         for path in sorted(directory.glob(pattern)):
-            total += convert(con, path, adapter)
+            total += convert(con, path, adapter, ulid, clock.utc_now)
     print(f"convert: {total} rows written")
     return 0
 

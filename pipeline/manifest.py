@@ -4,15 +4,14 @@ digest gold/evidence uses; lid_lo and lid_hi bound the records; file_digests lis
 of the source files those records came from.
 """
 
-from datetime import UTC, datetime
-
 from pipeline import db
 
 LAYER = {"bronze": 1, "silver": 2, "gold": 3}
 DATASET = "gold/dataset_manifest"
 
 
-def row(con, dataset: str, produced_at, commit: str) -> tuple:
+def row(con, dataset: str, produced_at, commit: str) -> dict:
+    """The manifest row of one dataset, keyed by the column names of the contract."""
     view = db.view_name(dataset)
     columns = {r[0] for r in con.execute(f"DESCRIBE {view}").fetchall()}
     if "lid" in columns:
@@ -24,22 +23,30 @@ def row(con, dataset: str, produced_at, commit: str) -> tuple:
     else:
         n, lo, hi = con.execute(f"SELECT count(*) FROM {view}").fetchone()[0], None, None
         digests = con.execute("SELECT sha256 FROM lineage_dim ORDER BY 1").fetchall()
-    layer = LAYER[dataset.split("/")[0]]
-    return (db.dataset_version(dataset), dataset, layer, lo, hi, n, [d[0] for d in digests],
-            produced_at, commit)
+    return {
+        "dataset_version": db.dataset_version(dataset),
+        "dataset": dataset,
+        "layer": LAYER[dataset.split("/")[0]],
+        "lid_lo": lo,
+        "lid_hi": hi,
+        "n_records": n,
+        "file_digests": [d[0] for d in digests],
+        "produced_at": produced_at,
+        "git_commit": commit,
+    }
 
 
-def write(con) -> int:
-    """One row per dataset that exists on disk, this dataset excluded. Returns rows written."""
-    produced_at = datetime.now(UTC).replace(tzinfo=None)
+def write(con, utc_now) -> int:
+    """One row per dataset that exists on disk, this dataset excluded. Returns rows written.
+    `utc_now` is the clock that stamps produced_at, handed in by the entry point."""
+    produced_at = utc_now()
     commit = db.git_commit()
     rows = [
         row(con, d, produced_at, commit)
         for d in db.DATASETS
         if d != DATASET and any((db.data_dir() / d).rglob("*.parquet"))
     ]
-    con.execute(f"CREATE OR REPLACE TEMP TABLE manifest_build ({db.columns(DATASET)})")
-    con.executemany("INSERT INTO manifest_build VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    db.stage_rows(con, "manifest_build", DATASET, rows)
     target = db.data_dir() / DATASET / "data_0.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
     con.execute(f"COPY (SELECT * FROM manifest_build ORDER BY dataset) TO '{target.as_posix()}' (FORMAT parquet)")

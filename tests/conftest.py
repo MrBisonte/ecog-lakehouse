@@ -1,5 +1,7 @@
 """One small synthetic build per test session, in a temporary DATA_DIR."""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from pipeline import checks, run, synth
@@ -9,6 +11,8 @@ CHANNELS = 16
 FILES = len(synth.SUBJECTS) * len(synth.EXPERIMENTS)
 # Files of subjects that reach the Gold marts: the canary subject stays in Silver.
 MART_FILES = (len(synth.SUBJECTS) - 1) * len(synth.EXPERIMENTS)
+# The time a test hands a unit in place of the clock: UTC with no zone, as pipeline/clock.py reads it.
+FIXED_TIME = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC).replace(tzinfo=None)
 
 
 @pytest.fixture(scope="session")
