@@ -1,9 +1,11 @@
+import duckdb
 import pytest
 import yaml
 
 from pipeline import db
 
 CONTRACTS = sorted((db.REPO / "contracts").glob("*.yaml"))
+MANIFEST = "gold/dataset_manifest"
 
 
 def load(path):
@@ -14,18 +16,28 @@ def load(path):
     return doc["name"], obj
 
 
-def test_a_row_that_differs_from_its_contract_is_refused(tmp_path, monkeypatch):
+def manifest_row() -> dict:
+    """A row with exactly the properties of the manifest contract, every value NULL."""
+    return dict.fromkeys(db.column_names(MANIFEST))
+
+
+def test_a_row_that_differs_from_its_contract_is_refused():
     """A column on one side only stops the write. It is never filled with NULL."""
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    con = db.connect()
-    row = dict.fromkeys(db.column_names("gold/dataset_manifest"))
-    db.stage_rows(con, "staged", "gold/dataset_manifest", [row])
+    con = duckdb.connect()
+    row = manifest_row()
+    db.stage_rows(con, "staged", MANIFEST, [row])
     assert con.execute("SELECT count(*) FROM staged").fetchone() == (1,)
     short = {k: v for k, v in row.items() if k != "git_commit"}
     with pytest.raises(ValueError, match="git_commit"):
-        db.stage_rows(con, "staged", "gold/dataset_manifest", [short])
+        db.stage_rows(con, "staged", MANIFEST, [short])
     with pytest.raises(ValueError, match="not_in_the_contract"):
-        db.stage_rows(con, "staged", "gold/dataset_manifest", [{**row, "not_in_the_contract": 1}])
+        db.stage_rows(con, "staged", MANIFEST, [{**row, "not_in_the_contract": 1}])
+
+
+def test_no_rows_to_stage_is_refused():
+    """Nothing to write is a refusal that names the contract, not an index error."""
+    with pytest.raises(ValueError, match=r"no row .*contracts/gold_dataset_manifest\.yaml"):
+        db.stage_rows(duckdb.connect(), "staged", MANIFEST, [])
 
 
 def test_one_contract_per_silver_and_gold_dataset():

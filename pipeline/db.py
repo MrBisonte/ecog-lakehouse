@@ -99,14 +99,21 @@ def stage_rows(con, table: str, dataset: str, rows: list[dict]):
 
     Each value lands under the name of its key, whatever the column order of the contract. A row
     whose keys are not exactly the columns of the dataset is refused: a column added to the
-    contract and not to the row would otherwise be written as NULL.
+    contract and not to the row would otherwise be written as NULL. No rows is refused as well:
+    there is nothing to write.
     """
+    contract = f"contracts/{view_name(dataset)}.yaml"
+    if not rows:
+        raise ValueError(
+            f"no row to stage for {dataset}, hand in at least one row with the properties of "
+            f"{contract}"
+        )
     names = list(rows[0])
     odd = sorted(set(names) ^ set(column_names(dataset)))
     if odd:
         raise ValueError(
             f"a {dataset} row and its contract differ on {odd}, give the row exactly the "
-            f"properties of contracts/{view_name(dataset)}.yaml"
+            f"properties of {contract}"
         )
     con.execute(f"CREATE OR REPLACE TEMP TABLE {table} ({columns(dataset)})")
     con.executemany(
